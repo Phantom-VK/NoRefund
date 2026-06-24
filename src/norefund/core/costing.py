@@ -1,16 +1,18 @@
-"""Pure cost and context calculation functions. No I/O, no state."""
+"""Pure cost and context-window calculations."""
+
+from __future__ import annotations
 
 import math
 
 from norefund.core.models_registry import ModelInfo
 
-# Tokens reserved for model output so input doesn't overflow the context window
-_RESERVED_OUTPUT_TOKENS = 1024
+# Tokens reserved for model output within the context window when chunking
+_RESERVED_OUTPUT = 1_024
 
 
 def context_usage_pct(token_count: int, context_window: int) -> float:
-    """Percentage of context window used by token_count."""
-    return round((token_count / context_window) * 100, 2)
+    """Return percentage of context window used, rounded to 2 dp."""
+    return round(token_count / context_window * 100, 2)
 
 
 def fits_in_context(token_count: int, context_window: int) -> bool:
@@ -19,17 +21,17 @@ def fits_in_context(token_count: int, context_window: int) -> bool:
 
 def min_chunks(token_count: int, context_window: int) -> int:
     """Minimum API calls needed to process the full document."""
-    usable = context_window - _RESERVED_OUTPUT_TOKENS
+    usable = context_window - _RESERVED_OUTPUT
     return math.ceil(token_count / usable)
 
 
 def input_cost(token_count: int, model: ModelInfo) -> float:
-    """Estimated cost in USD for sending token_count input tokens."""
+    """USD cost for processing token_count input tokens."""
     return (token_count / 1_000_000) * model.input_price_per_million
 
 
 def output_cost(token_count: int, model: ModelInfo) -> float:
-    """Estimated cost in USD for receiving token_count output tokens."""
+    """USD cost for token_count output tokens."""
     return (token_count / 1_000_000) * model.output_price_per_million
 
 
