@@ -1,0 +1,57 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "norefund"
+version = "0.1.0"
+description = "Know before you run. Token counter and cost estimator for LLMs."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.12"
+authors = [
+    { name = "Vikramaditya Khupse", email = "" }
+]
+keywords = ["llm", "tokens", "cost", "ai", "desktop"]
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+    "customtkinter>=5.2.2",
+    "tiktoken>=0.7.0",
+    "pypdf>=4.3.1",
+    "python-pptx>=1.0.2",
+    "python-docx>=1.1.2",
+    "PyYAML>=6.0.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.4.0",
+    "black>=24.0.0",
+    "pytest>=8.0.0",
+    "pyinstaller>=6.6.0",
+]
+
+[project.scripts]
+norefund = "norefund.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/norefund"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
