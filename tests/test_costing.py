@@ -1,5 +1,5 @@
 """Tests for pure costing functions."""
-from src.norefund.core.costing import context_usage_pct, fits_in_context, min_chunks
+from norefund.core.costing import context_usage_pct, fits_in_context, min_chunks
 
 
 def test_context_usage_pct_half():

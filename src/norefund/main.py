@@ -2,8 +2,8 @@
 
 import argparse
 
-from src.norefund.core.service import analyze_file
-from src.norefund.gui.app import App
+from norefund.core.service import analyze_file
+from norefund.gui.app import App
 
 
 def main() -> None:
