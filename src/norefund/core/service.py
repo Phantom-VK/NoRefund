@@ -1,4 +1,8 @@
-"""Service layer — orchestrates parsing, tokenisation and costing."""
+"""Service layer — orchestrates parsing, tokenisation and costing.
+
+Now includes structured logging so all key operations are captured as
+JSON log lines in the per-user log directory.
+"""
 
 from __future__ import annotations
 
@@ -15,8 +19,10 @@ from norefund.core.costing import (
 from norefund.core.models_registry import get_model
 from norefund.core.parsing import parse_file
 from norefund.core.tokenization import get_tokenizer
+from norefund.logging_config import get_logger
 
-# Supported extensions (lower-cased)
+
+_LOG = get_logger(__name__)
 _SUPPORTED = {".txt", ".md", ".pdf", ".pptx", ".docx", ".py", ".json"}
 
 
@@ -40,7 +46,7 @@ def analyze_file(path: Path, model_id: str) -> AnalysisResult:
 
     tokens = tokenizer.count(text)
 
-    return AnalysisResult(
+    result = AnalysisResult(
         file_path            = str(path),
         model_id             = model_id,
         char_count           = len(text),
@@ -52,10 +58,37 @@ def analyze_file(path: Path, model_id: str) -> AnalysisResult:
         estimated_input_cost = input_cost(tokens, model),
     )
 
+    _LOG.info(
+        "analysed_file",
+        extra={
+            "ctx": {
+                "path": result.file_path,
+                "model": result.model_id,
+                "tokens": result.token_count,
+                "context_pct": result.context_usage_pct,
+                "fits": result.fits_in_context,
+                "chunks": result.min_chunks_needed,
+                "input_cost": result.estimated_input_cost,
+            }
+        },
+    )
+
+    return result
+
 
 def analyze_folder(folder: Path, model_id: str) -> List[AnalysisResult]:
     results = []
     for f in sorted(folder.rglob("*")):
         if f.is_file() and f.suffix.lower() in _SUPPORTED:
             results.append(analyze_file(f, model_id))
+    _LOG.info(
+        "analysed_folder",
+        extra={
+            "ctx": {
+                "folder": str(folder),
+                "model": model_id,
+                "files": len(results),
+            }
+        },
+    )
     return results
