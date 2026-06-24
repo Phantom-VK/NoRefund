@@ -1,14 +1,16 @@
-"""Main view — full GUI implementation.
+"""Main view — full GUI implementation with logging pane.
 
 Layout (top to bottom):
   1. Top toolbar   — file/folder picker + model dropdown + Analyze button
   2. Results table — per-file breakdown (tokens, context %, cost, fit status)
   3. Summary bar   — total tokens, total cost, context usage bar
-  4. Status bar    — current operation message
+  4. Tabs          — [Results] [Logs]
+  5. Status bar    — current operation message
 """
 
 from __future__ import annotations
 
+import json
 import threading
 from pathlib import Path
 from tkinter import filedialog
@@ -18,11 +20,9 @@ import customtkinter as ctk
 
 from norefund.core.models_registry import ModelInfo, list_models
 from norefund.core.service import AnalysisResult, analyze_file, analyze_folder
+from norefund.logging_config import latest_log_file
 
 
-# ---------------------------------------------------------------------------
-# Colour constants (work with both light and dark CTk themes)
-# ---------------------------------------------------------------------------
 _GREEN  = "#2ecc71"
 _YELLOW = "#f39c12"
 _RED    = "#e74c3c"
@@ -37,12 +37,7 @@ def _usage_colour(pct: float) -> str:
     return _RED
 
 
-# ---------------------------------------------------------------------------
-# Small reusable widgets
-# ---------------------------------------------------------------------------
-
 class _SectionLabel(ctk.CTkLabel):
-    """Bold, slightly larger label used as a section heading."""
     def __init__(self, parent, text: str, **kw):
         super().__init__(
             parent,
@@ -53,8 +48,6 @@ class _SectionLabel(ctk.CTkLabel):
 
 
 class _ContextBar(ctk.CTkFrame):
-    """A thin progress bar with a % label for context window usage."""
-
     def __init__(self, parent, **kw):
         super().__init__(parent, fg_color="transparent", **kw)
         self._bar = ctk.CTkProgressBar(self, width=180, height=10)
@@ -76,10 +69,6 @@ class _ContextBar(ctk.CTkFrame):
         self._label.configure(text="—", text_color=_MUTED)
 
 
-# ---------------------------------------------------------------------------
-# Results table
-# ---------------------------------------------------------------------------
-
 _COLUMNS = [
     ("File",          260, "w"),
     ("Tokens",         90, "e"),
@@ -93,19 +82,14 @@ _COLUMNS = [
 
 
 class ResultsTable(ctk.CTkScrollableFrame):
-    """Scrollable grid that renders one row per AnalysisResult."""
-
-    _HEADER_FG  = ("#e5e5e5", "#2b2b2b")   # light / dark
+    _HEADER_FG  = ("#e5e5e5", "#2b2b2b")
     _ROW_EVEN   = ("#f9f9f9", "#222222")
     _ROW_ODD    = ("#f0f0f0", "#1e1e1e")
-    _FONT_HDR   = ctk.CTkFont
-    _FONT_ROW   = ctk.CTkFont
 
     def __init__(self, parent, **kw):
         super().__init__(parent, **kw)
         self._draw_header()
 
-    # ------------------------------------------------------------------
     def _draw_header(self) -> None:
         font = ctk.CTkFont(size=12, weight="bold")
         for col, (name, width, anchor) in enumerate(_COLUMNS):
@@ -119,15 +103,12 @@ class ResultsTable(ctk.CTkScrollableFrame):
                 corner_radius=0,
             ).grid(row=0, column=col, padx=1, pady=(0, 2), sticky="ew")
 
-    # ------------------------------------------------------------------
     def clear(self) -> None:
-        """Remove all data rows (keep header)."""
         for widget in self.winfo_children():
             info = widget.grid_info()
             if info and int(info["row"]) > 0:
                 widget.destroy()
 
-    # ------------------------------------------------------------------
     def add_result(self, result: AnalysisResult, row_idx: int) -> None:
         bg = self._ROW_EVEN if row_idx % 2 == 0 else self._ROW_ODD
         font = ctk.CTkFont(size=12)
@@ -158,7 +139,7 @@ class ResultsTable(ctk.CTkScrollableFrame):
             if text_color:
                 kw["text_color"] = text_color
             ctk.CTkLabel(self, **kw).grid(
-                row=row_idx + 1,   # +1 for header
+                row=row_idx + 1,
                 column=col,
                 padx=1,
                 pady=1,
@@ -166,30 +147,21 @@ class ResultsTable(ctk.CTkScrollableFrame):
             )
 
 
-# ---------------------------------------------------------------------------
-# Summary panel
-# ---------------------------------------------------------------------------
-
 class _SummaryPanel(ctk.CTkFrame):
-    """Bottom strip: total tokens, total cost, aggregate context bar."""
-
     def __init__(self, parent, **kw):
         super().__init__(parent, **kw)
         self.columnconfigure((0, 1, 2, 3, 4, 5), weight=1)
 
-        # Total tokens
         ctk.CTkLabel(self, text="Total tokens:", font=ctk.CTkFont(size=12, weight="bold")).grid(
             row=0, column=0, padx=(16, 4), pady=8, sticky="e")
         self._lbl_tokens = ctk.CTkLabel(self, text="—", font=ctk.CTkFont(size=12))
         self._lbl_tokens.grid(row=0, column=1, padx=(0, 24), pady=8, sticky="w")
 
-        # Estimated cost
         ctk.CTkLabel(self, text="Est. input cost:", font=ctk.CTkFont(size=12, weight="bold")).grid(
             row=0, column=2, padx=(0, 4), pady=8, sticky="e")
         self._lbl_cost = ctk.CTkLabel(self, text="—", font=ctk.CTkFont(size=12))
         self._lbl_cost.grid(row=0, column=3, padx=(0, 24), pady=8, sticky="w")
 
-        # Context bar (aggregate)
         ctk.CTkLabel(self, text="Context usage:", font=ctk.CTkFont(size=12, weight="bold")).grid(
             row=0, column=4, padx=(0, 4), pady=8, sticky="e")
         self._ctx_bar = _ContextBar(self)
@@ -210,13 +182,55 @@ class _SummaryPanel(ctk.CTkFrame):
         self._ctx_bar.reset()
 
 
-# ---------------------------------------------------------------------------
-# Main view
-# ---------------------------------------------------------------------------
+class LogsView(ctk.CTkFrame):
+    """Read-only view that shows the latest JSON log file.
+
+    - The file is resolved via logging_config.latest_log_file()
+    - The user can refresh to re-read the file while the app is running
+    - Lines are parsed and prettified for readability
+    """
+
+    def __init__(self, parent, **kw):
+        super().__init__(parent, **kw)
+
+        self._text = ctk.CTkTextbox(self, wrap="none", font=ctk.CTkFont(size=11))
+        self._text.pack(fill="both", expand=True, padx=8, pady=8)
+
+        btn_bar = ctk.CTkFrame(self)
+        btn_bar.pack(fill="x", padx=8, pady=(0, 8))
+
+        ctk.CTkButton(btn_bar, text="Refresh", width=90, command=self._refresh).pack(
+            side="left", padx=(0, 8), pady=4
+        )
+        self._lbl_path = ctk.CTkLabel(btn_bar, text="No log file yet", anchor="w")
+        self._lbl_path.pack(side="left", padx=(0, 8), pady=4)
+
+    def _refresh(self) -> None:
+        path = latest_log_file()
+        self._text.delete("1.0", "end")
+        if not path:
+            self._lbl_path.configure(text="No log file found")
+            return
+
+        self._lbl_path.configure(text=str(path))
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                        pretty = json.dumps(obj, indent=2, ensure_ascii=False)
+                        self._text.insert("end", pretty + "\n\n")
+                    except json.JSONDecodeError:
+                        # Fallback: show raw line
+                        self._text.insert("end", line + "\n")
+        except OSError as exc:
+            self._text.insert("end", f"Error reading log file: {exc}\n")
+
 
 class MainView(ctk.CTkFrame):
-    """Root frame — assembles toolbar, table, summary and status bar."""
-
     def __init__(self, parent: ctk.CTk) -> None:
         super().__init__(parent, fg_color="transparent")
         self._results:  List[AnalysisResult] = []
@@ -224,36 +238,24 @@ class MainView(ctk.CTkFrame):
         self._model_map: dict[str, ModelInfo] = {m.display_name: m for m in self._models}
 
         self._build_toolbar()
-        self._build_table()
+        self._build_tabs()
         self._build_summary()
         self._build_status()
-
-    # ------------------------------------------------------------------
-    # Layout builders
-    # ------------------------------------------------------------------
 
     def _build_toolbar(self) -> None:
         bar = ctk.CTkFrame(self, corner_radius=8)
         bar.pack(fill="x", padx=12, pady=(12, 6))
 
-        # ── File / folder pickers ──────────────────────────────────────
+        ctk.CTkButton(bar, text="📄 Add File", width=110, command=self._pick_file).pack(
+            side="left", padx=(12, 6), pady=8
+        )
+        ctk.CTkButton(bar, text="📁 Add Folder", width=120, command=self._pick_folder).pack(
+            side="left", padx=(0, 6), pady=8
+        )
         ctk.CTkButton(
-            bar, text="📄 Add File", width=110,
-            command=self._pick_file,
-        ).pack(side="left", padx=(12, 6), pady=8)
-
-        ctk.CTkButton(
-            bar, text="📁 Add Folder", width=120,
-            command=self._pick_folder,
-        ).pack(side="left", padx=(0, 6), pady=8)
-
-        ctk.CTkButton(
-            bar, text="✕ Clear", width=80,
-            fg_color="transparent", border_width=1,
-            command=self._clear,
+            bar, text="✕ Clear", width=80, fg_color="transparent", border_width=1, command=self._clear
         ).pack(side="left", padx=(0, 16), pady=8)
 
-        # ── Model selector ─────────────────────────────────────────────
         _SectionLabel(bar, text="Model:").pack(side="left", padx=(0, 6))
         names = [m.display_name for m in self._models]
         self._model_var = ctk.StringVar(value=names[0] if names else "")
@@ -265,30 +267,39 @@ class MainView(ctk.CTkFrame):
             command=self._on_model_change,
         ).pack(side="left", padx=(0, 16), pady=8)
 
-        # ── Output tokens input (for cost estimate) ────────────────────
         _SectionLabel(bar, text="Est. output tokens:").pack(side="left", padx=(0, 6))
         self._output_var = ctk.StringVar(value="500")
         ctk.CTkEntry(bar, textvariable=self._output_var, width=80).pack(
             side="left", padx=(0, 16), pady=8
         )
 
-        # ── Analyse button ─────────────────────────────────────────────
         self._btn_analyse = ctk.CTkButton(
-            bar, text="⚡ Analyse", width=110,
-            fg_color="#01696f", hover_color="#0c4e54",
+            bar,
+            text="⚡ Analyse",
+            width=110,
+            fg_color="#01696f",
+            hover_color="#0c4e54",
             command=self._run_analysis,
         )
         self._btn_analyse.pack(side="right", padx=12, pady=8)
 
-        # Selected paths list (shown below toolbar)
         self._path_frame = ctk.CTkScrollableFrame(self, height=60, corner_radius=6)
         self._path_frame.pack(fill="x", padx=12, pady=(0, 6))
         self._paths: list[Path] = []
 
-    def _build_table(self) -> None:
-        _SectionLabel(self, text="Results").pack(anchor="w", padx=16, pady=(4, 2))
-        self._table = ResultsTable(self, corner_radius=8)
-        self._table.pack(fill="both", expand=True, padx=12, pady=(0, 6))
+    def _build_tabs(self) -> None:
+        self._tabs = ctk.CTkTabview(self)
+        self._tabs.pack(fill="both", expand=True, padx=12, pady=(0, 6))
+
+        tab_results = self._tabs.add("Results")
+        tab_logs    = self._tabs.add("Logs")
+
+        _SectionLabel(tab_results, text="Results").pack(anchor="w", padx=4, pady=(4, 2))
+        self._table = ResultsTable(tab_results, corner_radius=8)
+        self._table.pack(fill="both", expand=True, padx=4, pady=(0, 6))
+
+        self._logs_view = LogsView(tab_logs)
+        self._logs_view.pack(fill="both", expand=True)
 
     def _build_summary(self) -> None:
         self._summary = _SummaryPanel(self, corner_radius=8)
@@ -303,10 +314,6 @@ class MainView(ctk.CTkFrame):
             text_color=_MUTED,
             anchor="w",
         ).pack(fill="x", padx=16, pady=(0, 8))
-
-    # ------------------------------------------------------------------
-    # Event handlers
-    # ------------------------------------------------------------------
 
     def _pick_file(self) -> None:
         path = filedialog.askopenfilename(
@@ -346,7 +353,6 @@ class MainView(ctk.CTkFrame):
         self._set_status("Cleared. Pick a file or folder to begin.")
 
     def _on_model_change(self, _: str) -> None:
-        """Re-run analysis with new model if we already have results."""
         if self._paths:
             self._run_analysis()
 
@@ -370,24 +376,15 @@ class MainView(ctk.CTkFrame):
                 results.append(analyze_file(path, model.id))
 
         self._results = results
-        # Schedule UI update on the main thread
         self.after(0, self._render_results, results, model)
 
-    def _render_results(
-        self, results: List[AnalysisResult], model: ModelInfo
-    ) -> None:
+    def _render_results(self, results: List[AnalysisResult], model: ModelInfo) -> None:
         self._table.clear()
         for i, r in enumerate(results):
             self._table.add_result(r, i)
         self._summary.update(results, model)
         self._btn_analyse.configure(state="normal", text="⚡ Analyse")
-        self._set_status(
-            f"Done — {len(results)} file(s) analysed with {model.display_name}."
-        )
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
+        self._set_status(f"Done — {len(results)} file(s) analysed with {model.display_name}.")
 
     def _set_status(self, msg: str) -> None:
         self._status_var.set(msg)
