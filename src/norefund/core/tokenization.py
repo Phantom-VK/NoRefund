@@ -14,6 +14,7 @@ class TikTokenBackend:
 
     def __init__(self, model_name: str) -> None:
         import tiktoken
+
         self._enc = tiktoken.encoding_for_model(model_name)
 
     def count(self, text: str) -> int:
@@ -24,8 +25,9 @@ class TransformersBackend:
     """Backend for HuggingFace models using AutoTokenizer."""
 
     def __init__(self, model_name: str) -> None:
-        from transformers import AutoTokenizer
-        self._tokenizer = AutoTokenizer.from_pretrained(model_name)
+        from tokenizers import Tokenizer
+
+        self._tokenizer = Tokenizer.from_pretrained(model_name)
 
     def count(self, text: str) -> int:
         return len(self._tokenizer.encode(text))

@@ -2,6 +2,9 @@
 
 import argparse
 
+from src.norefund.core.service import analyze_file
+from src.norefund.gui.app import App
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -21,13 +24,11 @@ def main() -> None:
 
 
 def _run_gui() -> None:
-    from norefund.gui.app import App
     app = App()
     app.mainloop()
 
 
 def _run_cli(file_path: str, model_id: str) -> None:
-    from norefund.core.service import analyze_file
     from pathlib import Path
 
     result = analyze_file(Path(file_path), model_id)

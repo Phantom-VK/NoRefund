@@ -1,7 +1,8 @@
 """Tests for parsing module."""
 
 from pathlib import Path
-from norefund.core.parsing import extract_text, SUPPORTED_EXTENSIONS
+
+from norefund.core.parsing import SUPPORTED_EXTENSIONS, extract_text
 
 
 def test_supported_extensions_present():

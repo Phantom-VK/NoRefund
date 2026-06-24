@@ -46,7 +46,8 @@ def analyze_file(path: Path, model_id: str) -> AnalysisResult:
 def analyze_folder(folder: Path, model_id: str) -> list[AnalysisResult]:
     """Analyze all supported files in a folder recursively."""
     files = [
-        f for f in folder.rglob("*")
+        f
+        for f in folder.rglob("*")
         if f.is_file() and f.suffix.lower() in parsing.SUPPORTED_EXTENSIONS
     ]
     return [analyze_file(f, model_id) for f in files]

@@ -9,7 +9,7 @@ def extract_text(path: Path) -> str:
     """Dispatch to the right parser based on file extension."""
     ext = path.suffix.lower()
     parsers = {
-        ".pdf":  _read_pdf,
+        ".pdf": _read_pdf,
         ".pptx": _read_pptx,
         ".docx": _read_docx,
     }
@@ -18,12 +18,14 @@ def extract_text(path: Path) -> str:
 
 def _read_pdf(path: Path) -> str:
     from pypdf import PdfReader
+
     reader = PdfReader(path)
     return "\n".join(page.extract_text() or "" for page in reader.pages)
 
 
 def _read_pptx(path: Path) -> str:
     from pptx import Presentation
+
     prs = Presentation(path)
     texts = [
         shape.text
@@ -36,6 +38,7 @@ def _read_pptx(path: Path) -> str:
 
 def _read_docx(path: Path) -> str:
     from docx import Document
+
     doc = Document(path)
     return "\n".join(para.text for para in doc.paragraphs)
 

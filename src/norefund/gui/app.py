@@ -16,4 +16,5 @@ class App(ctk.CTk):
 
     def _setup_views(self) -> None:
         from norefund.gui.views import MainView
+
         MainView(self).pack(fill="both", expand=True)
