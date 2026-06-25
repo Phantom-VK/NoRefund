@@ -6,6 +6,11 @@ Layout (top to bottom):
   3. Summary bar   — total tokens, total cost, context usage bar
   4. Tabs          — [Results] [Logs]
   5. Status bar    — current operation message
+
+Logs tab behaviour:
+  - When opened, shows the latest run log file by default.
+  - A dropdown lists all previous run logs (timestamped file names).
+  - Selecting a file loads that run's logs; Refresh re-reads the current file.
 """
 
 from __future__ import annotations
@@ -20,7 +25,7 @@ import customtkinter as ctk
 
 from norefund.core.models_registry import ModelInfo, list_models
 from norefund.core.service import AnalysisResult, analyze_file, analyze_folder
-from norefund.logging_config import latest_log_file
+from norefund.logging_config import list_log_files
 
 
 _GREEN  = "#2ecc71"
@@ -183,35 +188,90 @@ class _SummaryPanel(ctk.CTkFrame):
 
 
 class LogsView(ctk.CTkFrame):
-    """Read-only view that shows the latest JSON log file.
+    """Read-only view that lets the user pick and inspect any run log.
 
-    - The file is resolved via logging_config.latest_log_file()
-    - The user can refresh to re-read the file while the app is running
-    - Lines are parsed and prettified for readability
+    - Lists all `norefund-*.log` files from the per-user log directory.
+    - Select a file from the dropdown to load that run's logs.
+    - The latest run is selected by default.
     """
 
     def __init__(self, parent, **kw):
         super().__init__(parent, **kw)
 
-        self._text = ctk.CTkTextbox(self, wrap="none", font=ctk.CTkFont(size=11))
-        self._text.pack(fill="both", expand=True, padx=8, pady=8)
+        top = ctk.CTkFrame(self)
+        top.pack(fill="x", padx=8, pady=(8, 0))
 
-        btn_bar = ctk.CTkFrame(self)
-        btn_bar.pack(fill="x", padx=8, pady=(0, 8))
+        ctk.CTkLabel(top, text="Run:", font=ctk.CTkFont(size=12, weight="bold")).pack(
+            side="left", padx=(0, 6), pady=4
+        )
 
-        ctk.CTkButton(btn_bar, text="Refresh", width=90, command=self._refresh).pack(
+        self._file_var = ctk.StringVar(value="")
+        self._file_menu = ctk.CTkOptionMenu(
+            top,
+            variable=self._file_var,
+            values=["(no logs yet)"],
+            command=self._on_file_change,
+            width=260,
+        )
+        self._file_menu.pack(side="left", padx=(0, 8), pady=4)
+
+        ctk.CTkButton(top, text="Refresh", width=90, command=self._refresh).pack(
             side="left", padx=(0, 8), pady=4
         )
-        self._lbl_path = ctk.CTkLabel(btn_bar, text="No log file yet", anchor="w")
+
+        self._lbl_path = ctk.CTkLabel(top, text="", anchor="w", font=ctk.CTkFont(size=11))
         self._lbl_path.pack(side="left", padx=(0, 8), pady=4)
 
-    def _refresh(self) -> None:
-        path = latest_log_file()
-        self._text.delete("1.0", "end")
-        if not path:
+        self._text = ctk.CTkTextbox(self, wrap="none", font=ctk.CTkFont(size=11))
+        self._text.pack(fill="both", expand=True, padx=8, pady=(4, 8))
+
+        self._files: List[Path] = []
+        self._refresh(initial=True)
+
+    def _refresh(self, initial: bool = False) -> None:
+        """Reload the file list and, if possible, keep or move to latest selection."""
+
+        files = list_log_files()
+        self._files = files
+
+        if not files:
+            self._file_menu.configure(values=["(no logs yet)"])
+            self._file_var.set("(no logs yet)")
             self._lbl_path.configure(text="No log file found")
+            self._text.delete("1.0", "end")
+            if not initial:
+                self._text.insert("end", "No log files in log directory yet.\n")
             return
 
+        names = [f.name for f in files]
+        self._file_menu.configure(values=names)
+
+        # On initial load, always select the latest run; on manual refresh,
+        # keep current selection if still present, otherwise fall back to latest.
+        current = self._file_var.get()
+        if initial or current not in names:
+            selected_name = names[-1]
+        else:
+            selected_name = current
+
+        self._file_var.set(selected_name)
+        self._load_file(self._resolve_selected_path())
+
+    def _resolve_selected_path(self) -> Path:
+        name = self._file_var.get()
+        for f in self._files:
+            if f.name == name:
+                return f
+        # Fallback: latest
+        return self._files[-1]
+
+    def _on_file_change(self, _: str) -> None:
+        if not self._files:
+            return
+        self._load_file(self._resolve_selected_path())
+
+    def _load_file(self, path: Path) -> None:
+        self._text.delete("1.0", "end")
         self._lbl_path.configure(text=str(path))
         try:
             with path.open("r", encoding="utf-8") as f:
@@ -224,7 +284,6 @@ class LogsView(ctk.CTkFrame):
                         pretty = json.dumps(obj, indent=2, ensure_ascii=False)
                         self._text.insert("end", pretty + "\n\n")
                     except json.JSONDecodeError:
-                        # Fallback: show raw line
                         self._text.insert("end", line + "\n")
         except OSError as exc:
             self._text.insert("end", f"Error reading log file: {exc}\n")
