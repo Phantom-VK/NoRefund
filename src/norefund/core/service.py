@@ -17,7 +17,7 @@ from norefund.core.costing import (
     min_chunks,
 )
 from norefund.core.models_registry import get_model
-from norefund.core.parsing import parse_file
+from norefund.core.parsing import extract_text
 from norefund.core.tokenization import get_tokenizer
 from norefund.logging_config import get_logger
 
@@ -42,7 +42,7 @@ class AnalysisResult:
 def analyze_file(path: Path, model_id: str) -> AnalysisResult:
     model     = get_model(model_id)
     tokenizer = get_tokenizer(model)
-    text      = parse_file(path)
+    text      = extract_text(path)
 
     tokens = tokenizer.count(text)
 
