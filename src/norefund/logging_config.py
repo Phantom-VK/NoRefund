@@ -8,6 +8,7 @@ This module exposes a single `get_logger()` function that returns a
 - include optional context fields via extra={"ctx": {...}}
 - write logs to a per-user log directory (platform aware)
 - create **one log file per app run**, named with a UTC timestamp
+- delete the run's log file on exit if nothing was ever written
 
 Usage:
 
@@ -22,6 +23,7 @@ run's log file from a dropdown.
 
 from __future__ import annotations
 
+import atexit
 import json
 import logging
 import os
@@ -116,6 +118,7 @@ class JsonFormatter(logging.Formatter):
 # ---------------------------------------------------------------------------
 
 _LOGGERS: dict[str, logging.Logger] = {}
+_HANDLER_INITIALISED = False
 
 
 def _build_handler() -> logging.Handler:
@@ -127,12 +130,32 @@ def _build_handler() -> logging.Handler:
     return handler
 
 
+def _register_atexit_cleanup() -> None:
+    """Register a cleanup hook that deletes empty run log files.
+
+    If the app starts and exits without ever writing a log line,
+    we don't want to leave behind an empty `norefund-*.log` file.
+    """
+
+    def _cleanup() -> None:
+        try:
+            if RUN_LOG_FILE.exists() and RUN_LOG_FILE.stat().st_size == 0:
+                RUN_LOG_FILE.unlink()
+        except OSError:
+            # Best-effort only; ignore failures.
+            pass
+
+    atexit.register(_cleanup)
+
+
 def get_logger(name: str | None = None) -> logging.Logger:
     """Return a module-level logger with JSON file handler attached.
 
     The first call initialises root-level settings, subsequent calls reuse
     the same handler and configuration.
     """
+
+    global _HANDLER_INITIALISED
 
     logger_name = name or "norefund"
     if logger_name in _LOGGERS:
@@ -142,10 +165,11 @@ def get_logger(name: str | None = None) -> logging.Logger:
     logger.setLevel(logging.INFO)
 
     root = logging.getLogger("norefund")
-    if not root.handlers:
-        handler = _build_handler()
-        root.addHandler(handler)
+    if not _HANDLER_INITIALISED:
+        root.addHandler(_build_handler())
         root.setLevel(logging.INFO)
+        _register_atexit_cleanup()
+        _HANDLER_INITIALISED = True
 
     if logger is not root:
         logger.propagate = True
