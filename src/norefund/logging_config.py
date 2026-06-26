@@ -30,7 +30,7 @@ import os
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 # ---------------------------------------------------------------------------
@@ -44,6 +44,7 @@ def _default_log_dir() -> Path:
     - Linux/macOS: ~/.norefund/logs
     - Windows:     %LOCALAPPDATA%/NoRefund/logs
     """
+
     if os.name == "nt":
         base = os.getenv("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
         return Path(base) / "NoRefund" / "logs"
@@ -51,10 +52,7 @@ def _default_log_dir() -> Path:
 
 
 LOG_DIR: Path = _default_log_dir()
-try:
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-except OSError:
-    pass
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # One log file per app run, timestamped in UTC
 _RUN_TS = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
@@ -62,7 +60,8 @@ RUN_LOG_FILE: Path = LOG_DIR / f"norefund-{_RUN_TS}.log"
 
 
 def list_log_files() -> List[Path]:
-    """Return all run log files sorted oldest → newest."""
+    """Return all known run log files, sorted by name (oldest → newest)."""
+
     if not LOG_DIR.exists():
         return []
     return sorted(LOG_DIR.glob("norefund-*.log"))
@@ -70,6 +69,7 @@ def list_log_files() -> List[Path]:
 
 def latest_log_file() -> Optional[Path]:
     """Return the most recent run log file, or None if none exist."""
+
     files = list_log_files()
     return files[-1] if files else None
 
@@ -77,7 +77,6 @@ def latest_log_file() -> Optional[Path]:
 # ---------------------------------------------------------------------------
 # JSON formatter
 # ---------------------------------------------------------------------------
-
 
 @dataclass
 class LogRecordData:
@@ -89,7 +88,7 @@ class LogRecordData:
     func: str
     line: int
     pathname: str
-    ctx: dict[str, Any]
+    ctx: Dict[str, Any]
 
 
 class JsonFormatter(logging.Formatter):
@@ -124,26 +123,26 @@ _HANDLER_INITIALISED = False
 
 def _build_handler() -> logging.Handler:
     """Create a file handler for this run's log file."""
-    try:
-        LOG_DIR.mkdir(parents=True, exist_ok=True)
-    except OSError:
-        return logging.NullHandler()
-    try:
-        handler = logging.FileHandler(RUN_LOG_FILE, encoding="utf-8")
-    except OSError:
-        return logging.NullHandler()
+
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(RUN_LOG_FILE, encoding="utf-8")
     handler.setFormatter(JsonFormatter())
     return handler
 
 
 def _register_atexit_cleanup() -> None:
-    """Delete the run log file on exit if nothing was written to it."""
+    """Register a cleanup hook that deletes empty run log files.
+
+    If the app starts and exits without ever writing a log line,
+    we don't want to leave behind an empty `norefund-*.log` file.
+    """
 
     def _cleanup() -> None:
         try:
             if RUN_LOG_FILE.exists() and RUN_LOG_FILE.stat().st_size == 0:
                 RUN_LOG_FILE.unlink()
         except OSError:
+            # Best-effort only; ignore failures.
             pass
 
     atexit.register(_cleanup)
@@ -152,8 +151,10 @@ def _register_atexit_cleanup() -> None:
 def get_logger(name: str | None = None) -> logging.Logger:
     """Return a module-level logger with JSON file handler attached.
 
-    The first call initialises the handler; subsequent calls reuse it.
+    The first call initialises root-level settings, subsequent calls reuse
+    the same handler and configuration.
     """
+
     global _HANDLER_INITIALISED
 
     logger_name = name or "norefund"
@@ -165,11 +166,10 @@ def get_logger(name: str | None = None) -> logging.Logger:
 
     root = logging.getLogger("norefund")
     if not _HANDLER_INITIALISED:
-        handler = _build_handler()
-        root.addHandler(handler)
+        root.addHandler(_build_handler())
         root.setLevel(logging.INFO)
-        _HANDLER_INITIALISED = True
         _register_atexit_cleanup()
+        _HANDLER_INITIALISED = True
 
     if logger is not root:
         logger.propagate = True
