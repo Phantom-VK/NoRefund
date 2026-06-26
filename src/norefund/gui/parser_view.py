@@ -17,17 +17,17 @@ from norefund.gui.widgets import IconButton, ModelDropdown, StatPill
 from norefund.logging_config import latest_log_file
 
 
-def _tail_lines(path: Path, n: int = 120) -> list[str]:
+def _tail_lines(path: Path, n: int = 200, max_bytes: int = 32_000) -> list[str]:
+    """Read the last `n` lines from `path` without loading the whole file."""
     with path.open("rb") as f:
         f.seek(0, 2)
-        size = f.tell()
-        f.seek(max(0, size - 16_000))
+        f.seek(max(0, f.tell() - max_bytes))
         return f.read().decode("utf-8", errors="ignore").splitlines()[-n:]
 
 
 class ResultsTable(ctk.CTkScrollableFrame):
     HEADERS = ["File", "Tokens", "Context %", "Fits?", "Chunks", "Input Cost", "Words", "Chars"]
-    WIDTHS = [230, 90, 130, 70, 70, 100, 90, 90]
+    WIDTHS   = [230, 90, 130, 70, 70, 100, 90, 90]
 
     def __init__(self, parent) -> None:
         super().__init__(parent, fg_color=COLORS["bg"], corner_radius=0)
@@ -58,23 +58,41 @@ class ResultsTable(ctk.CTkScrollableFrame):
             self._add_row(idx, result)
 
     def _add_row(self, row: int, result: AnalysisResult) -> None:
-        bg = COLORS["card"] if row % 2 else COLORS["bg"]
+        bg  = COLORS["card"] if row % 2 else COLORS["bg"]
+        pct = result.context_usage_pct
+
+        # Guard: context_usage_pct is None when context_window <= 0 or on error.
+        pct_str   = f"{fmt_float(pct)}%" if pct is not None else "—"
+        pct_color = context_color(pct) if pct is not None else COLORS["muted_text"]
+        fits_color = COLORS["primary"] if result.fits_in_context else COLORS["danger"]
+
+        # Prefix filename with warning indicator when the result carries an error.
+        name = Path(result.file_path).name
+        if result.error:
+            name = f"⚠ {name}"
+
         values = [
-            Path(result.file_path).name,
+            name,
             fmt_num(result.token_count),
-            f"{fmt_float(result.context_usage_pct)}%",
+            pct_str,
             "OK" if result.fits_in_context else "NO",
             str(result.min_chunks_needed),
             fmt_cost(result.estimated_input_cost),
             fmt_num(result.word_count),
             fmt_num(result.char_count),
         ]
-        for col, (value, width) in enumerate(zip(values, self.WIDTHS)):
-            color = COLORS["text"]
-            if col == 2:
-                color = context_color(result.context_usage_pct)
-            elif col == 3:
-                color = COLORS["primary"] if result.fits_in_context else COLORS["danger"]
+        colors = [
+            COLORS["text"],   # File
+            COLORS["text"],   # Tokens
+            pct_color,        # Context %
+            fits_color,       # Fits?
+            COLORS["text"],   # Chunks
+            COLORS["text"],   # Input Cost
+            COLORS["text"],   # Words
+            COLORS["text"],   # Chars
+        ]
+
+        for col, (value, width, color) in enumerate(zip(values, self.WIDTHS, colors)):
             ctk.CTkLabel(
                 self,
                 text=value,
@@ -104,23 +122,33 @@ class LogsPanel(ctk.CTkFrame):
         self.refresh()
 
     def refresh(self) -> None:
+        """Reload the current run log.
+
+        Reads only the last 32 KB / 200 lines so large log files don't
+        stall the UI. All formatted lines are joined into a single string
+        and inserted with one CTkTextbox.insert() call to avoid the
+        per-line redraw overhead that caused visible slowness.
+        """
         self.text.delete("1.0", "end")
         path = latest_log_file()
         if not path:
             self.text.insert("end", "No logs yet. Run an analysis to see output here.\n")
             return
         try:
+            output: list[str] = []
             for line in _tail_lines(path):
-                if not line.strip():
+                line = line.strip()
+                if not line:
                     continue
                 try:
-                    obj = json.loads(line)
-                    ctx = obj.get("ctx") or {}
+                    obj     = json.loads(line)
+                    ctx     = obj.get("ctx") or {}
                     message = obj.get("message", "log")
-                    level = obj.get("level", "INFO")
-                    self.text.insert("end", f"> [{level}] {message} {ctx}\n")
+                    level   = obj.get("level", "INFO")
+                    output.append(f"> [{level}] {message} {ctx}")
                 except json.JSONDecodeError:
-                    self.text.insert("end", line + "\n")
+                    output.append(line)
+            self.text.insert("end", "\n".join(output))
         except OSError as exc:
             self.text.insert("end", f"Error reading log file: {exc}\n")
 
@@ -134,15 +162,15 @@ class ParserView(ctk.CTkFrame):
         default_output: ctk.StringVar,
     ) -> None:
         super().__init__(parent, fg_color=COLORS["bg"])
-        self.shell = shell
-        self.models = models
+        self.shell          = shell
+        self.models         = models
         self.default_output = default_output
-        self.output_tokens = ctk.StringVar(value=default_output.get())
-        self.paths: list[Path] = []
+        self.output_tokens  = ctk.StringVar(value=default_output.get())
+        self.paths:   list[Path]           = []
         self.results: list[AnalysisResult] = []
         self.active_tab = "results"
-        self.status = ctk.StringVar(value="Ready - add a file or folder to begin.")
-        self.analyzing = False
+        self.status     = ctk.StringVar(value="Ready - add a file or folder to begin.")
+        self.analyzing  = False
 
         self._build()
         self._render_files()
@@ -154,7 +182,7 @@ class ParserView(ctk.CTkFrame):
 
         toolbar = ctk.CTkFrame(self, fg_color=COLORS["card"], corner_radius=0)
         toolbar.grid(row=0, column=0, sticky="ew")
-        IconButton(toolbar, "+ Add File", width=104, command=self._pick_file).pack(
+        IconButton(toolbar, "+ Add File",   width=104, command=self._pick_file).pack(
             side="left", padx=(18, 6), pady=10
         )
         IconButton(toolbar, "+ Add Folder", width=114, command=self._pick_folder).pack(
@@ -211,12 +239,13 @@ class ParserView(ctk.CTkFrame):
             tabs, "Logs", width=70, command=lambda: self._set_tab("logs")
         )
         self.results_tab.pack(side="left", padx=(18, 0), pady=8)
-        self.logs_tab.pack(side="left", padx=(4, 0), pady=8)
+        self.logs_tab.pack(side="left",    padx=(4, 0),  pady=8)
 
         self.content = ctk.CTkFrame(self, fg_color=COLORS["bg"], corner_radius=0)
         self.content.grid(row=3, column=0, sticky="nsew")
         self.content.grid_columnconfigure(0, weight=1)
         self.content.grid_rowconfigure(0, weight=1)
+
         self.results_panel = ctk.CTkFrame(
             self.content, fg_color=COLORS["bg"], corner_radius=0
         )
@@ -224,19 +253,21 @@ class ParserView(ctk.CTkFrame):
         self.results_panel.grid(row=0, column=0, sticky="nsew")
         self.results_panel.grid_columnconfigure(0, weight=1)
         self.results_panel.grid_rowconfigure(1, weight=1)
+
         self.summary = ctk.CTkFrame(
             self.results_panel, fg_color=COLORS["card"], corner_radius=0
         )
         self.summary.grid(row=0, column=0, sticky="ew")
         self.summary.grid_columnconfigure((0, 1, 2, 3), weight=1, uniform="summary")
-        self.stat_files = StatPill(self.summary, "Files")
-        self.stat_tokens = StatPill(self.summary, "Total tokens")
-        self.stat_cost = StatPill(self.summary, "Input cost")
+        self.stat_files   = StatPill(self.summary, "Files")
+        self.stat_tokens  = StatPill(self.summary, "Total tokens")
+        self.stat_cost    = StatPill(self.summary, "Input cost")
         self.stat_context = StatPill(self.summary, "Avg context")
         for idx, stat in enumerate(
             [self.stat_files, self.stat_tokens, self.stat_cost, self.stat_context]
         ):
             stat.grid(row=0, column=idx, sticky="ew", padx=18, pady=12)
+
         self.table = ResultsTable(self.results_panel)
         self.table.grid(row=1, column=0, sticky="nsew")
 
@@ -251,6 +282,10 @@ class ParserView(ctk.CTkFrame):
         ).pack(side="left", padx=18, pady=8)
 
         self._set_tab("results")
+
+    # ------------------------------------------------------------------
+    # File management
+    # ------------------------------------------------------------------
 
     def _pick_file(self) -> None:
         path = filedialog.askopenfilename(
@@ -319,6 +354,10 @@ class ParserView(ctk.CTkFrame):
                 command=lambda p=path: self._remove_path(p),
             ).pack(side="right", padx=5, pady=4)
 
+    # ------------------------------------------------------------------
+    # Tab switching
+    # ------------------------------------------------------------------
+
     def _set_tab(self, tab: str) -> None:
         self.active_tab = tab
         self.results_tab.configure(
@@ -335,6 +374,10 @@ class ParserView(ctk.CTkFrame):
             self.results_panel.grid_remove()
             self.logs_panel.grid(row=0, column=0, sticky="nsew")
 
+    # ------------------------------------------------------------------
+    # Analysis
+    # ------------------------------------------------------------------
+
     def _run_analysis(self) -> None:
         if self.analyzing:
             return
@@ -347,9 +390,9 @@ class ParserView(ctk.CTkFrame):
         threading.Thread(target=self._analysis_worker, daemon=True).start()
 
     def _analysis_worker(self) -> None:
-        model = self.model_select.selected_model()
+        model   = self.model_select.selected_model()
         results: list[AnalysisResult] = []
-        errors: list[str] = []
+        errors:  list[str]            = []
         for path in list(self.paths):
             try:
                 if path.is_dir():
@@ -377,13 +420,24 @@ class ParserView(ctk.CTkFrame):
         )
 
     def _render_results(self) -> None:
+        """Populate the summary pills and results table.
+
+        Guards against None context_usage_pct which is returned by the
+        backend when a model has no context window defined (<=0) or when
+        a file failed to parse.
+        """
         self.table.set_results(self.results)
-        count = len(self.results)
+        count        = len(self.results)
         total_tokens = sum(item.token_count for item in self.results)
-        total_cost = sum(item.estimated_input_cost for item in self.results)
-        avg_context = (
-            sum(item.context_usage_pct for item in self.results) / count if count else 0
-        )
+        total_cost   = sum(item.estimated_input_cost for item in self.results)
+
+        valid_pcts   = [
+            item.context_usage_pct
+            for item in self.results
+            if item.context_usage_pct is not None
+        ]
+        avg_context  = sum(valid_pcts) / len(valid_pcts) if valid_pcts else 0.0
+
         self.stat_files.set_text(str(count))
         self.stat_tokens.set_text(fmt_num(total_tokens))
         self.stat_cost.set_text(fmt_cost(total_cost))
