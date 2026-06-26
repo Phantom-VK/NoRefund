@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
+import traceback
 from pathlib import Path
 from tkinter import filedialog, messagebox
 
@@ -15,6 +17,8 @@ from norefund.gui.formatting import context_color, fmt_cost, fmt_float, fmt_num
 from norefund.gui.theme import COLORS, SUPPORTED_FILETYPES
 from norefund.gui.widgets import IconButton, ModelDropdown, StatPill
 from norefund.logging_config import latest_log_file
+
+_LOG = logging.getLogger(__name__)
 
 
 def _tail_lines(path: Path, n: int = 200, max_bytes: int = 32_000) -> list[str]:
@@ -61,12 +65,10 @@ class ResultsTable(ctk.CTkScrollableFrame):
         bg  = COLORS["card"] if row % 2 else COLORS["bg"]
         pct = result.context_usage_pct
 
-        # Guard: context_usage_pct is None when context_window <= 0 or on error.
-        pct_str   = f"{fmt_float(pct)}%" if pct is not None else "—"
-        pct_color = context_color(pct) if pct is not None else COLORS["muted_text"]
+        pct_str    = f"{fmt_float(pct)}%" if pct is not None else "—"
+        pct_color  = context_color(pct) if pct is not None else COLORS["muted_text"]
         fits_color = COLORS["primary"] if result.fits_in_context else COLORS["danger"]
 
-        # Prefix filename with warning indicator when the result carries an error.
         name = Path(result.file_path).name
         if result.error:
             name = f"⚠ {name}"
@@ -82,14 +84,14 @@ class ResultsTable(ctk.CTkScrollableFrame):
             fmt_num(result.char_count),
         ]
         colors = [
-            COLORS["text"],   # File
-            COLORS["text"],   # Tokens
-            pct_color,        # Context %
-            fits_color,       # Fits?
-            COLORS["text"],   # Chunks
-            COLORS["text"],   # Input Cost
-            COLORS["text"],   # Words
-            COLORS["text"],   # Chars
+            COLORS["text"],
+            COLORS["text"],
+            pct_color,
+            fits_color,
+            COLORS["text"],
+            COLORS["text"],
+            COLORS["text"],
+            COLORS["text"],
         ]
 
         for col, (value, width, color) in enumerate(zip(values, self.WIDTHS, colors)):
@@ -124,10 +126,9 @@ class LogsPanel(ctk.CTkFrame):
     def refresh(self) -> None:
         """Reload the current run log.
 
-        Reads only the last 32 KB / 200 lines so large log files don't
-        stall the UI. All formatted lines are joined into a single string
-        and inserted with one CTkTextbox.insert() call to avoid the
-        per-line redraw overhead that caused visible slowness.
+        Reads only the last 32 KB / 200 lines. All lines are joined into a
+        single string and inserted with one CTkTextbox.insert() call to avoid
+        the per-line redraw overhead.
         """
         self.text.delete("1.0", "end")
         path = latest_log_file()
@@ -315,6 +316,9 @@ class ParserView(ctk.CTkFrame):
     def _clear(self) -> None:
         self.paths.clear()
         self.results.clear()
+        # Force-reset stuck analyzing state so Clear always unblocks the UI.
+        self.analyzing = False
+        self.analyze_btn.configure(state="normal", text="Analyze")
         self.status.set("Cleared. Add a file or folder to begin.")
         self._render_files()
         self._render_results()
@@ -390,18 +394,43 @@ class ParserView(ctk.CTkFrame):
         threading.Thread(target=self._analysis_worker, daemon=True).start()
 
     def _analysis_worker(self) -> None:
-        model   = self.model_select.selected_model()
-        results: list[AnalysisResult] = []
-        errors:  list[str]            = []
-        for path in list(self.paths):
-            try:
-                if path.is_dir():
-                    results.extend(analyze_folder(path, model.id))
-                else:
-                    results.append(analyze_file(path, model.id))
-            except Exception as exc:
-                errors.append(f"{path.name}: {exc}")
-        self.after(0, self._analysis_complete, results, model, errors)
+        """Run in a background thread.
+
+        MUST always schedule either _analysis_complete or _analysis_error
+        back on the main thread — even on unexpected exceptions — so the
+        button is never permanently stuck on 'Analyzing...'.
+        """
+        try:
+            model   = self.model_select.selected_model()
+            results: list[AnalysisResult] = []
+            errors:  list[str]            = []
+            for path in list(self.paths):
+                try:
+                    if path.is_dir():
+                        results.extend(analyze_folder(path, model.id))
+                    else:
+                        results.append(analyze_file(path, model.id))
+                except Exception as exc:
+                    errors.append(f"{path.name}: {exc}")
+            self.after(0, self._analysis_complete, results, model, errors)
+        except Exception as exc:
+            tb = traceback.format_exc()
+            _LOG.error(
+                "analysis_worker_crashed",
+                extra={"ctx": {"error": str(exc), "traceback": tb}},
+            )
+            self.after(0, self._analysis_error, str(exc))
+
+    def _analysis_error(self, message: str) -> None:
+        """Called on the main thread when the worker crashes unexpectedly."""
+        self.analyzing = False
+        self.analyze_btn.configure(state="normal", text="Analyze")
+        self.status.set(f"Error: {message}")
+        messagebox.showerror(
+            "Analysis failed",
+            f"An unexpected error stopped the analysis:\n\n{message}\n\n"
+            "Check the Logs tab for the full traceback.",
+        )
 
     def _analysis_complete(
         self, results: list[AnalysisResult], model: ModelInfo, errors: list[str]
@@ -420,17 +449,15 @@ class ParserView(ctk.CTkFrame):
         )
 
     def _render_results(self) -> None:
-        """Populate the summary pills and results table.
+        """Populate summary pills and results table.
 
-        Guards against None context_usage_pct which is returned by the
-        backend when a model has no context window defined (<=0) or when
-        a file failed to parse.
+        Guards against None context_usage_pct returned when a model has no
+        context window defined or when a file failed to parse.
         """
         self.table.set_results(self.results)
         count        = len(self.results)
         total_tokens = sum(item.token_count for item in self.results)
         total_cost   = sum(item.estimated_input_cost for item in self.results)
-
         valid_pcts   = [
             item.context_usage_pct
             for item in self.results
