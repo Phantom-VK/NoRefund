@@ -12,7 +12,6 @@ from norefund.gui.settings_modal import SettingsModal
 from norefund.gui.theme import COLORS
 from norefund.gui.widgets import IconButton, SidebarItem
 
-
 VIEW_CALCULATOR = "calculator"
 VIEW_PARSER = "parser"
 VIEW_REGISTRY = "registry"
@@ -27,7 +26,7 @@ class MainView(ctk.CTkFrame):
         self.header_count = ctk.StringVar(value="0 files")
         self.title_var = ctk.StringVar(value="File Parser")
         self.theme_dark = True
-        self.views: dict[str, ctk.CTkFrame] = {}
+        self._view_cache: dict[str, ctk.CTkFrame] = {}
 
         self._build_shell()
         self._show_view(VIEW_PARSER)
@@ -93,10 +92,10 @@ class MainView(ctk.CTkFrame):
             text_color=COLORS["muted_text"],
             font=ctk.CTkFont(size=9, weight="bold"),
             anchor="w",
-        ).pack(fill="x", padx=8, pady=0)
+        ).pack(fill="x", padx=8, pady=(16, 4))
         self.nav_buttons = {
             VIEW_CALCULATOR: SidebarItem(
-                nav, "Token Calculator", "#", lambda: self._show_view(VIEW_CALCULATOR)
+                nav, "Calculator", "#", lambda: self._show_view(VIEW_CALCULATOR)
             ),
             VIEW_PARSER: SidebarItem(
                 nav, "File Parser", "[]", lambda: self._show_view(VIEW_PARSER)
@@ -168,20 +167,14 @@ class MainView(ctk.CTkFrame):
         self.content.grid_columnconfigure(0, weight=1)
         self.content.grid_rowconfigure(0, weight=1)
 
-        self.views = {
-            VIEW_CALCULATOR: CalculatorView(
-                self.content, self.models, self.default_output_tokens
-            ),
-            VIEW_PARSER: ParserView(
-                self.content,
-                self,
-                self.models,
-                self.default_output_tokens,
-            ),
-            VIEW_REGISTRY: RegistryView(self.content, self.models),
-        }
-        for view in self.views.values():
-            view.grid(row=0, column=0, sticky="nsew")
+    def _make_view(self, name: str) -> ctk.CTkFrame:
+        if name == VIEW_CALCULATOR:
+            return CalculatorView(self.content, self.models, self.default_output_tokens)
+        if name == VIEW_PARSER:
+            return ParserView(self.content, self, self.models, self.default_output_tokens)
+        if name == VIEW_REGISTRY:
+            return RegistryView(self.content, self.models)
+        raise ValueError(f"Unknown view: {name}")
 
     def _show_view(self, name: str) -> None:
         self.current_view = name
@@ -193,11 +186,14 @@ class MainView(ctk.CTkFrame):
         self.title_var.set(titles[name])
         for key, button in self.nav_buttons.items():
             button.set_active(key == name)
-        for key, view in self.views.items():
-            if key == name:
-                view.tkraise()
-            else:
-                view.lower()
+
+        if name not in self._view_cache:
+            view = self._make_view(name)
+            view.grid(row=0, column=0, sticky="nsew")
+            self._view_cache[name] = view
+
+        self._view_cache[name].tkraise()
+
         if name == VIEW_PARSER:
             self.count_badge.pack(side="left", ipadx=8, ipady=2)
         else:
