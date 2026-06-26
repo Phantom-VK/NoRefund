@@ -12,16 +12,20 @@ _RESERVED_OUTPUT = 1_024
 
 def context_usage_pct(token_count: int, context_window: int) -> float:
     """Return percentage of context window used, rounded to 2 dp."""
+    if context_window <= 0:
+        return 0.0
     return round(token_count / context_window * 100, 2)
 
 
 def fits_in_context(token_count: int, context_window: int) -> bool:
+    if context_window <= 0:
+        return False
     return token_count <= context_window
 
 
 def min_chunks(token_count: int, context_window: int) -> int:
     """Minimum API calls needed to process the full document."""
-    usable = context_window - _RESERVED_OUTPUT
+    usable = max(context_window - _RESERVED_OUTPUT, 1)
     return math.ceil(token_count / usable)
 
 
