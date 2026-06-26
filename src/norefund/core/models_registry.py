@@ -7,6 +7,8 @@ import yaml
 
 _DEFAULT_REGISTRY_PATH = Path(__file__).parent.parent / "config" / "default_models.yaml"
 
+_cache: dict[str, "ModelInfo"] | None = None
+
 
 @dataclass
 class ModelInfo:
@@ -22,20 +24,22 @@ class ModelInfo:
 
 
 def load_models(path: Path = _DEFAULT_REGISTRY_PATH) -> dict[str, ModelInfo]:
-    """Load all models from YAML. Returns dict keyed by model id."""
+    global _cache
+    if _cache is not None:
+        return _cache
     if not path.exists():
         raise FileNotFoundError(f"Model registry not found: {path}")
     try:
         raw: list[dict] = yaml.safe_load(path.read_text())
         if not isinstance(raw, list):
             raise ValueError("Registry YAML must be a list of model entries.")
-        return {entry["id"]: ModelInfo(**entry) for entry in raw}
+        _cache = {entry["id"]: ModelInfo(**entry) for entry in raw}
+        return _cache
     except (yaml.YAMLError, TypeError, KeyError) as exc:
         raise ValueError(f"Failed to parse model registry '{path}': {exc}") from exc
 
 
 def get_model(model_id: str, path: Path = _DEFAULT_REGISTRY_PATH) -> ModelInfo:
-    """Get a single model by id. Raises ValueError with helpful message if not found."""
     models = load_models(path)
     if model_id not in models:
         raise ValueError(
@@ -46,5 +50,4 @@ def get_model(model_id: str, path: Path = _DEFAULT_REGISTRY_PATH) -> ModelInfo:
 
 
 def list_models(path: Path = _DEFAULT_REGISTRY_PATH) -> list[ModelInfo]:
-    """Return all models as a list."""
     return list(load_models(path).values())
