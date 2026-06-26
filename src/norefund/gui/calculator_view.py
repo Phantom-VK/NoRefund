@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
+from norefund.core.costing import context_usage_pct, fits_in_context, min_chunks
 from norefund.core.models_registry import ModelInfo
 from norefund.gui.formatting import (
-    chunks,
     context_color,
-    context_pct,
     fmt_cost,
     fmt_float,
     fmt_num,
@@ -127,10 +126,7 @@ class CalculatorView(ctk.CTkFrame):
         self.total_cost.grid(row=0, column=2, sticky="ew")
         ctk.CTkLabel(
             cost,
-            text=(
-                "Prices are estimates. Check each provider's pricing page "
-                "for exact rates."
-            ),
+            text="Prices are estimates. Check each provider's pricing page for exact rates.",
             text_color=COLORS["muted_text"],
             font=ctk.CTkFont(size=11),
             anchor="w",
@@ -157,39 +153,31 @@ class CalculatorView(ctk.CTkFrame):
 
     def _recalculate(self) -> None:
         model = self.model_select.selected_model()
-        input_tokens = parse_int(self.input_tokens.get())
-        output_tokens = parse_int(self.output_tokens.get())
-        input_cost = (input_tokens / 1_000_000) * model.input_price_per_million
-        output_cost = (output_tokens / 1_000_000) * model.output_price_per_million
-        pct = context_pct(input_tokens, model)
-        fits = input_tokens <= model.context_window
+        in_tok = parse_int(self.input_tokens.get())
+        out_tok = parse_int(self.output_tokens.get())
+        in_cost = (in_tok / 1_000_000) * model.input_price_per_million
+        out_cost = (out_tok / 1_000_000) * model.output_price_per_million
+        pct = context_usage_pct(in_tok, model.context_window)
         color = context_color(pct)
 
         self.context_bar.set_value(pct)
         self.context_pct_label.configure(text=f"{fmt_float(pct)}%", text_color=color)
-        context_text = (
-            f"{fmt_num(input_tokens)} input tokens of "
-            f"{fmt_num(model.context_window)} max"
+        self.context_detail.configure(
+            text=f"{fmt_num(in_tok)} input tokens of {fmt_num(model.context_window)} max"
         )
-        self.context_detail.configure(text=context_text)
-        if fits:
+        if fits_in_context(in_tok, model.context_window):
             self.fit_label.configure(
                 text="OK  Fits in one context window", text_color=COLORS["primary"]
             )
         else:
-            overage = input_tokens - model.context_window
-            chunks_needed = chunks(input_tokens, model)
+            overage = in_tok - model.context_window
             self.fit_label.configure(
                 text=(
                     f"Exceeds by {fmt_num(overage)} tokens - "
-                    f"{chunks_needed} chunks required"
+                    f"{min_chunks(in_tok, model.context_window)} chunks required"
                 ),
                 text_color=COLORS["danger"],
             )
-        self.input_cost.set(
-            f"{fmt_cost(input_cost)}  @ ${model.input_price_per_million:g}/M"
-        )
-        self.output_cost.set(
-            f"{fmt_cost(output_cost)}  @ ${model.output_price_per_million:g}/M"
-        )
-        self.total_cost.set(fmt_cost(input_cost + output_cost))
+        self.input_cost.set_text(f"{fmt_cost(in_cost)}  @ ${model.input_price_per_million:g}/M")
+        self.output_cost.set_text(f"{fmt_cost(out_cost)}  @ ${model.output_price_per_million:g}/M")
+        self.total_cost.set_text(fmt_cost(in_cost + out_cost))
