@@ -74,7 +74,7 @@ class ResultsTable(ctk.CTkScrollableFrame):
             color = COLORS["text"]
             if col == 2:
                 color = context_color(result.context_usage_pct)
-            if col == 3:
+            elif col == 3:
                 color = (
                     COLORS["primary"] if result.fits_in_context else COLORS["danger"]
                 )
@@ -85,7 +85,8 @@ class ResultsTable(ctk.CTkScrollableFrame):
                 fg_color=bg,
                 text_color=color,
                 font=ctk.CTkFont(
-                    size=12, weight="bold" if col in {0, 1, 5} else "normal"
+                    size=12,
+                    weight="bold" if col in {0, 1, 5} else "normal",
                 ),
                 anchor="w",
                 corner_radius=0,
@@ -121,9 +122,8 @@ class LogsPanel(ctk.CTkFrame):
                     obj = json.loads(line)
                     ctx = obj.get("ctx") or {}
                     message = obj.get("message", "log")
-                    self.text.insert(
-                        "end", f"> [{obj.get('level', 'INFO')}] {message} {ctx}\n"
-                    )
+                    level = obj.get("level", "INFO")
+                    self.text.insert("end", f"> [{level}] {message} {ctx}\n")
                 except json.JSONDecodeError:
                     self.text.insert("end", line + "\n")
         except OSError as exc:
@@ -194,7 +194,11 @@ class ParserView(ctk.CTkFrame):
             font=ctk.CTkFont(size=12),
         ).pack(side="left")
         self.analyze_btn = IconButton(
-            toolbar, "Analyze", variant="primary", width=110, command=self._run_analysis
+            toolbar,
+            "Analyze",
+            variant="primary",
+            width=110,
+            command=self._run_analysis,
         )
         self.analyze_btn.pack(side="right", padx=18, pady=10)
 
@@ -295,8 +299,8 @@ class ParserView(ctk.CTkFrame):
             ctk.CTkLabel(
                 row,
                 text=(
-                    'No files selected. Click "Add File" or '
-                    '"Add Folder" to get started.'
+                    "No files selected. Click \"Add File\" or "
+                    "\"Add Folder\" to get started."
                 ),
                 text_color=COLORS["muted_text"],
                 anchor="w",
@@ -307,9 +311,10 @@ class ParserView(ctk.CTkFrame):
                 self.files_frame, fg_color=COLORS["muted"], corner_radius=5
             )
             row.pack(fill="x", padx=18, pady=3)
+            prefix = "[folder]" if path.is_dir() else "[file]"
             ctk.CTkLabel(
                 row,
-                text=f"{'[folder]' if path.is_dir() else '[file]'} {path}",
+                text=f"{prefix} {path}",
                 text_color=COLORS["muted_text"],
                 font=ctk.CTkFont(size=11, family="monospace"),
                 anchor="w",
@@ -359,7 +364,7 @@ class ParserView(ctk.CTkFrame):
                     results.extend(analyze_folder(path, model.id))
                 else:
                     results.append(analyze_file(path, model.id))
-            except Exception as exc:  # noqa: BLE001 - report per-file failures in the UI.
+            except Exception as exc:
                 errors.append(f"{path.name}: {exc}")
         self.after(0, self._analysis_complete, results, model, errors)
 
