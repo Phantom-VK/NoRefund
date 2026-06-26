@@ -1,6 +1,6 @@
 """Service layer — orchestrates parsing, tokenisation and costing.
 
-Now includes structured logging so all key operations are captured as
+Includes structured logging so all key operations are captured as
 JSON log lines in the per-user log directory.
 """
 
@@ -15,8 +15,8 @@ from norefund.core.costing import (
     input_cost,
     min_chunks,
 )
-from norefund.core.models_registry import get_model
-from norefund.core.parsing import parse_file
+from norefund.core.models_registry import get_model, load_models
+from norefund.core.parsing import extract_text
 from norefund.core.tokenization import get_tokenizer
 from norefund.logging_config import get_logger
 
@@ -37,10 +37,21 @@ class AnalysisResult:
     estimated_input_cost: float
 
 
+def list_model_ids() -> list[str]:
+    """Return all known model IDs for use in CLI help / validation."""
+    return list(load_models().keys())
+
+
 def analyze_file(path: Path, model_id: str) -> AnalysisResult:
-    model = get_model(model_id)
+    models = load_models()
+    if model_id not in models:
+        raise ValueError(
+            f"Unknown model '{model_id}'. "
+            f"Available: {', '.join(sorted(models.keys()))}"
+        )
+    model = models[model_id]
     tokenizer = get_tokenizer(model)
-    text = parse_file(path)
+    text = extract_text(path)
 
     tokens = tokenizer.count(text)
 
@@ -75,10 +86,18 @@ def analyze_file(path: Path, model_id: str) -> AnalysisResult:
 
 
 def analyze_folder(folder: Path, model_id: str) -> list[AnalysisResult]:
+    """Analyze all supported files in a folder. Skips files that fail; logs each skip."""
     results = []
     for f in sorted(folder.rglob("*")):
-        if f.is_file() and f.suffix.lower() in _SUPPORTED:
+        if not f.is_file() or f.suffix.lower() not in _SUPPORTED:
+            continue
+        try:
             results.append(analyze_file(f, model_id))
+        except Exception as exc:
+            _LOG.warning(
+                "skipped_file",
+                extra={"ctx": {"path": str(f), "reason": str(exc)}},
+            )
     _LOG.info(
         "analysed_folder",
         extra={
