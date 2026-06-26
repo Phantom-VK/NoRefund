@@ -45,7 +45,7 @@ class StatPill(ctk.CTkFrame):
         )
         self._value.pack(anchor="w", pady=(2, 0))
 
-    def set(self, value: str) -> None:
+    def set_text(self, value: str) -> None:
         self._value.configure(text=value)
 
 
