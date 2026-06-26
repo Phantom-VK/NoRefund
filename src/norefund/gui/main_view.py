@@ -85,7 +85,7 @@ class MainView(ctk.CTkFrame):
 
     def _build_sidebar_nav(self, sidebar: ctk.CTkFrame) -> None:
         nav = ctk.CTkFrame(sidebar, fg_color="transparent")
-        nav.pack(fill="x", expand=True, padx=12)
+        nav.pack(fill="x", padx=12)
         ctk.CTkLabel(
             nav,
             text="TOOLS",
