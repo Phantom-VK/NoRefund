@@ -7,6 +7,7 @@ from typing import Protocol
 from norefund.core.models_registry import ModelInfo
 
 _LOG = logging.getLogger(__name__)
+_tokenizer_cache: dict[str, "TokenizerBackend"] = {}
 
 
 class TokenizerBackend(Protocol):
@@ -14,14 +15,10 @@ class TokenizerBackend(Protocol):
 
 
 class TikTokenBackend:
-    """Backend for OpenAI and compatible models using tiktoken."""
-
     def __init__(self, model_name: str) -> None:
         import tiktoken
 
         self._enc = None
-        self._using_fallback = False
-
         try:
             self._enc = tiktoken.encoding_for_model(model_name)
         except KeyError:
@@ -32,15 +29,11 @@ class TikTokenBackend:
                     extra={"ctx": {"model": model_name, "fallback": "cl100k_base"}},
                 )
             except Exception as exc:
-                self._enc = None
-                self._using_fallback = True
                 _LOG.warning(
                     "tiktoken_unavailable",
                     extra={"ctx": {"model": model_name, "error": str(exc)}},
                 )
         except Exception as exc:
-            self._enc = None
-            self._using_fallback = True
             _LOG.warning(
                 "tiktoken_unavailable",
                 extra={"ctx": {"model": model_name, "error": str(exc)}},
@@ -51,34 +44,26 @@ class TikTokenBackend:
             return 0
         if self._enc is not None:
             return len(self._enc.encode(text))
-        # Regex approximation — counts are inaccurate. User was warned at init.
-        _LOG.warning(
-            "token_count_approximate",
-            extra={"ctx": {"reason": "tiktoken unavailable, using regex word-split approximation"}},
-        )
+        _LOG.warning("token_count_approximate")
         return len(re.findall(r"\w+|[^\w\s]", text, flags=re.UNICODE))
 
 
 class HFTokenizerBackend:
-    """Backend for HuggingFace models using the lightweight tokenizers library.
-
-    NOTE: First use of a model downloads the tokenizer from HuggingFace Hub
-    (~a few MB). Subsequent runs use the local cache.
-    """
+    """NOTE: First use downloads the tokenizer from HuggingFace Hub (~few MB)."""
 
     def __init__(self, model_name: str) -> None:
         from tokenizers import Tokenizer
 
         _LOG.info(
             "hf_tokenizer_loading",
-            extra={"ctx": {"model": model_name, "note": "may download from HuggingFace Hub on first use"}},
+            extra={"ctx": {"model": model_name}},
         )
         try:
             self._tokenizer = Tokenizer.from_pretrained(model_name)
         except Exception as exc:
             raise RuntimeError(
                 f"Failed to load HuggingFace tokenizer '{model_name}'. "
-                f"Check your internet connection for first-time downloads. Error: {exc}"
+                f"Check internet connection for first-time downloads. Error: {exc}"
             ) from exc
 
     def count(self, text: str) -> int:
@@ -86,9 +71,13 @@ class HFTokenizerBackend:
 
 
 def get_tokenizer(model: ModelInfo) -> TokenizerBackend:
-    """Factory: return the right backend for the given model."""
+    if model.id in _tokenizer_cache:
+        return _tokenizer_cache[model.id]
     if model.tokenizer_backend == "tiktoken":
-        return TikTokenBackend(model.tokenizer_name)
-    if model.tokenizer_backend == "hf":
-        return HFTokenizerBackend(model.tokenizer_name)
-    raise ValueError(f"Unknown tokenizer backend: '{model.tokenizer_backend}'")
+        backend: TokenizerBackend = TikTokenBackend(model.tokenizer_name)
+    elif model.tokenizer_backend == "hf":
+        backend = HFTokenizerBackend(model.tokenizer_name)
+    else:
+        raise ValueError(f"Unknown tokenizer backend: '{model.tokenizer_backend}'")
+    _tokenizer_cache[model.id] = backend
+    return backend
