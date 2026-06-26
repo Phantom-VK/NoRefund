@@ -1,7 +1,10 @@
 """Load and query the model/pricing registry from YAML."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 import yaml
 
@@ -21,6 +24,7 @@ class ModelInfo:
     input_price_per_million: float
     output_price_per_million: float
     currency: str = "USD"
+    docs_url: Optional[str] = None   # Optional link to provider pricing/docs page
 
 
 def load_models(path: Path = _DEFAULT_REGISTRY_PATH) -> dict[str, ModelInfo]:

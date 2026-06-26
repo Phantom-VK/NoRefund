@@ -1,5 +1,7 @@
 """Tokenizer backends. Each backend counts tokens for a given model."""
 
+from __future__ import annotations
+
 import logging
 import re
 from typing import Protocol
@@ -49,7 +51,19 @@ class TikTokenBackend:
 
 
 class HFTokenizerBackend:
-    """NOTE: First use downloads the tokenizer from HuggingFace Hub (~few MB)."""
+    """HuggingFace tokenizer backend.
+
+    OFFLINE-FIRST: Only loads from the local HuggingFace cache. If the
+    tokenizer files are not already cached, a clear RuntimeError is raised
+    instead of silently downloading from the internet.
+
+    To cache a tokenizer for offline use, run once with internet access:
+
+        python -c "from tokenizers import Tokenizer; Tokenizer.from_pretrained('<model>')"
+
+    The files will be stored under the default HF cache directory
+    (~/.cache/huggingface/hub on Linux/macOS).
+    """
 
     def __init__(self, model_name: str) -> None:
         from tokenizers import Tokenizer
@@ -59,14 +73,28 @@ class HFTokenizerBackend:
             extra={"ctx": {"model": model_name}},
         )
         try:
-            self._tokenizer = Tokenizer.from_pretrained(model_name)
+            self._tokenizer = Tokenizer.from_pretrained(
+                model_name,
+                # Prevent any network call — only use locally cached files.
+                # Raises EnvironmentError / OSError if files are not cached.
+                local_files_only=True,
+            )
+        except (OSError, EnvironmentError) as exc:
+            raise RuntimeError(
+                f"HuggingFace tokenizer '{model_name}' is not available in the local cache.\n"
+                "To download it once (requires internet access), run:\n"
+                f"  python -c \"from tokenizers import Tokenizer; "
+                f"Tokenizer.from_pretrained('{model_name}')\"\n"
+                "After that, NoRefund will use it fully offline."
+            ) from exc
         except Exception as exc:
             raise RuntimeError(
-                f"Failed to load HuggingFace tokenizer '{model_name}'. "
-                f"Check internet connection for first-time downloads. Error: {exc}"
+                f"Failed to load HuggingFace tokenizer '{model_name}': {exc}"
             ) from exc
 
     def count(self, text: str) -> int:
+        if not text:
+            return 0
         return len(self._tokenizer.encode(text).ids)
 
 
