@@ -15,8 +15,10 @@ class RegistryView(ctk.CTkFrame):
         super().__init__(parent, fg_color=COLORS["bg"])
         self.models = models
         self.provider = "All"
+        self._cards: list[tuple[ModelInfo, ctk.CTkFrame]] = []
         self._build()
-        self._render_models()
+        self._build_cards()
+        self._apply_filter()
 
     def _build(self) -> None:
         self.grid_columnconfigure(0, weight=1)
@@ -44,55 +46,42 @@ class RegistryView(ctk.CTkFrame):
         ).pack(anchor="w", pady=(2, 12))
         filters = ctk.CTkFrame(header, fg_color="transparent")
         filters.pack(fill="x")
-        for provider in ["All", *sorted({model.provider for model in self.models})]:
+        for p in ["All", *sorted({model.provider for model in self.models})]:
             IconButton(
                 filters,
-                provider,
-                width=max(58, len(provider) * 10),
-                command=lambda p=provider: self._set_provider(p),
+                p,
+                width=max(58, len(p) * 10),
+                command=lambda p=p: self._set_provider(p),
             ).pack(side="left", padx=(0, 6), pady=2)
 
         self.model_grid = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self.model_grid.grid(row=1, column=0, sticky="nsew", padx=24, pady=(0, 20))
         self.model_grid.grid_columnconfigure((0, 1, 2), weight=1, uniform="model")
 
-    def _set_provider(self, provider: str) -> None:
-        self.provider = provider
-        self._render_models()
+    def _build_cards(self) -> None:
+        for model in self.models:
+            card = self._make_card(model)
+            self._cards.append((model, card))
 
-    def _render_models(self) -> None:
-        for child in self.model_grid.winfo_children():
-            child.destroy()
-        models = [
-            model
-            for model in self.models
-            if self.provider == "All" or model.provider == self.provider
-        ]
-        for idx, model in enumerate(models):
-            self._model_card(model, idx // 3, idx % 3)
-
-    def _model_card(self, model: ModelInfo, row: int, column: int) -> None:
+    def _make_card(self, model: ModelInfo) -> ctk.CTkFrame:
         accent = provider_color(model.provider)
-        card = ctk.CTkFrame(self.model_grid, fg_color=COLORS["card"], corner_radius=6)
-        card.grid(row=row, column=column, sticky="nsew", padx=6, pady=6)
-
-        head = ctk.CTkFrame(card, fg_color=COLORS["muted"], corner_radius=6)
-        head.pack(fill="x", padx=0, pady=0)
+        card = ctk.CTkFrame(self.model_grid, fg_color=COLORS["card"], corner_radius=8)
+        head = ctk.CTkFrame(card, fg_color=accent, corner_radius=0, height=4)
+        head.pack(fill="x")
         ctk.CTkLabel(
-            head,
+            card,
             text=model.display_name,
             text_color=COLORS["text"],
             font=ctk.CTkFont(size=14, weight="bold"),
             anchor="w",
         ).pack(fill="x", padx=14, pady=(10, 0))
         ctk.CTkLabel(
-            head,
+            card,
             text=model.id,
             text_color=COLORS["muted_text"],
             font=ctk.CTkFont(size=10, family="monospace"),
             anchor="w",
         ).pack(fill="x", padx=14, pady=(0, 10))
-
         ctk.CTkLabel(
             card,
             text=model.provider.upper(),
@@ -100,27 +89,18 @@ class RegistryView(ctk.CTkFrame):
             font=ctk.CTkFont(size=10, weight="bold"),
             anchor="w",
         ).pack(fill="x", padx=14, pady=(12, 8))
-        ctk.CTkLabel(
-            card,
-            text=f"Context window      {fmt_num(model.context_window)} tokens",
-            text_color=COLORS["text"],
-            font=ctk.CTkFont(size=12, family="monospace"),
-            anchor="w",
-        ).pack(fill="x", padx=14, pady=2)
-        ctk.CTkLabel(
-            card,
-            text=f"Input / 1M          ${model.input_price_per_million:.2f}",
-            text_color=COLORS["text"],
-            font=ctk.CTkFont(size=12, family="monospace"),
-            anchor="w",
-        ).pack(fill="x", padx=14, pady=2)
-        ctk.CTkLabel(
-            card,
-            text=f"Output / 1M         ${model.output_price_per_million:.2f}",
-            text_color=COLORS["text"],
-            font=ctk.CTkFont(size=12, family="monospace"),
-            anchor="w",
-        ).pack(fill="x", padx=14, pady=2)
+        for text in [
+            f"Context window      {fmt_num(model.context_window)} tokens",
+            f"Input / 1M          ${model.input_price_per_million:.2f}",
+            f"Output / 1M         ${model.output_price_per_million:.2f}",
+        ]:
+            ctk.CTkLabel(
+                card,
+                text=text,
+                text_color=COLORS["text"],
+                font=ctk.CTkFont(size=12, family="monospace"),
+                anchor="w",
+            ).pack(fill="x", padx=14, pady=2)
         ctk.CTkLabel(
             card,
             text=f"Tokenizer: {model.tokenizer_name}",
@@ -128,10 +108,21 @@ class RegistryView(ctk.CTkFrame):
             font=ctk.CTkFont(size=10, family="monospace"),
             anchor="w",
         ).pack(fill="x", padx=14, pady=(10, 12))
-        ctk.CTkLabel(
-            card,
-            text="Docs link: backend field pending",
-            text_color=COLORS["muted_text"],
-            font=ctk.CTkFont(size=10),
-            anchor="w",
-        ).pack(fill="x", padx=14, pady=(0, 12))
+        return card
+
+    def _set_provider(self, provider: str) -> None:
+        self.provider = provider
+        self._apply_filter()
+
+    def _apply_filter(self) -> None:
+        col = 0
+        row = 0
+        for model, card in self._cards:
+            if self.provider == "All" or model.provider == self.provider:
+                card.grid(row=row, column=col, padx=8, pady=8, sticky="nsew")
+                col += 1
+                if col > 2:
+                    col = 0
+                    row += 1
+            else:
+                card.grid_remove()
