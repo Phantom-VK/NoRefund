@@ -17,17 +17,16 @@ from norefund.gui.widgets import IconButton, ModelDropdown, StatPill
 from norefund.logging_config import latest_log_file
 
 
+def _tail_lines(path: Path, n: int = 120) -> list[str]:
+    with path.open("rb") as f:
+        f.seek(0, 2)
+        size = f.tell()
+        f.seek(max(0, size - 16_000))
+        return f.read().decode("utf-8", errors="ignore").splitlines()[-n:]
+
+
 class ResultsTable(ctk.CTkScrollableFrame):
-    HEADERS = [
-        "File",
-        "Tokens",
-        "Context %",
-        "Fits?",
-        "Chunks",
-        "Input Cost",
-        "Words",
-        "Chars",
-    ]
+    HEADERS = ["File", "Tokens", "Context %", "Fits?", "Chunks", "Input Cost", "Words", "Chars"]
     WIDTHS = [230, 90, 130, 70, 70, 100, 90, 90]
 
     def __init__(self, parent) -> None:
@@ -75,9 +74,7 @@ class ResultsTable(ctk.CTkScrollableFrame):
             if col == 2:
                 color = context_color(result.context_usage_pct)
             elif col == 3:
-                color = (
-                    COLORS["primary"] if result.fits_in_context else COLORS["danger"]
-                )
+                color = COLORS["primary"] if result.fits_in_context else COLORS["danger"]
             ctk.CTkLabel(
                 self,
                 text=value,
@@ -110,12 +107,10 @@ class LogsPanel(ctk.CTkFrame):
         self.text.delete("1.0", "end")
         path = latest_log_file()
         if not path:
-            self.text.insert(
-                "end", "No logs yet. Run an analysis to see output here.\n"
-            )
+            self.text.insert("end", "No logs yet. Run an analysis to see output here.\n")
             return
         try:
-            for line in path.read_text(encoding="utf-8").splitlines()[-120:]:
+            for line in _tail_lines(path):
                 if not line.strip():
                     continue
                 try:
@@ -298,10 +293,7 @@ class ParserView(ctk.CTkFrame):
             row.pack(fill="x", padx=18, pady=14)
             ctk.CTkLabel(
                 row,
-                text=(
-                    "No files selected. Click \"Add File\" or "
-                    "\"Add Folder\" to get started."
-                ),
+                text='No files selected. Click "Add File" or "Add Folder" to get started.',
                 text_color=COLORS["muted_text"],
                 anchor="w",
             ).pack(fill="x")
@@ -392,7 +384,7 @@ class ParserView(ctk.CTkFrame):
         avg_context = (
             sum(item.context_usage_pct for item in self.results) / count if count else 0
         )
-        self.stat_files.set(str(count))
-        self.stat_tokens.set(fmt_num(total_tokens))
-        self.stat_cost.set(fmt_cost(total_cost))
-        self.stat_context.set(f"{fmt_float(avg_context)}%")
+        self.stat_files.set_text(str(count))
+        self.stat_tokens.set_text(fmt_num(total_tokens))
+        self.stat_cost.set_text(fmt_cost(total_cost))
+        self.stat_context.set_text(f"{fmt_float(avg_context)}%")
