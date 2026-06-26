@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
 
 from norefund.core.costing import (
     context_usage_pct,
@@ -20,7 +19,6 @@ from norefund.core.models_registry import get_model
 from norefund.core.parsing import parse_file
 from norefund.core.tokenization import get_tokenizer
 from norefund.logging_config import get_logger
-
 
 _LOG = get_logger(__name__)
 _SUPPORTED = {".txt", ".md", ".pdf", ".pptx", ".docx", ".py", ".json"}
@@ -40,22 +38,22 @@ class AnalysisResult:
 
 
 def analyze_file(path: Path, model_id: str) -> AnalysisResult:
-    model     = get_model(model_id)
+    model = get_model(model_id)
     tokenizer = get_tokenizer(model)
-    text      = parse_file(path)
+    text = parse_file(path)
 
     tokens = tokenizer.count(text)
 
     result = AnalysisResult(
-        file_path            = str(path),
-        model_id             = model_id,
-        char_count           = len(text),
-        word_count           = len(text.split()),
-        token_count          = tokens,
-        context_usage_pct    = context_usage_pct(tokens, model.context_window),
-        fits_in_context      = fits_in_context(tokens, model.context_window),
-        min_chunks_needed    = min_chunks(tokens, model.context_window),
-        estimated_input_cost = input_cost(tokens, model),
+        file_path=str(path),
+        model_id=model_id,
+        char_count=len(text),
+        word_count=len(text.split()),
+        token_count=tokens,
+        context_usage_pct=context_usage_pct(tokens, model.context_window),
+        fits_in_context=fits_in_context(tokens, model.context_window),
+        min_chunks_needed=min_chunks(tokens, model.context_window),
+        estimated_input_cost=input_cost(tokens, model),
     )
 
     _LOG.info(
@@ -76,7 +74,7 @@ def analyze_file(path: Path, model_id: str) -> AnalysisResult:
     return result
 
 
-def analyze_folder(folder: Path, model_id: str) -> List[AnalysisResult]:
+def analyze_folder(folder: Path, model_id: str) -> list[AnalysisResult]:
     results = []
     for f in sorted(folder.rglob("*")):
         if f.is_file() and f.suffix.lower() in _SUPPORTED:

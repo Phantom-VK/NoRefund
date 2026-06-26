@@ -1,5 +1,6 @@
 """Tokenizer backends. Each backend counts tokens for a given model."""
 
+import re
 from typing import Protocol
 
 from norefund.core.models_registry import ModelInfo
@@ -15,14 +16,24 @@ class TikTokenBackend:
     def __init__(self, model_name: str) -> None:
         import tiktoken
 
+        self._enc = None
         # Falls back to cl100k_base if model name not found in tiktoken registry
         try:
             self._enc = tiktoken.encoding_for_model(model_name)
         except KeyError:
-            self._enc = tiktoken.get_encoding("cl100k_base")
+            try:
+                self._enc = tiktoken.get_encoding("cl100k_base")
+            except Exception:
+                self._enc = None
+        except Exception:
+            self._enc = None
 
     def count(self, text: str) -> int:
-        return len(self._enc.encode(text))
+        if not text:
+            return 0
+        if self._enc is not None:
+            return len(self._enc.encode(text))
+        return len(re.findall(r"\w+|[^\w\s]", text, flags=re.UNICODE))
 
 
 class HFTokenizerBackend:

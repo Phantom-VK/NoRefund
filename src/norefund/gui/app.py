@@ -2,7 +2,7 @@
 
 import customtkinter as ctk
 
-ctk.set_appearance_mode("System")
+ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
 
@@ -10,8 +10,8 @@ class App(ctk.CTk):
     def __init__(self) -> None:
         super().__init__()
         self.title("NoRefund — Token & Cost Analyzer")
-        self.geometry("1000x680")
-        self.minsize(800, 560)
+        self.geometry("1280x780")
+        self.minsize(1040, 640)
         self._setup_views()
 
     def _setup_views(self) -> None:

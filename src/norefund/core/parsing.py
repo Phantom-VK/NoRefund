@@ -16,6 +16,11 @@ def extract_text(path: Path) -> str:
     return parsers.get(ext, _read_text)(path)
 
 
+def parse_file(path: Path) -> str:
+    """Compatibility wrapper used by the service layer."""
+    return extract_text(path)
+
+
 def _read_pdf(path: Path) -> str:
     from pypdf import PdfReader
 

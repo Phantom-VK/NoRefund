@@ -28,8 +28,7 @@ import os
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Log directory helpers
@@ -50,10 +49,13 @@ def _default_log_dir() -> Path:
 
 
 LOG_DIR: Path = _default_log_dir()
-LOG_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    pass
 
 
-def latest_log_file() -> Optional[Path]:
+def latest_log_file() -> Path | None:
     """Return the most recent log file in LOG_DIR, or None if empty."""
 
     if not LOG_DIR.exists():
@@ -66,6 +68,7 @@ def latest_log_file() -> Optional[Path]:
 # JSON formatter
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class LogRecordData:
     ts: str
@@ -76,7 +79,7 @@ class LogRecordData:
     func: str
     line: int
     pathname: str
-    ctx: Dict[str, Any]
+    ctx: dict[str, Any]
 
 
 class JsonFormatter(logging.Formatter):
@@ -112,15 +115,21 @@ _LOGGERS: dict[str, logging.Logger] = {}
 def _build_handler() -> logging.Handler:
     """Create a rotating file handler in the user log directory."""
 
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return logging.NullHandler()
     logfile = LOG_DIR / "norefund.log"
 
-    handler = logging.handlers.RotatingFileHandler(
-        logfile,
-        maxBytes=5 * 1024 * 1024,  # 5 MB per file
-        backupCount=3,
-        encoding="utf-8",
-    )
+    try:
+        handler = logging.handlers.RotatingFileHandler(
+            logfile,
+            maxBytes=5 * 1024 * 1024,  # 5 MB per file
+            backupCount=3,
+            encoding="utf-8",
+        )
+    except OSError:
+        return logging.NullHandler()
     handler.setFormatter(JsonFormatter())
     return handler
 
