@@ -13,19 +13,24 @@ from norefund.gui.theme import COLORS
 from norefund.gui.widgets import IconButton, SidebarItem
 
 
+VIEW_CALCULATOR = "calculator"
+VIEW_PARSER = "parser"
+VIEW_REGISTRY = "registry"
+
+
 class MainView(ctk.CTkFrame):
     def __init__(self, parent: ctk.CTk) -> None:
         super().__init__(parent, fg_color=COLORS["bg"])
         self.models = list_models()
         self.default_output_tokens = ctk.StringVar(value="500")
-        self.current_nav = "parser"
+        self.current_view = VIEW_PARSER
         self.header_count = ctk.StringVar(value="0 files")
         self.title_var = ctk.StringVar(value="File Parser")
         self.theme_dark = True
         self.views: dict[str, ctk.CTkFrame] = {}
 
         self._build_shell()
-        self._show_view("parser")
+        self._show_view(VIEW_PARSER)
 
     def _build_shell(self) -> None:
         self.grid_columnconfigure(1, weight=1)
@@ -88,20 +93,20 @@ class MainView(ctk.CTkFrame):
             text_color=COLORS["muted_text"],
             font=ctk.CTkFont(size=9, weight="bold"),
             anchor="w",
-        ).pack(fill="x", padx=8, pady=(0, 0))
+        ).pack(fill="x", padx=8, pady=0)
         self.nav_buttons = {
-            "calculator": SidebarItem(
-                nav, "Token Calculator", "#", lambda: self._show_view("calculator")
+            VIEW_CALCULATOR: SidebarItem(
+                nav, "Token Calculator", "#", lambda: self._show_view(VIEW_CALCULATOR)
             ),
-            "parser": SidebarItem(
-                nav, "File Parser", "[]", lambda: self._show_view("parser")
+            VIEW_PARSER: SidebarItem(
+                nav, "File Parser", "[]", lambda: self._show_view(VIEW_PARSER)
             ),
-            "registry": SidebarItem(
-                nav, "Model Registry", "::", lambda: self._show_view("registry")
+            VIEW_REGISTRY: SidebarItem(
+                nav, "Model Registry", "::", lambda: self._show_view(VIEW_REGISTRY)
             ),
         }
-        self.nav_buttons["calculator"].pack(fill="x", pady=(0, 2))
-        self.nav_buttons["parser"].pack(fill="x", pady=2)
+        self.nav_buttons[VIEW_CALCULATOR].pack(fill="x", pady=(0, 2))
+        self.nav_buttons[VIEW_PARSER].pack(fill="x", pady=2)
         ctk.CTkLabel(
             nav,
             text="DATA",
@@ -109,7 +114,7 @@ class MainView(ctk.CTkFrame):
             font=ctk.CTkFont(size=9, weight="bold"),
             anchor="w",
         ).pack(fill="x", padx=8, pady=(16, 4))
-        self.nav_buttons["registry"].pack(fill="x", pady=2)
+        self.nav_buttons[VIEW_REGISTRY].pack(fill="x", pady=2)
 
     def _build_sidebar_footer(self, sidebar: ctk.CTkFrame) -> None:
         footer = ctk.CTkFrame(sidebar, fg_color="transparent")
@@ -164,26 +169,26 @@ class MainView(ctk.CTkFrame):
         self.content.grid_rowconfigure(0, weight=1)
 
         self.views = {
-            "calculator": CalculatorView(
+            VIEW_CALCULATOR: CalculatorView(
                 self.content, self.models, self.default_output_tokens
             ),
-            "parser": ParserView(
+            VIEW_PARSER: ParserView(
                 self.content,
                 self,
                 self.models,
                 self.default_output_tokens,
             ),
-            "registry": RegistryView(self.content, self.models),
+            VIEW_REGISTRY: RegistryView(self.content, self.models),
         }
         for view in self.views.values():
             view.grid(row=0, column=0, sticky="nsew")
 
     def _show_view(self, name: str) -> None:
-        self.current_nav = name
+        self.current_view = name
         titles = {
-            "calculator": "Token Calculator",
-            "parser": "File Parser",
-            "registry": "Model Registry",
+            VIEW_CALCULATOR: "Token Calculator",
+            VIEW_PARSER: "File Parser",
+            VIEW_REGISTRY: "Model Registry",
         }
         self.title_var.set(titles[name])
         for key, button in self.nav_buttons.items():
@@ -193,13 +198,14 @@ class MainView(ctk.CTkFrame):
                 view.tkraise()
             else:
                 view.lower()
-        if name == "parser":
+        if name == VIEW_PARSER:
             self.count_badge.pack(side="left", ipadx=8, ipady=2)
         else:
             self.count_badge.pack_forget()
 
     def update_header_count(self, count: int) -> None:
-        self.header_count.set(f"{count} file{'s' if count != 1 else ''}")
+        label = "file" if count == 1 else "files"
+        self.header_count.set(f"{count} {label}")
 
     def _toggle_theme(self) -> None:
         self.theme_dark = not self.theme_dark
