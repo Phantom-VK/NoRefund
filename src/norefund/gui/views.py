@@ -1,16 +1,14 @@
-"""Main view — full GUI implementation with logging pane.
+"""Standalone MainView — used only if app.py is updated to import from here.
 
-Layout (top to bottom):
-  1. Top toolbar   — file/folder picker + model dropdown + Analyze button
-  2. Results table — per-file breakdown (tokens, context %, cost, fit status)
-  3. Summary bar   — total tokens, total cost, context usage bar
-  4. Tabs          — [Results] [Logs]
-  5. Status bar    — current operation message
+Current entry point (app.py) imports from main_view.py, so this file is
+not active. Kept as reference / future merge target.
 
-Logs tab behaviour:
-  - When opened, shows the latest run log file by default.
-  - A dropdown lists all previous run logs (timestamped file names).
-  - Selecting a file loads that run's logs; Refresh re-reads the current file.
+Fixed:
+  - _on_model_change no longer auto-triggers analysis on dropdown change.
+  - _SummaryPanel.update guards against None context_usage_pct.
+  - ResultsTable.add_result handles None context_usage_pct and error results.
+  - LogsView._load_file tail-reads 32 KB and batches all inserts into one
+    string instead of calling CTkTextbox.insert() per line.
 """
 
 from __future__ import annotations
@@ -19,7 +17,7 @@ import json
 import threading
 from pathlib import Path
 from tkinter import filedialog
-from typing import List
+from typing import List, Optional
 
 import customtkinter as ctk
 
@@ -87,9 +85,9 @@ _COLUMNS = [
 
 
 class ResultsTable(ctk.CTkScrollableFrame):
-    _HEADER_FG  = ("#e5e5e5", "#2b2b2b")
-    _ROW_EVEN   = ("#f9f9f9", "#222222")
-    _ROW_ODD    = ("#f0f0f0", "#1e1e1e")
+    _HEADER_FG = ("#e5e5e5", "#2b2b2b")
+    _ROW_EVEN  = ("#f9f9f9", "#222222")
+    _ROW_ODD   = ("#f0f0f0", "#1e1e1e")
 
     def __init__(self, parent, **kw):
         super().__init__(parent, **kw)
@@ -115,20 +113,27 @@ class ResultsTable(ctk.CTkScrollableFrame):
                 widget.destroy()
 
     def add_result(self, result: AnalysisResult, row_idx: int) -> None:
-        bg = self._ROW_EVEN if row_idx % 2 == 0 else self._ROW_ODD
+        bg   = self._ROW_EVEN if row_idx % 2 == 0 else self._ROW_ODD
         font = ctk.CTkFont(size=12)
+
         fits_text  = "✅" if result.fits_in_context else "❌"
-        pct_colour = _usage_colour(result.context_usage_pct)
+        pct        = result.context_usage_pct
+        pct_str    = f"{pct:.1f}%" if pct is not None else "—"
+        pct_colour = _usage_colour(pct) if pct is not None else _MUTED
+
+        name = Path(result.file_path).name
+        if result.error:
+            name = f"⚠ {name}"
 
         cells = [
-            (Path(result.file_path).name,           "w",      None),
-            (f"{result.token_count:,}",              "e",      None),
-            (f"{result.context_usage_pct:.1f}%",    "e",      pct_colour),
-            (fits_text,                              "center", None),
-            (str(result.min_chunks_needed),          "e",      None),
-            (f"${result.estimated_input_cost:.4f}",  "e",      None),
-            (f"{result.word_count:,}",               "e",      None),
-            (f"{result.char_count:,}",               "e",      None),
+            (name,                                  "w",      None),
+            (f"{result.token_count:,}",             "e",      None),
+            (pct_str,                               "e",      pct_colour),
+            (fits_text,                             "center", None),
+            (str(result.min_chunks_needed),         "e",      None),
+            (f"${result.estimated_input_cost:.4f}", "e",      None),
+            (f"{result.word_count:,}",              "e",      None),
+            (f"{result.char_count:,}",              "e",      None),
         ]
 
         for col, (text, anchor, text_color) in enumerate(cells):
@@ -175,7 +180,8 @@ class _SummaryPanel(ctk.CTkFrame):
     def update(self, results: List[AnalysisResult], model: ModelInfo) -> None:
         total_tokens = sum(r.token_count for r in results)
         total_cost   = sum(r.estimated_input_cost for r in results)
-        avg_pct      = sum(r.context_usage_pct for r in results) / len(results) if results else 0
+        valid_pcts   = [r.context_usage_pct for r in results if r.context_usage_pct is not None]
+        avg_pct      = sum(valid_pcts) / len(valid_pcts) if valid_pcts else 0.0
 
         self._lbl_tokens.configure(text=f"{total_tokens:,}")
         self._lbl_cost.configure(text=f"${total_cost:.4f}")
@@ -188,13 +194,6 @@ class _SummaryPanel(ctk.CTkFrame):
 
 
 class LogsView(ctk.CTkFrame):
-    """Read-only view that lets the user pick and inspect any run log.
-
-    - Lists all `norefund-*.log` files from the per-user log directory.
-    - Select a file from the dropdown to load that run's logs.
-    - The latest run is selected by default.
-    """
-
     def __init__(self, parent, **kw):
         super().__init__(parent, **kw)
 
@@ -204,7 +203,6 @@ class LogsView(ctk.CTkFrame):
         ctk.CTkLabel(top, text="Run:", font=ctk.CTkFont(size=12, weight="bold")).pack(
             side="left", padx=(0, 6), pady=4
         )
-
         self._file_var = ctk.StringVar(value="")
         self._file_menu = ctk.CTkOptionMenu(
             top,
@@ -214,11 +212,9 @@ class LogsView(ctk.CTkFrame):
             width=260,
         )
         self._file_menu.pack(side="left", padx=(0, 8), pady=4)
-
         ctk.CTkButton(top, text="Refresh", width=90, command=self._refresh).pack(
             side="left", padx=(0, 8), pady=4
         )
-
         self._lbl_path = ctk.CTkLabel(top, text="", anchor="w", font=ctk.CTkFont(size=11))
         self._lbl_path.pack(side="left", padx=(0, 8), pady=4)
 
@@ -229,8 +225,6 @@ class LogsView(ctk.CTkFrame):
         self._refresh(initial=True)
 
     def _refresh(self, initial: bool = False) -> None:
-        """Reload the file list and, if possible, keep or move to latest selection."""
-
         files = list_log_files()
         self._files = files
 
@@ -246,15 +240,9 @@ class LogsView(ctk.CTkFrame):
         names = [f.name for f in files]
         self._file_menu.configure(values=names)
 
-        # On initial load, always select the latest run; on manual refresh,
-        # keep current selection if still present, otherwise fall back to latest.
         current = self._file_var.get()
-        if initial or current not in names:
-            selected_name = names[-1]
-        else:
-            selected_name = current
-
-        self._file_var.set(selected_name)
+        selected = names[-1] if (initial or current not in names) else current
+        self._file_var.set(selected)
         self._load_file(self._resolve_selected_path())
 
     def _resolve_selected_path(self) -> Path:
@@ -262,29 +250,32 @@ class LogsView(ctk.CTkFrame):
         for f in self._files:
             if f.name == name:
                 return f
-        # Fallback: latest
         return self._files[-1]
 
     def _on_file_change(self, _: str) -> None:
-        if not self._files:
-            return
-        self._load_file(self._resolve_selected_path())
+        if self._files:
+            self._load_file(self._resolve_selected_path())
 
     def _load_file(self, path: Path) -> None:
         self._text.delete("1.0", "end")
         self._lbl_path.configure(text=str(path))
         try:
-            with path.open("r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        obj = json.loads(line)
-                        pretty = json.dumps(obj, indent=2, ensure_ascii=False)
-                        self._text.insert("end", pretty + "\n\n")
-                    except json.JSONDecodeError:
-                        self._text.insert("end", line + "\n")
+            with path.open("rb") as f:
+                f.seek(0, 2)
+                f.seek(max(0, f.tell() - 32_000))
+                lines = f.read().decode("utf-8", errors="ignore").splitlines()[-200:]
+            output: list[str] = []
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                    ctx = obj.get("ctx") or {}
+                    output.append(f"[{obj.get('level', 'INFO')}] {obj.get('message', '')} {ctx}")
+                except json.JSONDecodeError:
+                    output.append(line)
+            self._text.insert("end", "\n".join(output))
         except OSError as exc:
             self._text.insert("end", f"Error reading log file: {exc}\n")
 
@@ -292,9 +283,9 @@ class LogsView(ctk.CTkFrame):
 class MainView(ctk.CTkFrame):
     def __init__(self, parent: ctk.CTk) -> None:
         super().__init__(parent, fg_color="transparent")
-        self._results:  List[AnalysisResult] = []
-        self._models:   List[ModelInfo]       = list_models()
-        self._model_map: dict[str, ModelInfo] = {m.display_name: m for m in self._models}
+        self._results:   List[AnalysisResult] = []
+        self._models:    List[ModelInfo]       = list_models()
+        self._model_map: dict[str, ModelInfo]  = {m.display_name: m for m in self._models}
 
         self._build_toolbar()
         self._build_tabs()
@@ -323,7 +314,6 @@ class MainView(ctk.CTkFrame):
             values=names,
             variable=self._model_var,
             width=220,
-            command=self._on_model_change,
         ).pack(side="left", padx=(0, 16), pady=8)
 
         _SectionLabel(bar, text="Est. output tokens:").pack(side="left", padx=(0, 6))
@@ -410,10 +400,6 @@ class MainView(ctk.CTkFrame):
         self._summary.reset()
         self._results.clear()
         self._set_status("Cleared. Pick a file or folder to begin.")
-
-    def _on_model_change(self, _: str) -> None:
-        if self._paths:
-            self._run_analysis()
 
     def _run_analysis(self) -> None:
         if not self._paths:

@@ -1,13 +1,16 @@
 """Load and query the model/pricing registry from YAML."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 import yaml
 
 _DEFAULT_REGISTRY_PATH = Path(__file__).parent.parent / "config" / "default_models.yaml"
 
-_cache: dict[str, "ModelInfo"] | None = None
+_cache: dict[Path, dict[str, ModelInfo]] = {}
 
 
 @dataclass
@@ -21,20 +24,22 @@ class ModelInfo:
     input_price_per_million: float
     output_price_per_million: float
     currency: str = "USD"
+    docs_url: Optional[str] = None   # Optional link to provider pricing/docs page
 
 
 def load_models(path: Path = _DEFAULT_REGISTRY_PATH) -> dict[str, ModelInfo]:
-    global _cache
-    if _cache is not None:
-        return _cache
+    key = path.resolve()
+    if key in _cache:
+        return _cache[key]
     if not path.exists():
         raise FileNotFoundError(f"Model registry not found: {path}")
     try:
         raw: list[dict] = yaml.safe_load(path.read_text())
         if not isinstance(raw, list):
             raise ValueError("Registry YAML must be a list of model entries.")
-        _cache = {entry["id"]: ModelInfo(**entry) for entry in raw}
-        return _cache
+        models = {entry["id"]: ModelInfo(**entry) for entry in raw}
+        _cache[key] = models
+        return models
     except (yaml.YAMLError, TypeError, KeyError) as exc:
         raise ValueError(f"Failed to parse model registry '{path}': {exc}") from exc
 

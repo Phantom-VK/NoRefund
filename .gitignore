@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+/NoRefund Desktop UI Design
+ISSUES.md
+backend_changes.md
+.idea

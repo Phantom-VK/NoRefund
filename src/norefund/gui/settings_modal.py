@@ -15,7 +15,11 @@ class SettingsModal(ctk.CTkToplevel):
         self.geometry("430x330")
         self.resizable(False, False)
         self.transient(parent)
-        self.grab_set()
+        # Defer grab_set until the window is fully mapped and viewable.
+        # Calling grab_set() synchronously in __init__ races against Tk's
+        # window-map event on some Linux compositors and raises:
+        #   TclError: grab failed: window not viewable
+        self.after(50, self._safe_grab)
 
         frame = ctk.CTkFrame(self, fg_color=COLORS["card"], corner_radius=8)
         frame.pack(fill="both", expand=True, padx=16, pady=16)
@@ -80,3 +84,28 @@ class SettingsModal(ctk.CTkToplevel):
         IconButton(
             footer, "Save changes", variant="primary", width=120, command=self.destroy
         ).pack(side="right")
+
+    # ------------------------------------------------------------------
+    # Internal
+    # ------------------------------------------------------------------
+
+    def _safe_grab(self) -> None:
+        """Attempt grab_set only when the window is actually viewable.
+
+        The 50 ms delay scheduled in __init__ is enough on virtually all
+        platforms, but we guard with winfo_viewable() as a belt-and-braces
+        check.  If somehow still not viewable we retry once after another
+        100 ms before giving up (modal still works, just without grab).
+        """
+        if self.winfo_exists() and self.winfo_viewable():
+            self.grab_set()
+        else:
+            self.after(100, self._grab_final_attempt)
+
+    def _grab_final_attempt(self) -> None:
+        """Last-chance grab attempt; silently skip if window is gone."""
+        if self.winfo_exists() and self.winfo_viewable():
+            try:
+                self.grab_set()
+            except Exception:  # noqa: BLE001
+                pass  # Non-fatal — modal is visible, just not input-locked
