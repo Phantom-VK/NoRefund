@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import webbrowser
+
 import customtkinter as ctk
 
 from norefund.core.models_registry import ModelInfo
@@ -107,7 +109,28 @@ class RegistryView(ctk.CTkFrame):
             text_color=COLORS["muted_text"],
             font=ctk.CTkFont(size=10, family="monospace"),
             anchor="w",
-        ).pack(fill="x", padx=14, pady=(10, 12))
+        ).pack(fill="x", padx=14, pady=(10, 2))
+        if model.docs_url:
+            docs_label = ctk.CTkLabel(
+                card,
+                text="Docs & pricing ↗",
+                text_color=accent,
+                font=ctk.CTkFont(size=11, weight="bold"),
+                anchor="w",
+                cursor="hand2",
+            )
+            docs_label.pack(fill="x", padx=14, pady=(0, 12))
+            docs_label.bind(
+                "<Button-1>", lambda _e, url=model.docs_url: webbrowser.open(url)
+            )
+        else:
+            ctk.CTkLabel(
+                card,
+                text="Docs link unavailable",
+                text_color=COLORS["muted_text"],
+                font=ctk.CTkFont(size=11),
+                anchor="w",
+            ).pack(fill="x", padx=14, pady=(0, 12))
         return card
 
     def _set_provider(self, provider: str) -> None:

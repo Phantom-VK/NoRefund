@@ -1,4 +1,4 @@
-"""Settings persistence — loads/saves user preferences to a per-user JSON file.
+r"""Settings persistence — loads/saves user preferences to a per-user JSON file.
 
 Storage location (platform-appropriate):
   - Linux:   ~/.config/NoRefund/settings.json

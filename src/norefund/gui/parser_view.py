@@ -7,13 +7,15 @@ import logging
 import threading
 import traceback
 from pathlib import Path
-from tkinter import filedialog, messagebox
+from tkinter import TclError, filedialog, messagebox
+from typing import Optional
 
 import customtkinter as ctk
 
+from norefund.core.costing import output_cost
 from norefund.core.models_registry import ModelInfo
 from norefund.core.service import AnalysisResult, analyze_file, analyze_folder
-from norefund.gui.formatting import context_color, fmt_cost, fmt_float, fmt_num
+from norefund.gui.formatting import context_color, fmt_cost, fmt_float, fmt_num, parse_int
 from norefund.gui.theme import COLORS, SUPPORTED_FILETYPES
 from norefund.gui.widgets import IconButton, ModelDropdown, StatPill
 from norefund.logging_config import latest_log_file
@@ -172,6 +174,9 @@ class ParserView(ctk.CTkFrame):
         self.active_tab = "results"
         self.status     = ctk.StringVar(value="Ready - add a file or folder to begin.")
         self.analyzing  = False
+        self.cancel_event: Optional[threading.Event] = None
+        self._files_processed = 0
+        self.last_model: Optional[ModelInfo] = None
 
         self._build()
         self._render_files()
@@ -259,13 +264,20 @@ class ParserView(ctk.CTkFrame):
             self.results_panel, fg_color=COLORS["card"], corner_radius=0
         )
         self.summary.grid(row=0, column=0, sticky="ew")
-        self.summary.grid_columnconfigure((0, 1, 2, 3), weight=1, uniform="summary")
-        self.stat_files   = StatPill(self.summary, "Files")
-        self.stat_tokens  = StatPill(self.summary, "Total tokens")
-        self.stat_cost    = StatPill(self.summary, "Input cost")
-        self.stat_context = StatPill(self.summary, "Avg context")
+        self.summary.grid_columnconfigure((0, 1, 2, 3, 4), weight=1, uniform="summary")
+        self.stat_files       = StatPill(self.summary, "Files")
+        self.stat_tokens      = StatPill(self.summary, "Total tokens")
+        self.stat_cost        = StatPill(self.summary, "Input cost")
+        self.stat_output_cost = StatPill(self.summary, "Est. output cost")
+        self.stat_context     = StatPill(self.summary, "Avg context")
         for idx, stat in enumerate(
-            [self.stat_files, self.stat_tokens, self.stat_cost, self.stat_context]
+            [
+                self.stat_files,
+                self.stat_tokens,
+                self.stat_cost,
+                self.stat_output_cost,
+                self.stat_context,
+            ]
         ):
             stat.grid(row=0, column=idx, sticky="ew", padx=18, pady=12)
 
@@ -316,9 +328,15 @@ class ParserView(ctk.CTkFrame):
     def _clear(self) -> None:
         self.paths.clear()
         self.results.clear()
+        self.last_model = None
         # Force-reset stuck analyzing state so Clear always unblocks the UI.
+        if self.cancel_event is not None:
+            self.cancel_event.set()
+        self.cancel_event = None
         self.analyzing = False
-        self.analyze_btn.configure(state="normal", text="Analyze")
+        self.analyze_btn.configure(
+            state="normal", text="Analyze", command=self._run_analysis
+        )
         self.status.set("Cleared. Add a file or folder to begin.")
         self._render_files()
         self._render_results()
@@ -389,9 +407,38 @@ class ParserView(ctk.CTkFrame):
             self.status.set("No files selected. Use Add File or Add Folder first.")
             return
         self.analyzing = True
-        self.analyze_btn.configure(state="disabled", text="Analyzing...")
+        self._files_processed = 0
+        self.cancel_event = threading.Event()
+        self.analyze_btn.configure(text="Cancel", command=self._cancel_analysis)
         self.status.set("Analyzing - please wait...")
         threading.Thread(target=self._analysis_worker, daemon=True).start()
+
+    def _cancel_analysis(self) -> None:
+        """Signal the worker to stop after the file it's currently on."""
+        if self.cancel_event is not None:
+            self.cancel_event.set()
+        self.analyze_btn.configure(state="disabled", text="Cancelling...")
+        self.status.set("Cancelling - finishing current file...")
+
+    def _schedule(self, callback, *args) -> None:
+        """Schedule *callback* on the main thread; no-op if the window is gone.
+
+        Called from the background analysis thread, which may finish after
+        the user has already closed the window/app. self.after() itself can
+        raise TclError once the underlying Tk interpreter is torn down.
+        """
+        try:
+            if self.winfo_exists():
+                self.after(0, callback, *args)
+        except (TclError, RuntimeError):
+            pass
+
+    def _on_file_progress(self, result: AnalysisResult) -> None:
+        """Called on the main thread after each file finishes analysing."""
+        if not self.winfo_exists():
+            return
+        self._files_processed += 1
+        self.status.set(f"Analyzing... {self._files_processed} file(s) processed")
 
     def _analysis_worker(self) -> None:
         """Run in a background thread.
@@ -400,31 +447,52 @@ class ParserView(ctk.CTkFrame):
         back on the main thread — even on unexpected exceptions — so the
         button is never permanently stuck on 'Analyzing...'.
         """
+        cancel_event = self.cancel_event
         try:
             model   = self.model_select.selected_model()
             results: list[AnalysisResult] = []
             errors:  list[str]            = []
             for path in list(self.paths):
+                if cancel_event.is_set():
+                    break
                 try:
                     if path.is_dir():
-                        results.extend(analyze_folder(path, model.id))
+                        results.extend(
+                            analyze_folder(
+                                path,
+                                model.id,
+                                on_progress=lambda r: self._schedule(
+                                    self._on_file_progress, r
+                                ),
+                                cancel_event=cancel_event,
+                            )
+                        )
                     else:
-                        results.append(analyze_file(path, model.id))
+                        result = analyze_file(path, model.id)
+                        results.append(result)
+                        self._schedule(self._on_file_progress, result)
                 except Exception as exc:
                     errors.append(f"{path.name}: {exc}")
-            self.after(0, self._analysis_complete, results, model, errors)
+            self._schedule(
+                self._analysis_complete, results, model, errors, cancel_event.is_set()
+            )
         except Exception as exc:
             tb = traceback.format_exc()
             _LOG.error(
                 "analysis_worker_crashed",
                 extra={"ctx": {"error": str(exc), "traceback": tb}},
             )
-            self.after(0, self._analysis_error, str(exc))
+            self._schedule(self._analysis_error, str(exc))
 
     def _analysis_error(self, message: str) -> None:
         """Called on the main thread when the worker crashes unexpectedly."""
+        if not self.winfo_exists():
+            return
         self.analyzing = False
-        self.analyze_btn.configure(state="normal", text="Analyze")
+        self.cancel_event = None
+        self.analyze_btn.configure(
+            state="normal", text="Analyze", command=self._run_analysis
+        )
         self.status.set(f"Error: {message}")
         messagebox.showerror(
             "Analysis failed",
@@ -433,17 +501,32 @@ class ParserView(ctk.CTkFrame):
         )
 
     def _analysis_complete(
-        self, results: list[AnalysisResult], model: ModelInfo, errors: list[str]
+        self,
+        results: list[AnalysisResult],
+        model: ModelInfo,
+        errors: list[str],
+        cancelled: bool = False,
     ) -> None:
+        if not self.winfo_exists():
+            return
         self.analyzing = False
-        self.analyze_btn.configure(state="normal", text="Analyze")
+        self.cancel_event = None
+        self.analyze_btn.configure(
+            state="normal", text="Analyze", command=self._run_analysis
+        )
         self.results = results
+        self.last_model = model
         self._render_results()
         self._set_tab("results")
         if errors:
             messagebox.showwarning(
                 "Analysis completed with errors", "\n".join(errors[:8])
             )
+        if cancelled:
+            self.status.set(
+                f"Cancelled - {len(results)} file(s) analysed before stopping."
+            )
+            return
         self.status.set(
             f"Done - {len(results)} file(s) analysed with {model.display_name}."
         )
@@ -465,7 +548,17 @@ class ParserView(ctk.CTkFrame):
         ]
         avg_context  = sum(valid_pcts) / len(valid_pcts) if valid_pcts else 0.0
 
+        # Est. output cost = (per-file output-token estimate) x file count,
+        # priced against the model actually used for the last analysis run.
+        if self.last_model is not None and count > 0:
+            est_output_tokens = parse_int(self.output_tokens.get())
+            total_output_cost = count * output_cost(est_output_tokens, self.last_model)
+            output_cost_str = fmt_cost(total_output_cost)
+        else:
+            output_cost_str = "—"
+
         self.stat_files.set_text(str(count))
         self.stat_tokens.set_text(fmt_num(total_tokens))
         self.stat_cost.set_text(fmt_cost(total_cost))
+        self.stat_output_cost.set_text(output_cost_str)
         self.stat_context.set_text(f"{fmt_float(avg_context)}%")

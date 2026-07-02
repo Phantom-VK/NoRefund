@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 import customtkinter as ctk
 
 from norefund.core.models_registry import ModelInfo
@@ -21,7 +23,12 @@ class ContextBar(ctk.CTkFrame):
         self._bar.set(0)
         self._bar.pack(fill="x", expand=True)
 
-    def set_value(self, pct: float) -> None:
+    def set_value(self, pct: Optional[float]) -> None:
+        """Update bar fill and colour. None (no context window) renders empty/muted."""
+        if pct is None:
+            self._bar.set(0)
+            self._bar.configure(progress_color=context_color(None))
+            return
         self._bar.set(min(max(pct, 0), 100) / 100)
         self._bar.configure(progress_color=context_color(pct))
 

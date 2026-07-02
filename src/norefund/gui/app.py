@@ -18,3 +18,7 @@ class App(ctk.CTk):
         from norefund.gui.main_view import MainView
 
         MainView(self).pack(fill="both", expand=True)
+
+
+if __name__ == "__main__":
+    App().mainloop()

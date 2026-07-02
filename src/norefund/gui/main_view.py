@@ -5,6 +5,7 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from norefund.core.models_registry import list_models
+from norefund.core.settings import SettingsStore
 from norefund.gui.calculator_view import CalculatorView
 from norefund.gui.parser_view import ParserView
 from norefund.gui.registry_view import RegistryView
@@ -20,15 +21,22 @@ VIEW_REGISTRY = "registry"
 class MainView(ctk.CTkFrame):
     def __init__(self, parent: ctk.CTk) -> None:
         super().__init__(parent, fg_color=COLORS["bg"])
+        self.settings_store = SettingsStore()
+        self.settings = self.settings_store.load()
+
         self.models = list_models()
-        self.default_output_tokens = ctk.StringVar(value="500")
+        self.default_output_tokens = ctk.StringVar(
+            value=str(self.settings.default_output_tokens)
+        )
+        self.currency = ctk.StringVar(value=self.settings.currency)
         self.current_view = VIEW_PARSER
         self.header_count = ctk.StringVar(value="0 files")
         self.title_var = ctk.StringVar(value="File Parser")
-        self.theme_dark = True
+        self.theme_dark = self.settings.theme != "light"
         self._view_cache: dict[str, ctk.CTkFrame] = {}
 
         self._build_shell()
+        ctk.set_appearance_mode("Dark" if self.theme_dark else "Light")
         self._show_view(VIEW_PARSER)
 
     def _build_shell(self) -> None:
@@ -157,7 +165,10 @@ class MainView(ctk.CTkFrame):
             side="right", padx=(6, 18), pady=8
         )
         self.theme_btn = IconButton(
-            header, "Light", width=68, command=self._toggle_theme
+            header,
+            "Light" if self.theme_dark else "Dark",
+            width=68,
+            command=self._toggle_theme,
         )
         self.theme_btn.pack(side="right", padx=6, pady=8)
 
@@ -207,6 +218,8 @@ class MainView(ctk.CTkFrame):
         self.theme_dark = not self.theme_dark
         ctk.set_appearance_mode("Dark" if self.theme_dark else "Light")
         self.theme_btn.configure(text="Light" if self.theme_dark else "Dark")
+        self.settings.theme = "dark" if self.theme_dark else "light"
+        self.settings_store.save(self.settings)
 
     def _open_settings(self) -> None:
         SettingsModal(self)
