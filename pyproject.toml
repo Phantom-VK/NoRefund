@@ -31,10 +31,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "ruff>=0.4.0",
-    "black>=24.0.0",
-    "pytest>=8.0.0",
-    "pyinstaller>=6.6.0",
+    "ruff>=0.15.19",
+    "black>=26.5.1",
+    "pytest>=9.1.1",
+    "pyinstaller>=6.21.0",
 ]
 
 [project.scripts]

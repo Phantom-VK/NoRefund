@@ -28,7 +28,7 @@ import json
 import logging
 import os
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -55,7 +55,7 @@ LOG_DIR: Path = _default_log_dir()
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # One log file per app run, timestamped in UTC
-_RUN_TS = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+_RUN_TS = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 RUN_LOG_FILE: Path = LOG_DIR / f"norefund-{_RUN_TS}.log"
 
 
@@ -100,7 +100,9 @@ class JsonFormatter(logging.Formatter):
             ctx = {"value": repr(ctx)}
 
         data = LogRecordData(
-            ts=datetime.utcfromtimestamp(record.created).isoformat() + "Z",
+            ts=datetime.fromtimestamp(record.created, tz=timezone.utc)
+            .isoformat()
+            .replace("+00:00", "Z"),
             level=record.levelname,
             logger=record.name,
             message=str(record.getMessage()),

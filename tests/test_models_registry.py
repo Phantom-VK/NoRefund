@@ -35,8 +35,8 @@ def test_list_models_returns_list():
 def test_get_model_invalid_id_raises():
     try:
         get_model("fake:nonexistent")
-        assert False, "Should have raised KeyError"
-    except KeyError:
+        assert False, "Should have raised ValueError"
+    except ValueError:
         pass
 
 

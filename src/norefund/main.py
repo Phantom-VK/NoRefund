@@ -32,9 +32,18 @@ def _run_cli(file_path: str, model_id: str) -> None:
     from pathlib import Path
 
     result = analyze_file(Path(file_path), model_id)
+    if result.error:
+        print(f"Error     : {result.error}")
+        return
+
+    pct = (
+        f"{result.context_usage_pct:.1f}%"
+        if result.context_usage_pct is not None
+        else "—"
+    )
     print(f"File      : {result.file_path}")
     print(f"Tokens    : {result.token_count:,}")
-    print(f"Context   : {result.context_usage_pct:.1f}% of {result.context_window:,}")
+    print(f"Context   : {pct} of {result.context_window:,}")
     print(f"Fits      : {'Yes' if result.fits_in_context else 'No — needs chunking'}")
     print(f"Min chunks: {result.min_chunks_needed}")
     print(f"Est. cost : ${result.estimated_input_cost:.6f} USD (input only)")

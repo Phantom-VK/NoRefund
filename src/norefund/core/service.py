@@ -34,6 +34,7 @@ class AnalysisResult:
     char_count: int
     word_count: int
     token_count: int
+    context_window: int
     context_usage_pct: Optional[float]   # None when context_window <= 0
     fits_in_context: bool
     min_chunks_needed: int
@@ -59,6 +60,7 @@ def analyze_file(path: Path, model_id: str) -> AnalysisResult:
             char_count           = len(text),
             word_count           = len(text.split()),
             token_count          = tokens,
+            context_window       = model.context_window,
             context_usage_pct    = context_usage_pct(tokens, model.context_window),
             fits_in_context      = fits_in_context(tokens, model.context_window),
             min_chunks_needed    = min_chunks(tokens, model.context_window),
@@ -93,6 +95,7 @@ def analyze_file(path: Path, model_id: str) -> AnalysisResult:
             char_count           = 0,
             word_count           = 0,
             token_count          = 0,
+            context_window       = 0,
             context_usage_pct    = None,
             fits_in_context      = False,
             min_chunks_needed    = 0,
