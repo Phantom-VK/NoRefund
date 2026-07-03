@@ -16,25 +16,77 @@ class TokenizerBackend(Protocol):
     def count(self, text: str) -> int: ...
 
 
+class TikTokenOfflineError(RuntimeError):
+    """Raised when a tiktoken encoding isn't cached locally.
+
+    tiktoken silently downloads encoding vocab files from the internet on
+    first use, which would break NoRefund's 100%-offline promise. This
+    error is raised instead of letting that network call happen.
+    """
+
+
+class _TikTokenNetworkBlocked(Exception):
+    """Internal signal: tiktoken attempted to fetch data over the network."""
+
+
+def _blocked_read_file(blobpath: str) -> bytes:
+    raise _TikTokenNetworkBlocked(blobpath)
+
+
+def _load_tiktoken_offline_first(loader):
+    """Run a tiktoken loader while blocking any network fetch it may attempt.
+
+    Raises _TikTokenNetworkBlocked instead of downloading when the requested
+    encoding is not already present in the local tiktoken cache.
+    """
+    import tiktoken.load as tiktoken_load
+
+    original_read_file = tiktoken_load.read_file
+    tiktoken_load.read_file = _blocked_read_file
+    try:
+        return loader()
+    finally:
+        tiktoken_load.read_file = original_read_file
+
+
+def _offline_cache_hint(encoding_or_model: str) -> str:
+    return (
+        f"tiktoken encoding for '{encoding_or_model}' is not available in the local "
+        "cache, and NoRefund will not silently download it (offline-first policy).\n"
+        "To cache it once (requires internet access), run:\n"
+        "  python -c \"import tiktoken; "
+        f"tiktoken.get_encoding('{encoding_or_model}')\"\n"
+        "After that, NoRefund will use it fully offline."
+    )
+
+
 class TikTokenBackend:
     def __init__(self, model_name: str) -> None:
         import tiktoken
 
         self._enc = None
         try:
-            self._enc = tiktoken.encoding_for_model(model_name)
+            self._enc = _load_tiktoken_offline_first(
+                lambda: tiktoken.encoding_for_model(model_name)
+            )
         except KeyError:
             try:
-                self._enc = tiktoken.get_encoding("cl100k_base")
+                self._enc = _load_tiktoken_offline_first(
+                    lambda: tiktoken.get_encoding("cl100k_base")
+                )
                 _LOG.warning(
                     "tiktoken_model_not_found",
                     extra={"ctx": {"model": model_name, "fallback": "cl100k_base"}},
                 )
+            except _TikTokenNetworkBlocked as exc:
+                raise TikTokenOfflineError(_offline_cache_hint("cl100k_base")) from exc
             except Exception as exc:
                 _LOG.warning(
                     "tiktoken_unavailable",
                     extra={"ctx": {"model": model_name, "error": str(exc)}},
                 )
+        except _TikTokenNetworkBlocked as exc:
+            raise TikTokenOfflineError(_offline_cache_hint(model_name)) from exc
         except Exception as exc:
             _LOG.warning(
                 "tiktoken_unavailable",
@@ -59,13 +111,19 @@ class HFTokenizerBackend:
 
     To cache a tokenizer for offline use, run once with internet access:
 
-        python -c "from tokenizers import Tokenizer; Tokenizer.from_pretrained('<model>')"
+        python -c "from huggingface_hub import hf_hub_download; \
+hf_hub_download('<model>', 'tokenizer.json')"
 
     The files will be stored under the default HF cache directory
     (~/.cache/huggingface/hub on Linux/macOS).
     """
 
     def __init__(self, model_name: str) -> None:
+        # NOTE: tokenizers.Tokenizer.from_pretrained() does not accept
+        # local_files_only, so it cannot enforce offline-only loading itself.
+        # huggingface_hub.hf_hub_download() does, so we resolve the cached
+        # file path through it and hand that straight to Tokenizer.from_file.
+        from huggingface_hub import hf_hub_download
         from tokenizers import Tokenizer
 
         _LOG.info(
@@ -73,18 +131,18 @@ class HFTokenizerBackend:
             extra={"ctx": {"model": model_name}},
         )
         try:
-            self._tokenizer = Tokenizer.from_pretrained(
-                model_name,
-                # Prevent any network call — only use locally cached files.
-                # Raises EnvironmentError / OSError if files are not cached.
+            tokenizer_path = hf_hub_download(
+                repo_id=model_name,
+                filename="tokenizer.json",
                 local_files_only=True,
             )
-        except (OSError, EnvironmentError) as exc:
+            self._tokenizer = Tokenizer.from_file(tokenizer_path)
+        except OSError as exc:
             raise RuntimeError(
                 f"HuggingFace tokenizer '{model_name}' is not available in the local cache.\n"
                 "To download it once (requires internet access), run:\n"
-                f"  python -c \"from tokenizers import Tokenizer; "
-                f"Tokenizer.from_pretrained('{model_name}')\"\n"
+                "  python -c \"from huggingface_hub import hf_hub_download; "
+                f"hf_hub_download('{model_name}', 'tokenizer.json')\"\n"
                 "After that, NoRefund will use it fully offline."
             ) from exc
         except Exception as exc:

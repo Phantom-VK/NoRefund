@@ -25,6 +25,7 @@ class ModelInfo:
     output_price_per_million: float
     currency: str = "USD"
     docs_url: Optional[str] = None   # Optional link to provider pricing/docs page
+    tokenizer_is_approximate: bool = False  # True when no real local tokenizer exists
 
 
 def load_models(path: Path = _DEFAULT_REGISTRY_PATH) -> dict[str, ModelInfo]:

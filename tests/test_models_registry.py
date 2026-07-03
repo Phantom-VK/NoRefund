@@ -47,3 +47,42 @@ def test_free_models_have_zero_price():
         m = get_model(model_id)
         assert m.input_price_per_million == 0.0
         assert m.output_price_per_million == 0.0
+
+
+def test_tokenizer_is_approximate_defaults_false():
+    model = ModelInfo(
+        id="test:model",
+        display_name="Test",
+        provider="Test",
+        tokenizer_backend="tiktoken",
+        tokenizer_name="cl100k_base",
+        context_window=1000,
+        input_price_per_million=0.0,
+        output_price_per_million=0.0,
+    )
+    assert model.tokenizer_is_approximate is False
+
+
+def test_models_with_no_public_tokenizer_are_flagged_approximate():
+    """Claude and Gemini have no publicly cacheable local tokenizer, so their
+    counts come from a tiktoken approximation and must say so."""
+    approximate_ids = [
+        "anthropic:claude-3-5-sonnet",
+        "anthropic:claude-3-haiku",
+        "google:gemini-2.0-flash",
+        "google:gemini-1.5-pro",
+    ]
+    for model_id in approximate_ids:
+        assert get_model(model_id).tokenizer_is_approximate is True
+
+
+def test_models_with_real_hf_tokenizer_are_not_flagged_approximate():
+    real_tokenizer_ids = [
+        "deepseek:deepseek-v3",
+        "meta:llama-3-8b",
+        "mistral:mistral-7b",
+    ]
+    for model_id in real_tokenizer_ids:
+        model = get_model(model_id)
+        assert model.tokenizer_backend == "hf"
+        assert model.tokenizer_is_approximate is False
