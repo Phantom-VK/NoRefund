@@ -7,9 +7,10 @@ import webbrowser
 import customtkinter as ctk
 
 from norefund.core.models_registry import ModelInfo
-from norefund.gui.formatting import fmt_num, provider_color
-from norefund.gui.theme import COLORS
-from norefund.gui.widgets import IconButton
+from norefund.gui.formatting import fmt_num, provider_color, tint
+from norefund.gui.theme import COLORS, mono_font
+from norefund.gui.theme import font as themed_font
+from norefund.gui.widgets import IconButton, ProviderBadge
 
 
 class RegistryView(ctk.CTkFrame):
@@ -18,9 +19,11 @@ class RegistryView(ctk.CTkFrame):
         self.models = models
         self.provider = "All"
         self._cards: list[tuple[ModelInfo, ctk.CTkFrame]] = []
+        self.filter_buttons: dict[str, IconButton] = {}
         self._build()
         self._build_cards()
         self._apply_filter()
+        self._style_filters()
 
     def _build(self) -> None:
         self.grid_columnconfigure(0, weight=1)
@@ -32,7 +35,7 @@ class RegistryView(ctk.CTkFrame):
             header,
             text="Model Registry",
             text_color=COLORS["text"],
-            font=ctk.CTkFont(size=17, weight="bold"),
+            font=themed_font(17, "bold"),
             anchor="w",
         ).pack(anchor="w")
         providers = len({model.provider for model in self.models})
@@ -43,18 +46,22 @@ class RegistryView(ctk.CTkFrame):
                 "- offline pricing data."
             ),
             text_color=COLORS["muted_text"],
-            font=ctk.CTkFont(size=12),
+            font=themed_font(12),
             anchor="w",
         ).pack(anchor="w", pady=(2, 12))
         filters = ctk.CTkFrame(header, fg_color="transparent")
         filters.pack(fill="x")
         for p in ["All", *sorted({model.provider for model in self.models})]:
-            IconButton(
+            btn = IconButton(
                 filters,
                 p,
                 width=max(58, len(p) * 10),
+                height=24,
+                corner_radius=12,
                 command=lambda p=p: self._set_provider(p),
-            ).pack(side="left", padx=(0, 6), pady=2)
+            )
+            btn.pack(side="left", padx=(0, 6), pady=2)
+            self.filter_buttons[p] = btn
 
         self.model_grid = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self.model_grid.grid(row=1, column=0, sticky="nsew", padx=24, pady=(0, 20))
@@ -68,74 +75,118 @@ class RegistryView(ctk.CTkFrame):
     def _make_card(self, model: ModelInfo) -> ctk.CTkFrame:
         accent = provider_color(model.provider)
         card = ctk.CTkFrame(self.model_grid, fg_color=COLORS["card"], corner_radius=8)
-        head = ctk.CTkFrame(card, fg_color=accent, corner_radius=0, height=4)
+
+        head = ctk.CTkFrame(card, fg_color=tint(accent, 0.09), corner_radius=0)
         head.pack(fill="x")
+        head_text = ctk.CTkFrame(head, fg_color="transparent")
+        head_text.pack(side="left", fill="x", expand=True, padx=14, pady=10)
         ctk.CTkLabel(
-            card,
+            head_text,
             text=model.display_name,
             text_color=COLORS["text"],
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=themed_font(14, "bold"),
             anchor="w",
-        ).pack(fill="x", padx=14, pady=(10, 0))
+        ).pack(fill="x")
         ctk.CTkLabel(
-            card,
+            head_text,
             text=model.id,
             text_color=COLORS["muted_text"],
-            font=ctk.CTkFont(size=10, family="monospace"),
+            font=mono_font(10),
             anchor="w",
-        ).pack(fill="x", padx=14, pady=(0, 10))
+        ).pack(fill="x", pady=(2, 0))
+        ProviderBadge(head, model.provider).pack(side="right", padx=14)
+
+        body = ctk.CTkFrame(card, fg_color="transparent")
+        body.pack(fill="x", padx=14, pady=12)
+
+        ctx_row = ctk.CTkFrame(body, fg_color="transparent")
+        ctx_row.pack(fill="x", pady=(0, 10))
         ctk.CTkLabel(
-            card,
-            text=model.provider.upper(),
-            text_color=accent,
-            font=ctk.CTkFont(size=10, weight="bold"),
-            anchor="w",
-        ).pack(fill="x", padx=14, pady=(12, 8))
-        for text in [
-            f"Context window      {fmt_num(model.context_window)} tokens",
-            f"Input / 1M          ${model.input_price_per_million:.2f}",
-            f"Output / 1M         ${model.output_price_per_million:.2f}",
-        ]:
-            ctk.CTkLabel(
-                card,
-                text=text,
-                text_color=COLORS["text"],
-                font=ctk.CTkFont(size=12, family="monospace"),
-                anchor="w",
-            ).pack(fill="x", padx=14, pady=2)
-        ctk.CTkLabel(
-            card,
-            text=f"Tokenizer: {model.tokenizer_name}",
+            ctx_row,
+            text="Context window",
             text_color=COLORS["muted_text"],
-            font=ctk.CTkFont(size=10, family="monospace"),
+            font=themed_font(10),
             anchor="w",
-        ).pack(fill="x", padx=14, pady=(10, 2))
+        ).pack(side="left")
+        ctk.CTkLabel(
+            ctx_row,
+            text=f"{fmt_num(model.context_window)} tokens",
+            text_color=COLORS["text"],
+            font=mono_font(12, "bold"),
+            anchor="e",
+        ).pack(side="right")
+
+        tiles = ctk.CTkFrame(body, fg_color="transparent")
+        tiles.pack(fill="x", pady=(0, 10))
+        tiles.grid_columnconfigure((0, 1), weight=1, uniform="price")
+        for col, (label, price) in enumerate(
+            [
+                ("Input / 1M", model.input_price_per_million),
+                ("Output / 1M", model.output_price_per_million),
+            ]
+        ):
+            tile = ctk.CTkFrame(tiles, fg_color=COLORS["muted"], corner_radius=5)
+            tile.grid(row=0, column=col, sticky="ew", padx=(0, 6) if col == 0 else 0)
+            ctk.CTkLabel(
+                tile,
+                text=label,
+                text_color=COLORS["muted_text"],
+                font=themed_font(9),
+                anchor="w",
+            ).pack(fill="x", padx=10, pady=(6, 0))
+            ctk.CTkLabel(
+                tile,
+                text=f"${price:.2f}",
+                text_color=COLORS["text"],
+                font=mono_font(13, "bold"),
+                anchor="w",
+            ).pack(fill="x", padx=10, pady=(0, 6))
+
+        divider = ctk.CTkFrame(body, height=1, fg_color=COLORS["border"])
+        divider.pack(fill="x", pady=(0, 8))
+
+        footer = ctk.CTkFrame(body, fg_color="transparent")
+        footer.pack(fill="x")
+        ctk.CTkLabel(
+            footer,
+            text=model.tokenizer_name,
+            text_color=COLORS["muted_text"],
+            font=mono_font(10),
+            anchor="w",
+        ).pack(side="left")
         if model.docs_url:
             docs_label = ctk.CTkLabel(
-                card,
+                footer,
                 text="Docs & pricing ↗",
                 text_color=accent,
-                font=ctk.CTkFont(size=11, weight="bold"),
-                anchor="w",
+                font=themed_font(11, "bold"),
                 cursor="hand2",
             )
-            docs_label.pack(fill="x", padx=14, pady=(0, 12))
+            docs_label.pack(side="right")
             docs_label.bind(
                 "<Button-1>", lambda _e, url=model.docs_url: webbrowser.open(url)
             )
         else:
             ctk.CTkLabel(
-                card,
+                footer,
                 text="Docs link unavailable",
                 text_color=COLORS["muted_text"],
-                font=ctk.CTkFont(size=11),
-                anchor="w",
-            ).pack(fill="x", padx=14, pady=(0, 12))
+                font=themed_font(11),
+            ).pack(side="right")
         return card
+
+    def _style_filters(self) -> None:
+        for provider, btn in self.filter_buttons.items():
+            active = provider == self.provider
+            btn.configure(
+                fg_color=COLORS["primary"] if active else COLORS["muted"],
+                text_color=COLORS["primary_text"] if active else COLORS["muted_text"],
+            )
 
     def _set_provider(self, provider: str) -> None:
         self.provider = provider
         self._apply_filter()
+        self._style_filters()
 
     def _apply_filter(self) -> None:
         col = 0

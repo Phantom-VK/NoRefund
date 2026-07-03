@@ -15,9 +15,16 @@ import customtkinter as ctk
 from norefund.core.costing import output_cost
 from norefund.core.models_registry import ModelInfo
 from norefund.core.service import AnalysisResult, analyze_file, analyze_folder
-from norefund.gui.formatting import context_color, fmt_cost, fmt_float, fmt_num, parse_int
-from norefund.gui.theme import COLORS, SUPPORTED_FILETYPES
-from norefund.gui.widgets import IconButton, ModelDropdown, StatPill
+from norefund.gui.formatting import (
+    context_color,
+    fmt_cost,
+    fmt_float,
+    fmt_num,
+    parse_int,
+)
+from norefund.gui.theme import COLORS, ICONS, SUPPORTED_FILETYPES, mono_font
+from norefund.gui.theme import font as themed_font
+from norefund.gui.widgets import ContextBar, IconButton, ModelDropdown, StatPill
 from norefund.logging_config import latest_log_file
 
 _LOG = logging.getLogger(__name__)
@@ -47,7 +54,7 @@ class ResultsTable(ctk.CTkScrollableFrame):
                 width=width,
                 fg_color=COLORS["muted"],
                 text_color=COLORS["muted_text"],
-                font=ctk.CTkFont(size=10, weight="bold"),
+                font=themed_font(10, "bold"),
                 anchor="w",
                 corner_radius=0,
             ).grid(row=0, column=col, sticky="ew", padx=(0, 1), pady=(0, 1))
@@ -75,41 +82,72 @@ class ResultsTable(ctk.CTkScrollableFrame):
         if result.error:
             name = f"⚠ {name}"
 
-        values = [
-            name,
-            fmt_num(result.token_count),
-            pct_str,
-            "OK" if result.fits_in_context else "NO",
-            str(result.min_chunks_needed),
-            fmt_cost(result.estimated_input_cost),
-            fmt_num(result.word_count),
-            fmt_num(result.char_count),
-        ]
-        colors = [
-            COLORS["text"],
-            COLORS["text"],
-            pct_color,
-            fits_color,
-            COLORS["text"],
-            COLORS["text"],
-            COLORS["text"],
-            COLORS["text"],
-        ]
+        text_values = {
+            0: name,
+            1: fmt_num(result.token_count),
+            4: str(result.min_chunks_needed),
+            5: fmt_cost(result.estimated_input_cost),
+            6: fmt_num(result.word_count),
+            7: fmt_num(result.char_count),
+        }
 
-        for col, (value, width, color) in enumerate(zip(values, self.WIDTHS, colors)):
+        for col, width in enumerate(self.WIDTHS):
+            if col == 2:
+                cell = ctk.CTkFrame(
+                    self, fg_color=bg, corner_radius=0, width=width, height=28
+                )
+                cell.grid_propagate(False)
+                bar_wrap = ctk.CTkFrame(
+                    cell, fg_color="transparent", width=44, height=5
+                )
+                bar_wrap.place(relx=0, rely=0.5, x=6, anchor="w")
+                bar_wrap.pack_propagate(False)
+                bar = ContextBar(bar_wrap, height=5)
+                bar.pack(fill="x", expand=True)
+                bar.set_value(pct)
+                ctk.CTkLabel(
+                    cell,
+                    text=pct_str,
+                    text_color=pct_color,
+                    font=mono_font(12, "bold"),
+                    anchor="w",
+                ).place(relx=0, rely=0.5, x=56, anchor="w")
+                cell.grid(row=row, column=col, sticky="ew", padx=(0, 1), pady=(0, 1))
+                continue
+            if col == 3:
+                glyph = ICONS["check"] if result.fits_in_context else ICONS["x_circle"]
+                ctk.CTkLabel(
+                    self,
+                    text=glyph,
+                    width=width,
+                    fg_color=bg,
+                    text_color=fits_color,
+                    font=themed_font(13, "bold"),
+                    anchor="center",
+                    corner_radius=0,
+                ).grid(row=row, column=col, sticky="ew", padx=(0, 1), pady=(0, 1))
+                continue
             ctk.CTkLabel(
                 self,
-                text=value,
+                text=text_values[col],
                 width=width,
                 fg_color=bg,
-                text_color=color,
-                font=ctk.CTkFont(
-                    size=12,
-                    weight="bold" if col in {0, 1, 5} else "normal",
-                ),
+                text_color=COLORS["text"],
+                font=themed_font(12, "bold" if col in {0, 1, 5} else "normal"),
                 anchor="w",
                 corner_radius=0,
             ).grid(row=row, column=col, sticky="ew", padx=(0, 1), pady=(0, 1))
+
+
+_LEVEL_TAGS = {
+    "INFO": "info",
+    "WARN": "warn",
+    "WARNING": "warn",
+    "OK": "ok",
+    "DONE": "done",
+    "ERROR": "err",
+    "CRITICAL": "err",
+}
 
 
 class LogsPanel(ctk.CTkFrame):
@@ -119,18 +157,32 @@ class LogsPanel(ctk.CTkFrame):
             self,
             fg_color=COLORS["bg"],
             text_color=COLORS["muted_text"],
-            font=ctk.CTkFont(size=12, family="monospace"),
+            font=mono_font(12),
             wrap="none",
         )
         self.text.pack(fill="both", expand=True, padx=18, pady=16)
+        self._configure_tags()
         self.refresh()
+
+    def _configure_tags(self) -> None:
+        """Colour-code log levels. Resolved once at construction against the
+        appearance mode active at that time; won't re-resolve on a later
+        theme toggle while this cached view stays alive (cosmetic-only).
+        """
+        self.text.tag_config("prefix", foreground=COLORS["primary"][1])
+        self.text.tag_config("dim", foreground=COLORS["muted_text"][1])
+        self.text.tag_config("info", foreground=COLORS["muted_text"][1])
+        self.text.tag_config("warn", foreground=COLORS["warning"][1])
+        self.text.tag_config("ok", foreground=COLORS["primary"][1])
+        self.text.tag_config("done", foreground=COLORS["primary"][1])
+        self.text.tag_config("err", foreground=COLORS["danger"][1])
 
     def refresh(self) -> None:
         """Reload the current run log.
 
-        Reads only the last 32 KB / 200 lines. All lines are joined into a
-        single string and inserted with one CTkTextbox.insert() call to avoid
-        the per-line redraw overhead.
+        Reads only the last 32 KB / 200 lines. Each parsed line is inserted
+        with a level-specific colour tag; still bounded to <=200 lines so
+        the per-line insert cost stays negligible.
         """
         self.text.delete("1.0", "end")
         path = latest_log_file()
@@ -138,7 +190,6 @@ class LogsPanel(ctk.CTkFrame):
             self.text.insert("end", "No logs yet. Run an analysis to see output here.\n")
             return
         try:
-            output: list[str] = []
             for line in _tail_lines(path):
                 line = line.strip()
                 if not line:
@@ -148,15 +199,19 @@ class LogsPanel(ctk.CTkFrame):
                     ctx     = obj.get("ctx") or {}
                     message = obj.get("message", "log")
                     level   = obj.get("level", "INFO")
-                    output.append(f"> [{level}] {message} {ctx}")
+                    tag     = _LEVEL_TAGS.get(level, "info")
+                    self.text.insert("end", "› ", "prefix")
+                    self.text.insert("end", f"[{level}] ", "dim")
+                    self.text.insert("end", f"{message} {ctx}\n", tag)
                 except json.JSONDecodeError:
-                    output.append(line)
-            self.text.insert("end", "\n".join(output))
+                    self.text.insert("end", f"{line}\n")
         except OSError as exc:
             self.text.insert("end", f"Error reading log file: {exc}\n")
 
 
 class ParserView(ctk.CTkFrame):
+    _ANALYZE_LABEL = f"{ICONS['zap']} Analyze"
+
     def __init__(
         self,
         parent,
@@ -177,6 +232,7 @@ class ParserView(ctk.CTkFrame):
         self.cancel_event: Optional[threading.Event] = None
         self._files_processed = 0
         self.last_model: Optional[ModelInfo] = None
+        self.has_run = False
 
         self._build()
         self._render_files()
@@ -188,14 +244,21 @@ class ParserView(ctk.CTkFrame):
 
         toolbar = ctk.CTkFrame(self, fg_color=COLORS["card"], corner_radius=0)
         toolbar.grid(row=0, column=0, sticky="ew")
-        IconButton(toolbar, "+ Add File",   width=104, command=self._pick_file).pack(
-            side="left", padx=(18, 6), pady=10
-        )
-        IconButton(toolbar, "+ Add Folder", width=114, command=self._pick_folder).pack(
-            side="left", padx=6, pady=10
-        )
         IconButton(
-            toolbar, "x Clear", variant="danger", width=82, command=self._clear
+            toolbar, f"{ICONS['plus']} Add File", width=104, command=self._pick_file
+        ).pack(side="left", padx=(18, 6), pady=10)
+        IconButton(
+            toolbar,
+            f"{ICONS['folder_plus']} Add Folder",
+            width=114,
+            command=self._pick_folder,
+        ).pack(side="left", padx=6, pady=10)
+        IconButton(
+            toolbar,
+            f"{ICONS['x']} Clear",
+            variant="danger",
+            width=82,
+            command=self._clear,
         ).pack(side="left", padx=6, pady=10)
         ctk.CTkFrame(toolbar, width=1, fg_color=COLORS["border"]).pack(
             side="left", fill="y", padx=8, pady=14
@@ -206,7 +269,7 @@ class ParserView(ctk.CTkFrame):
             toolbar,
             text="Est. output:",
             text_color=COLORS["muted_text"],
-            font=ctk.CTkFont(size=12),
+            font=themed_font(12),
         ).pack(side="left")
         ctk.CTkEntry(
             toolbar,
@@ -214,19 +277,19 @@ class ParserView(ctk.CTkFrame):
             width=76,
             fg_color=COLORS["input"],
             border_width=0,
-            font=ctk.CTkFont(size=12, family="monospace"),
+            font=mono_font(12),
         ).pack(side="left", padx=(6, 3), pady=10)
         ctk.CTkLabel(
             toolbar,
             text="tokens",
             text_color=COLORS["muted_text"],
-            font=ctk.CTkFont(size=12),
+            font=themed_font(12),
         ).pack(side="left")
         self.analyze_btn = IconButton(
             toolbar,
-            "Analyze",
+            f"{ICONS['zap']} Analyze",
             variant="primary",
-            width=110,
+            width=120,
             command=self._run_analysis,
         )
         self.analyze_btn.pack(side="right", padx=18, pady=10)
@@ -255,7 +318,11 @@ class ParserView(ctk.CTkFrame):
         self.results_panel = ctk.CTkFrame(
             self.content, fg_color=COLORS["bg"], corner_radius=0
         )
-        self.logs_panel = LogsPanel(self.content)
+        # Grid immediately (before children are built) so the whole subtree
+        # — including CTkScrollableFrame's internal canvas in ResultsTable —
+        # grows up already mapped. Building it fully offscreen and mapping it
+        # only later left canvas-backed widgets (CTkLabel, CTkScrollableFrame)
+        # with stale/zero geometry that a later grid() didn't fix.
         self.results_panel.grid(row=0, column=0, sticky="nsew")
         self.results_panel.grid_columnconfigure(0, weight=1)
         self.results_panel.grid_rowconfigure(1, weight=1)
@@ -284,17 +351,77 @@ class ParserView(ctk.CTkFrame):
         self.table = ResultsTable(self.results_panel)
         self.table.grid(row=1, column=0, sticky="nsew")
 
+        self.empty_state = ctk.CTkFrame(
+            self.content, fg_color=COLORS["bg"], corner_radius=0
+        )
+        ctk.CTkLabel(
+            self.empty_state,
+            text=ICONS["bar_chart"],
+            font=themed_font(32),
+            text_color=COLORS["muted_text"],
+        ).pack(pady=(80, 8))
+        ctk.CTkLabel(
+            self.empty_state,
+            text="Add files and click Analyze to see results",
+            font=themed_font(13),
+            text_color=COLORS["muted_text"],
+        ).pack()
+        self.logs_panel = LogsPanel(self.content)
+
         footer = ctk.CTkFrame(self, fg_color=COLORS["card"], corner_radius=0)
         footer.grid(row=4, column=0, sticky="ew")
         ctk.CTkLabel(
             footer,
             textvariable=self.status,
             text_color=COLORS["muted_text"],
-            font=ctk.CTkFont(size=11, family="monospace"),
+            font=mono_font(11),
             anchor="w",
         ).pack(side="left", padx=18, pady=8)
 
+        # Packed unconditionally here (not lazily inside _render_results) so
+        # the footer's layout is stable from the very first render.
+        self.footer_stats = ctk.CTkFrame(footer, fg_color="transparent")
+        self.footer_stats.pack(side="right", padx=18, pady=8)
+        self.footer_tokens_val = self._footer_stat(self.footer_stats, "Total tokens:")
+        self.footer_cost_val = self._footer_stat(self.footer_stats, "Est. input cost:")
+
+        # Text-only (no embedded ContextBar/CTkProgressBar): a CTkProgressBar
+        # nested in a narrow pack_propagate(False) wrapper here reproducibly
+        # left sibling canvas widgets (StatPills, ResultsTable rows) unpainted
+        # under Xvfb once this view was embedded in MainView's tkraise'd
+        # container — isolated via bisection. The results-table's own
+        # per-row ContextBar (a wider cell inside a CTkScrollableFrame) does
+        # not exhibit this, so only the footer usage is avoided.
+        ctx_block = ctk.CTkFrame(self.footer_stats, fg_color="transparent")
+        ctx_block.pack(side="left")
+        ctk.CTkLabel(
+            ctx_block,
+            text="Avg context:",
+            text_color=COLORS["muted_text"],
+            font=mono_font(11),
+        ).pack(side="left", padx=(0, 6))
+        self.footer_context_val = ctk.CTkLabel(
+            ctx_block,
+            text="-",
+            text_color=COLORS["primary"],
+            font=mono_font(11, "bold"),
+        )
+        self.footer_context_val.pack(side="left")
+
         self._set_tab("results")
+
+    def _footer_stat(self, parent, label: str) -> ctk.CTkLabel:
+        """Build a footer label/value pair; returns the value label to update later."""
+        frame = ctk.CTkFrame(parent, fg_color="transparent")
+        frame.pack(side="left", padx=(0, 16))
+        ctk.CTkLabel(
+            frame, text=label, text_color=COLORS["muted_text"], font=mono_font(11)
+        ).pack(side="left", padx=(0, 4))
+        value = ctk.CTkLabel(
+            frame, text="-", text_color=COLORS["text"], font=mono_font(11, "bold")
+        )
+        value.pack(side="left")
+        return value
 
     # ------------------------------------------------------------------
     # File management
@@ -329,13 +456,14 @@ class ParserView(ctk.CTkFrame):
         self.paths.clear()
         self.results.clear()
         self.last_model = None
+        self.has_run = False
         # Force-reset stuck analyzing state so Clear always unblocks the UI.
         if self.cancel_event is not None:
             self.cancel_event.set()
         self.cancel_event = None
         self.analyzing = False
         self.analyze_btn.configure(
-            state="normal", text="Analyze", command=self._run_analysis
+            state="normal", text=self._ANALYZE_LABEL, command=self._run_analysis
         )
         self.status.set("Cleared. Add a file or folder to begin.")
         self._render_files()
@@ -365,12 +493,12 @@ class ParserView(ctk.CTkFrame):
                 row,
                 text=f"{prefix} {path}",
                 text_color=COLORS["muted_text"],
-                font=ctk.CTkFont(size=11, family="monospace"),
+                font=mono_font(11),
                 anchor="w",
             ).pack(side="left", fill="x", expand=True, padx=10, pady=5)
             IconButton(
                 row,
-                "x",
+                ICONS["x"],
                 variant="danger",
                 width=28,
                 command=lambda p=path: self._remove_path(p),
@@ -390,11 +518,21 @@ class ParserView(ctk.CTkFrame):
         )
         if tab == "results":
             self.logs_panel.grid_remove()
-            self.results_panel.grid()
+            self._update_results_visibility()
         else:
             self.logs_panel.refresh()
             self.results_panel.grid_remove()
+            self.empty_state.grid_remove()
             self.logs_panel.grid(row=0, column=0, sticky="nsew")
+
+    def _update_results_visibility(self) -> None:
+        """Show the empty-state placeholder until the first analysis run completes."""
+        if self.has_run:
+            self.empty_state.grid_remove()
+            self.results_panel.grid(row=0, column=0, sticky="nsew")
+        else:
+            self.results_panel.grid_remove()
+            self.empty_state.grid(row=0, column=0, sticky="nsew")
 
     # ------------------------------------------------------------------
     # Analysis
@@ -491,7 +629,7 @@ class ParserView(ctk.CTkFrame):
         self.analyzing = False
         self.cancel_event = None
         self.analyze_btn.configure(
-            state="normal", text="Analyze", command=self._run_analysis
+            state="normal", text=self._ANALYZE_LABEL, command=self._run_analysis
         )
         self.status.set(f"Error: {message}")
         messagebox.showerror(
@@ -512,10 +650,11 @@ class ParserView(ctk.CTkFrame):
         self.analyzing = False
         self.cancel_event = None
         self.analyze_btn.configure(
-            state="normal", text="Analyze", command=self._run_analysis
+            state="normal", text=self._ANALYZE_LABEL, command=self._run_analysis
         )
         self.results = results
         self.last_model = model
+        self.has_run = True
         self._render_results()
         self._set_tab("results")
         if errors:
@@ -535,8 +674,13 @@ class ParserView(ctk.CTkFrame):
         """Populate summary pills and results table.
 
         Guards against None context_usage_pct returned when a model has no
-        context window defined or when a file failed to parse.
+        context window defined or when a file failed to parse. Visibility is
+        updated first so widgets are mapped before their text is set — CTk's
+        canvas-based labels can end up with stale (unmapped-time) geometry
+        if text changes while still hidden behind grid_remove().
         """
+        if self.active_tab == "results":
+            self._update_results_visibility()
         self.table.set_results(self.results)
         count        = len(self.results)
         total_tokens = sum(item.token_count for item in self.results)
@@ -562,3 +706,12 @@ class ParserView(ctk.CTkFrame):
         self.stat_cost.set_text(fmt_cost(total_cost))
         self.stat_output_cost.set_text(output_cost_str)
         self.stat_context.set_text(f"{fmt_float(avg_context)}%")
+
+        if self.has_run:
+            self.footer_tokens_val.configure(text=fmt_num(total_tokens))
+            self.footer_cost_val.configure(text=fmt_cost(total_cost))
+            self.footer_context_val.configure(text=f"{fmt_float(avg_context)}%")
+        else:
+            self.footer_tokens_val.configure(text="-")
+            self.footer_cost_val.configure(text="-")
+            self.footer_context_val.configure(text="-")

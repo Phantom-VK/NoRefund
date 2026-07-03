@@ -7,6 +7,7 @@ import customtkinter as ctk
 from norefund.core.settings import Settings
 from norefund.gui.formatting import parse_int
 from norefund.gui.theme import COLORS
+from norefund.gui.theme import font as themed_font
 from norefund.gui.widgets import IconButton
 
 
@@ -32,7 +33,7 @@ class SettingsModal(ctk.CTkToplevel):
         ctk.CTkLabel(
             header,
             text="Settings",
-            font=ctk.CTkFont(size=16, weight="bold"),
+            font=themed_font(16, "bold"),
             text_color=COLORS["text"],
         ).pack(side="left")
         IconButton(header, "x", width=30, command=self.destroy).pack(side="right")
@@ -65,19 +66,12 @@ class SettingsModal(ctk.CTkToplevel):
             border_width=0,
         ).pack(fill="x", pady=(4, 14))
 
-        parent.chunk_warnings = ctk.BooleanVar(value=True)
-        ctk.CTkSwitch(
-            body,
-            text="Show chunk warnings",
-            variable=parent.chunk_warnings,
-            progress_color=COLORS["primary"],
-        ).pack(anchor="w", pady=(4, 0))
         ctk.CTkLabel(
             body,
             text="Currency conversion isn't implemented yet — prices remain in the "
             "model's native currency (USD).",
             text_color=COLORS["muted_text"],
-            font=ctk.CTkFont(size=11),
+            font=themed_font(11),
             anchor="w",
             wraplength=360,
             justify="left",

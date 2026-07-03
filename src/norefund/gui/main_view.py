@@ -10,7 +10,8 @@ from norefund.gui.calculator_view import CalculatorView
 from norefund.gui.parser_view import ParserView
 from norefund.gui.registry_view import RegistryView
 from norefund.gui.settings_modal import SettingsModal
-from norefund.gui.theme import COLORS
+from norefund.gui.theme import COLORS, ICONS, mono_font
+from norefund.gui.theme import font as themed_font
 from norefund.gui.widgets import IconButton, SidebarItem
 
 VIEW_CALCULATOR = "calculator"
@@ -72,7 +73,7 @@ class MainView(ctk.CTkFrame):
             fg_color=COLORS["primary"],
             text_color=COLORS["primary_text"],
             corner_radius=5,
-            font=ctk.CTkFont(size=18, weight="bold"),
+            font=themed_font(18, "bold"),
         ).pack(side="left")
         brand = ctk.CTkFrame(logo, fg_color="transparent")
         brand.pack(side="left", padx=10)
@@ -80,14 +81,14 @@ class MainView(ctk.CTkFrame):
             brand,
             text="NoRefund",
             text_color=COLORS["text"],
-            font=ctk.CTkFont(size=15, weight="bold"),
+            font=themed_font(15, "bold"),
             anchor="w",
         ).pack(anchor="w")
         ctk.CTkLabel(
             brand,
             text="TOKEN & COST ANALYZER",
             text_color=COLORS["muted_text"],
-            font=ctk.CTkFont(size=9, weight="bold"),
+            font=themed_font(9, "bold"),
             anchor="w",
         ).pack(anchor="w")
 
@@ -98,18 +99,27 @@ class MainView(ctk.CTkFrame):
             nav,
             text="TOOLS",
             text_color=COLORS["muted_text"],
-            font=ctk.CTkFont(size=9, weight="bold"),
+            font=themed_font(9, "bold"),
             anchor="w",
         ).pack(fill="x", padx=8, pady=(16, 4))
         self.nav_buttons = {
             VIEW_CALCULATOR: SidebarItem(
-                nav, "Calculator", "#", lambda: self._show_view(VIEW_CALCULATOR)
+                nav,
+                "Token Calculator",
+                ICONS["calculator"],
+                lambda: self._show_view(VIEW_CALCULATOR),
             ),
             VIEW_PARSER: SidebarItem(
-                nav, "File Parser", "[]", lambda: self._show_view(VIEW_PARSER)
+                nav,
+                "File Parser",
+                ICONS["folder_open"],
+                lambda: self._show_view(VIEW_PARSER),
             ),
             VIEW_REGISTRY: SidebarItem(
-                nav, "Model Registry", "::", lambda: self._show_view(VIEW_REGISTRY)
+                nav,
+                "Model Registry",
+                ICONS["layers"],
+                lambda: self._show_view(VIEW_REGISTRY),
             ),
         }
         self.nav_buttons[VIEW_CALCULATOR].pack(fill="x", pady=(0, 2))
@@ -118,7 +128,7 @@ class MainView(ctk.CTkFrame):
             nav,
             text="DATA",
             text_color=COLORS["muted_text"],
-            font=ctk.CTkFont(size=9, weight="bold"),
+            font=themed_font(9, "bold"),
             anchor="w",
         ).pack(fill="x", padx=8, pady=(16, 4))
         self.nav_buttons[VIEW_REGISTRY].pack(fill="x", pady=2)
@@ -126,20 +136,28 @@ class MainView(ctk.CTkFrame):
     def _build_sidebar_footer(self, sidebar: ctk.CTkFrame) -> None:
         footer = ctk.CTkFrame(sidebar, fg_color="transparent")
         footer.pack(fill="x", padx=12, pady=14)
+        offline_note = ctk.CTkFrame(footer, fg_color=COLORS["muted"], corner_radius=5)
+        offline_note.pack(fill="x", pady=(0, 8))
         ctk.CTkLabel(
-            footer,
+            offline_note,
+            text=ICONS["warning"],
+            text_color=COLORS["warning"],
+            font=themed_font(11),
+        ).pack(side="left", padx=(8, 4), pady=8)
+        ctk.CTkLabel(
+            offline_note,
             text="100% offline. No API calls made.",
             text_color=COLORS["muted_text"],
-            fg_color=COLORS["muted"],
-            corner_radius=5,
-            font=ctk.CTkFont(size=10),
-            wraplength=150,
-        ).pack(fill="x", pady=(0, 8), ipady=8)
+            font=themed_font(10),
+            wraplength=120,
+            justify="left",
+            anchor="w",
+        ).pack(side="left", fill="x", expand=True, padx=(0, 8), pady=8)
         ctk.CTkLabel(
             footer,
             text="v0.1.0 · open-source",
             text_color=COLORS["muted_text"],
-            font=ctk.CTkFont(size=9),
+            font=themed_font(9),
         ).pack()
 
     def _build_header(self, main: ctk.CTkFrame) -> None:
@@ -150,7 +168,7 @@ class MainView(ctk.CTkFrame):
             header,
             textvariable=self.title_var,
             text_color=COLORS["text"],
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=themed_font(14, "bold"),
         ).pack(side="left", padx=(20, 8))
         self.count_badge = ctk.CTkLabel(
             header,
@@ -158,19 +176,26 @@ class MainView(ctk.CTkFrame):
             text_color=COLORS["muted_text"],
             fg_color=COLORS["muted"],
             corner_radius=4,
-            font=ctk.CTkFont(size=10, family="monospace"),
+            font=mono_font(10),
         )
         self.count_badge.pack(side="left", ipadx=8, ipady=2)
-        IconButton(header, "Settings", width=82, command=self._open_settings).pack(
-            side="right", padx=(6, 18), pady=8
-        )
+        IconButton(
+            header,
+            ICONS["settings"],
+            width=32,
+            height=32,
+            font=themed_font(15),
+            command=self._open_settings,
+        ).pack(side="right", padx=(6, 18), pady=7)
         self.theme_btn = IconButton(
             header,
-            "Light" if self.theme_dark else "Dark",
-            width=68,
+            ICONS["sun"] if self.theme_dark else ICONS["moon"],
+            width=32,
+            height=32,
+            font=themed_font(15),
             command=self._toggle_theme,
         )
-        self.theme_btn.pack(side="right", padx=6, pady=8)
+        self.theme_btn.pack(side="right", padx=6, pady=7)
 
     def _build_content(self, main: ctk.CTkFrame) -> None:
         self.content = ctk.CTkFrame(main, fg_color=COLORS["bg"], corner_radius=0)
@@ -217,7 +242,8 @@ class MainView(ctk.CTkFrame):
     def _toggle_theme(self) -> None:
         self.theme_dark = not self.theme_dark
         ctk.set_appearance_mode("Dark" if self.theme_dark else "Light")
-        self.theme_btn.configure(text="Light" if self.theme_dark else "Dark")
+        glyph = ICONS["sun"] if self.theme_dark else ICONS["moon"]
+        self.theme_btn.configure(text=glyph)
         self.settings.theme = "dark" if self.theme_dark else "light"
         self.settings_store.save(self.settings)
 
