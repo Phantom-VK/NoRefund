@@ -75,6 +75,16 @@ tests/
 | Llama 3 8B | Meta (self-hosted) | 8K |
 | Mistral 7B | Mistral (self-hosted) | 32K |
 
+**Tokenizer accuracy:** OpenAI models, DeepSeek V3, Llama 3, and Mistral use each
+provider's real tokenizer. Anthropic and Google don't publish a local tokenizer for
+Claude or Gemini, so those counts are a `cl100k_base` approximation — the app marks
+them `(approx.)` wherever they're shown.
+
+**Staying fully offline:** the first time you use a given tokenizer, NoRefund needs to
+cache its vocab files locally (one-time, requires internet). After that it never
+touches the network again for that model. If a tokenizer isn't cached yet, NoRefund
+raises a clear error with the exact command to run, instead of silently downloading it.
+
 ---
 
 ## License

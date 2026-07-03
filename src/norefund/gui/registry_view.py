@@ -147,9 +147,12 @@ class RegistryView(ctk.CTkFrame):
 
         footer = ctk.CTkFrame(body, fg_color="transparent")
         footer.pack(fill="x")
+        tokenizer_text = model.tokenizer_name
+        if model.tokenizer_is_approximate:
+            tokenizer_text += " (approx.)"
         ctk.CTkLabel(
             footer,
-            text=model.tokenizer_name,
+            text=tokenizer_text,
             text_color=COLORS["muted_text"],
             font=mono_font(10),
             anchor="w",

@@ -87,4 +87,7 @@ def tint(accent_hex: str, alpha: float = 0.09) -> tuple[str, str]:
 
 
 def model_label(model: ModelInfo) -> str:
-    return f"{model.display_name}  \u00b7  {model.provider}"
+    label = f"{model.display_name}  \u00b7  {model.provider}"
+    if model.tokenizer_is_approximate:
+        label += "  (approx.)"
+    return label
