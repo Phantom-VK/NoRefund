@@ -13,7 +13,8 @@ from norefund.gui.formatting import (
     fmt_num,
     parse_int,
 )
-from norefund.gui.theme import COLORS
+from norefund.gui.theme import COLORS, mono_font
+from norefund.gui.theme import font as themed_font
 from norefund.gui.widgets import ContextBar, ModelDropdown, StatPill
 
 
@@ -40,7 +41,7 @@ class CalculatorView(ctk.CTkFrame):
         ctk.CTkLabel(
             shell,
             text="Token Calculator",
-            font=ctk.CTkFont(size=17, weight="bold"),
+            font=themed_font(17, "bold"),
             text_color=COLORS["text"],
             anchor="w",
         ).grid(row=0, column=0, sticky="ew")
@@ -48,7 +49,7 @@ class CalculatorView(ctk.CTkFrame):
             shell,
             text="Manually estimate token cost for any LLM before making an API call.",
             text_color=COLORS["muted_text"],
-            font=ctk.CTkFont(size=12),
+            font=themed_font(12),
             anchor="w",
         ).grid(row=1, column=0, sticky="ew", pady=(2, 18))
 
@@ -57,7 +58,7 @@ class CalculatorView(ctk.CTkFrame):
         ctk.CTkLabel(
             config,
             text="CONFIGURATION",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=themed_font(11, "bold"),
             text_color=COLORS["muted_text"],
             anchor="w",
         ).pack(fill="x", padx=18, pady=(16, 10))
@@ -79,13 +80,13 @@ class CalculatorView(ctk.CTkFrame):
         ctk.CTkLabel(
             top,
             text="CONTEXT WINDOW",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=themed_font(11, "bold"),
             text_color=COLORS["muted_text"],
         ).pack(side="left")
         self.context_pct_label = ctk.CTkLabel(
             top,
             text="-",
-            font=ctk.CTkFont(size=12, weight="bold", family="monospace"),
+            font=mono_font(12, "bold"),
         )
         self.context_pct_label.pack(side="right")
         self.context_bar = ContextBar(context)
@@ -94,14 +95,14 @@ class CalculatorView(ctk.CTkFrame):
             context,
             text="-",
             text_color=COLORS["muted_text"],
-            font=ctk.CTkFont(size=12, family="monospace"),
+            font=mono_font(12),
             anchor="w",
         )
         self.context_detail.pack(fill="x", padx=18)
         self.fit_label = ctk.CTkLabel(
             context,
             text="-",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=themed_font(12, "bold"),
             anchor="w",
         )
         self.fit_label.pack(fill="x", padx=18, pady=(8, 16))
@@ -111,24 +112,32 @@ class CalculatorView(ctk.CTkFrame):
         ctk.CTkLabel(
             cost,
             text="COST ESTIMATE",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=themed_font(11, "bold"),
             text_color=COLORS["muted_text"],
             anchor="w",
         ).pack(fill="x", padx=18, pady=(16, 10))
         row = ctk.CTkFrame(cost, fg_color="transparent")
         row.pack(fill="x", padx=18, pady=(0, 16))
-        row.grid_columnconfigure((0, 1, 2), weight=1, uniform="cost")
-        self.input_cost = StatPill(row, "Input")
-        self.output_cost = StatPill(row, "Output")
-        self.total_cost = StatPill(row, "Total")
+        row.grid_columnconfigure((0, 1, 3), weight=1, uniform="cost")
+        self.input_cost = StatPill(row, "Input", value_size=18)
+        self.output_cost = StatPill(row, "Output", value_size=18)
+        divider = ctk.CTkFrame(row, width=1, fg_color=COLORS["border"])
+        self.total_cost = StatPill(
+            row,
+            "Total",
+            value_size=18,
+            value_color=COLORS["primary"],
+            value_weight="bold",
+        )
         self.input_cost.grid(row=0, column=0, sticky="ew")
         self.output_cost.grid(row=0, column=1, sticky="ew", padx=12)
-        self.total_cost.grid(row=0, column=2, sticky="ew")
+        divider.grid(row=0, column=2, sticky="ns", padx=(0, 12))
+        self.total_cost.grid(row=0, column=3, sticky="ew")
         ctk.CTkLabel(
             cost,
             text="Prices are estimates. Check each provider's pricing page for exact rates.",
             text_color=COLORS["muted_text"],
-            font=ctk.CTkFont(size=11),
+            font=themed_font(11),
             anchor="w",
         ).pack(fill="x", padx=18, pady=(0, 16))
 
@@ -178,6 +187,9 @@ class CalculatorView(ctk.CTkFrame):
                 ),
                 text_color=COLORS["danger"],
             )
-        self.input_cost.set_text(f"{fmt_cost(in_cost)}  @ ${model.input_price_per_million:g}/M")
-        self.output_cost.set_text(f"{fmt_cost(out_cost)}  @ ${model.output_price_per_million:g}/M")
+        self.input_cost.set_text(fmt_cost(in_cost))
+        self.input_cost.set_subtext(f"${model.input_price_per_million:g}/M tokens")
+        self.output_cost.set_text(fmt_cost(out_cost))
+        self.output_cost.set_subtext(f"${model.output_price_per_million:g}/M tokens")
         self.total_cost.set_text(fmt_cost(in_cost + out_cost))
+        self.total_cost.set_subtext("USD")

@@ -1,5 +1,38 @@
 """Shared colors and static UI constants for the desktop GUI."""
 
+from __future__ import annotations
+
+import customtkinter as ctk
+
+FONT_FAMILY = "Inter"
+
+
+def font(size: int, weight: str = "normal") -> ctk.CTkFont:
+    """CTkFont in FONT_FAMILY; Tk falls back to the OS default if unavailable."""
+    return ctk.CTkFont(family=FONT_FAMILY, size=size, weight=weight)
+
+
+def mono_font(size: int, weight: str = "normal") -> ctk.CTkFont:
+    return ctk.CTkFont(family="monospace", size=size, weight=weight)
+
+
+ICONS = {
+    "calculator": "🧮",
+    "folder_open": "📂",
+    "layers": "🗂",
+    "plus": "+",
+    "folder_plus": "📁",
+    "x": "✕",
+    "zap": "⚡",
+    "check": "✓",
+    "x_circle": "✕",
+    "sun": "☀",
+    "moon": "🌙",
+    "settings": "⚙",
+    "warning": "⚠",
+    "bar_chart": "📊",
+}
+
 COLORS = {
     "bg": ("#f5f6f8", "#111318"),
     "card": ("#ffffff", "#1c2029"),

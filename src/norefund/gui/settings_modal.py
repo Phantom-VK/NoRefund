@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
+from norefund.core.settings import Settings
+from norefund.gui.formatting import parse_int
 from norefund.gui.theme import COLORS
+from norefund.gui.theme import font as themed_font
 from norefund.gui.widgets import IconButton
 
 
 class SettingsModal(ctk.CTkToplevel):
     def __init__(self, parent) -> None:
         super().__init__(parent)
+        self._parent = parent
         self.title("Settings")
         self.geometry("430x330")
         self.resizable(False, False)
@@ -29,7 +33,7 @@ class SettingsModal(ctk.CTkToplevel):
         ctk.CTkLabel(
             header,
             text="Settings",
-            font=ctk.CTkFont(size=16, weight="bold"),
+            font=themed_font(16, "bold"),
             text_color=COLORS["text"],
         ).pack(side="left")
         IconButton(header, "x", width=30, command=self.destroy).pack(side="right")
@@ -43,6 +47,7 @@ class SettingsModal(ctk.CTkToplevel):
         ctk.CTkOptionMenu(
             body,
             values=["USD", "EUR", "GBP", "INR"],
+            variable=parent.currency,
             fg_color=COLORS["input"],
             button_color=COLORS["input"],
             state="disabled",
@@ -61,19 +66,15 @@ class SettingsModal(ctk.CTkToplevel):
             border_width=0,
         ).pack(fill="x", pady=(4, 14))
 
-        parent.chunk_warnings = ctk.BooleanVar(value=True)
-        ctk.CTkSwitch(
-            body,
-            text="Show chunk warnings",
-            variable=parent.chunk_warnings,
-            progress_color=COLORS["primary"],
-        ).pack(anchor="w", pady=(4, 0))
         ctk.CTkLabel(
             body,
-            text="Currency conversion and preference persistence are placeholders.",
+            text="Currency conversion isn't implemented yet — prices remain in the "
+            "model's native currency (USD).",
             text_color=COLORS["muted_text"],
-            font=ctk.CTkFont(size=11),
+            font=themed_font(11),
             anchor="w",
+            wraplength=360,
+            justify="left",
         ).pack(fill="x", pady=(8, 0))
 
         footer = ctk.CTkFrame(frame, fg_color="transparent")
@@ -82,12 +83,22 @@ class SettingsModal(ctk.CTkToplevel):
             side="right", padx=(8, 0)
         )
         IconButton(
-            footer, "Save changes", variant="primary", width=120, command=self.destroy
+            footer, "Save changes", variant="primary", width=120, command=self._save
         ).pack(side="right")
 
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
+
+    def _save(self) -> None:
+        parent = self._parent
+        parent.settings = Settings(
+            default_output_tokens=parse_int(parent.default_output_tokens.get()),
+            theme="dark" if parent.theme_dark else "light",
+            currency=parent.currency.get(),
+        )
+        parent.settings_store.save(parent.settings)
+        self.destroy()
 
     def _safe_grab(self) -> None:
         """Attempt grab_set only when the window is actually viewable.

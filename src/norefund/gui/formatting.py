@@ -66,5 +66,25 @@ def provider_color(provider: str) -> str:
     return PROVIDER_COLORS.get(provider, COLORS["primary"][1])
 
 
+def _blend(fg_hex: str, bg_hex: str, alpha: float) -> str:
+    """Blend fg_hex over bg_hex at the given alpha (0-1), returning a hex color."""
+    fg = tuple(int(fg_hex.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4))
+    bg = tuple(int(bg_hex.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4))
+    blended = tuple(round(f * alpha + b * (1 - alpha)) for f, b in zip(fg, bg))
+    return "#{:02x}{:02x}{:02x}".format(*blended)
+
+
+def tint(accent_hex: str, alpha: float = 0.09) -> tuple[str, str]:
+    """Blend an accent color over the card background for light/dark mode.
+
+    CTk widget fg_color can't do real alpha compositing, so this pre-blends
+    the accent into a flat hex per mode instead.
+    """
+    return (
+        _blend(accent_hex, COLORS["card"][0], alpha),
+        _blend(accent_hex, COLORS["card"][1], alpha),
+    )
+
+
 def model_label(model: ModelInfo) -> str:
     return f"{model.display_name}  \u00b7  {model.provider}"
