@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import webbrowser
 
 import customtkinter as ctk
@@ -13,10 +12,6 @@ from norefund.gui.theme import COLORS, ICONS
 from norefund.gui.widgets import ProviderBadge, bind_mousewheel
 
 _MIN_CARD_WIDTH = 300
-_GLOW_INTERVAL_MS = 60
-_GLOW_STEP = 0.18
-_GLOW_MAX_ALPHA = 0.4
-_MIN_SKELETON_MS = 500
 
 
 class RegistryView(ctk.CTkFrame):
@@ -26,12 +21,6 @@ class RegistryView(ctk.CTkFrame):
         self._active_provider = "All"
         self._pills: dict[str, ctk.CTkButton] = {}
         self._cards: list[tuple[ModelInfo, ctk.CTkFrame]] = []
-        self._skeletons: list[ctk.CTkFrame] = []
-        self._real_cards: list[ctk.CTkFrame | None] = []
-        self._dwell_done = False
-        self._build_done = False
-        self._glow_widgets: list[ctk.CTkFrame] = []
-        self._glow_phase = 0.0
         self._loading = False
         self._last_col_count = -1
 
@@ -105,57 +94,50 @@ class RegistryView(ctk.CTkFrame):
         self._scroll = ctk.CTkScrollableFrame(self, fg_color=COLORS["bg"])
         self._scroll.pack(fill="both", expand=True, padx=24, pady=(0, 20))
         self._scroll.bind("<Configure>", lambda _e: self._relayout())
+        # Parented on the canvas (the scroll area's actual visible viewport,
+        # not the inner content frame that grows/shrinks with card count) so
+        # relx/rely=0.5 centers it on the screen the user sees, regardless
+        # of scroll position or how many cards end up being built.
+        self._loading_label = ctk.CTkLabel(
+            self._scroll._parent_canvas,
+            text="Loading models…",
+            font=theme.font(12),
+            text_color=COLORS["muted_fg"],
+        )
 
     # ------------------------------------------------------------------
-    # Skeleton loading: build placeholder cards instantly, then build real
-    # cards off-screen in the background and swap the whole grid from
-    # skeleton to real in a single atomic reveal (never one card at a time).
+    # Loading: build every real card off-screen first, then reveal them
+    # all together in one grid pass. A plain text label covers the wait
+    # instead of a skeleton grid.
     # ------------------------------------------------------------------
 
     def _start_loading(self) -> None:
         self._loading = True
-        self._dwell_done = False
-        self._build_done = False
-        self._skeletons = [self._build_skeleton_card() for _ in self.shell.models]
-        self._real_cards = [None] * len(self.shell.models)
-        self._cards = list(zip(self.shell.models, self._skeletons))
+        self._cards = []
         self._sync_pill_enabled()
-        self.after(50, self._relayout, True)
-        self._animate_glow()
-        self.after(_MIN_SKELETON_MS, self._mark_dwell_done)
-        self.after(1, self._build_next_real_card, 0)
+        self._loading_label.place(relx=0.5, rely=0.5, anchor="center")
+        self.after(1, self._build_next_card, 0, [])
 
-    def _mark_dwell_done(self) -> None:
-        if not self.winfo_exists():
-            return
-        self._dwell_done = True
-        self._maybe_reveal()
-
-    def _build_next_real_card(self, index: int) -> None:
+    def _build_next_card(
+        self, index: int, built: list[tuple[ModelInfo, ctk.CTkFrame]]
+    ) -> None:
         if not self.winfo_exists():
             return
         if index >= len(self.shell.models):
-            self._build_done = True
-            self._maybe_reveal()
+            self._finish_loading(built)
             return
-        # Built off-screen (never gridded here) so the skeleton->real swap
-        # happens as a single reveal in _maybe_reveal, not as len(models)
-        # separate visible layout passes.
-        self._real_cards[index] = self._build_card(self.shell.models[index])
-        self.after(1, self._build_next_real_card, index + 1)
+        # Built off-screen (never gridded here) so cards only become visible
+        # once all of them are ready, in a single _relayout call.
+        model = self.shell.models[index]
+        built.append((model, self._build_card(model)))
+        self.after(1, self._build_next_card, index + 1, built)
 
-    def _maybe_reveal(self) -> None:
-        if not (self._dwell_done and self._build_done):
-            return
+    def _finish_loading(self, built: list[tuple[ModelInfo, ctk.CTkFrame]]) -> None:
         if not self.winfo_exists():
             return
         self._loading = False
-        self._glow_widgets = []
-        for skeleton in self._skeletons:
-            skeleton.destroy()
-        self._skeletons = []
-        self._cards = list(zip(self.shell.models, self._real_cards))
-        self._real_cards = []
+        self._loading_label.place_forget()
+        self._cards = built
         self._sync_pill_enabled()
         self._relayout(force=True)
 
@@ -171,74 +153,6 @@ class RegistryView(ctk.CTkFrame):
         canvas = self._scroll._parent_canvas
         self._scroll.update_idletasks()
         canvas.configure(scrollregion=canvas.bbox("all"))
-
-    def _glow_block(
-        self, parent, width: int, height: int, corner_radius: int = 4
-    ) -> ctk.CTkFrame:
-        block = ctk.CTkFrame(
-            parent,
-            width=width,
-            height=height,
-            corner_radius=corner_radius,
-            fg_color=COLORS["muted"],
-        )
-        self._glow_widgets.append(block)
-        return block
-
-    def _build_skeleton_card(self) -> ctk.CTkFrame:
-        card = ctk.CTkFrame(self._scroll, fg_color=COLORS["card"], corner_radius=6)
-
-        header = ctk.CTkFrame(card, fg_color=COLORS["muted"], corner_radius=0)
-        header.pack(fill="x")
-        header_inner = ctk.CTkFrame(header, fg_color="transparent")
-        header_inner.pack(fill="x", padx=14, pady=10)
-        top_row = ctk.CTkFrame(header_inner, fg_color="transparent")
-        top_row.pack(fill="x")
-        self._glow_block(top_row, 120, 14).pack(side="left")
-        self._glow_block(top_row, 46, 16, corner_radius=8).pack(side="right")
-        self._glow_block(header_inner, 90, 10).pack(anchor="w", pady=(6, 0))
-
-        body = ctk.CTkFrame(card, fg_color="transparent")
-        body.pack(fill="x", padx=14, pady=12)
-        self._glow_block(body, 90, 10).pack(anchor="w", pady=(0, 6))
-        self._glow_block(body, 130, 16).pack(anchor="w", pady=(0, 10))
-
-        pricing = ctk.CTkFrame(body, fg_color="transparent")
-        pricing.pack(fill="x")
-        pricing.columnconfigure((0, 1), weight=1)
-        for col in (0, 1):
-            cell = self._glow_block(pricing, 1, 44)
-            cell.grid(
-                row=0,
-                column=col,
-                sticky="ew",
-                padx=(0 if col == 0 else 6, 0 if col == 1 else 6),
-            )
-
-        footer = ctk.CTkFrame(card, fg_color="transparent")
-        ctk.CTkFrame(footer, fg_color=COLORS["border"], height=1).pack(fill="x")
-        footer_inner = ctk.CTkFrame(footer, fg_color="transparent")
-        footer_inner.pack(fill="x", padx=14, pady=8)
-        self._glow_block(footer_inner, 80, 10).pack(anchor="w")
-        footer.pack(fill="x")
-
-        return card
-
-    def _animate_glow(self) -> None:
-        if not self.winfo_exists():
-            return
-        self._glow_widgets = [w for w in self._glow_widgets if w.winfo_exists()]
-        if not self._glow_widgets:
-            return
-        self._glow_phase += _GLOW_STEP
-        alpha = _GLOW_MAX_ALPHA * (math.sin(self._glow_phase) + 1) / 2
-        dark = ctk.get_appearance_mode() == "Dark"
-        base = theme.resolve("muted", dark)
-        accent = theme.resolve("primary", dark)
-        color = formatting.tint(accent, base, alpha)
-        for widget in self._glow_widgets:
-            widget.configure(fg_color=color)
-        self.after(_GLOW_INTERVAL_MS, self._animate_glow)
 
     def _build_card(self, model: ModelInfo) -> ctk.CTkFrame:
         accent = theme.provider_color(model.provider)
