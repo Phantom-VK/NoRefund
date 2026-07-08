@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import ClassVar
 
 import customtkinter as ctk
 
@@ -168,7 +169,15 @@ class ModelDropdownButton(ctk.CTkFrame):
 
     Opens a non-modal ModelDropdownPopover on click (no grab_set — avoids the
     grab-race bug class the old Settings modal used to hit).
+
+    Tracks every instance with an open popover in a class-level registry so
+    callers that switch screens (e.g. MainView.show_view) can force-close
+    any dropdown left open on the screen being navigated away from — the
+    popover is a separate CTkToplevel, so raising a different view frame on
+    top of it does nothing to make it go away on its own.
     """
+
+    _open: ClassVar[set[ModelDropdownButton]] = set()
 
     def __init__(
         self,
@@ -223,16 +232,29 @@ class ModelDropdownButton(ctk.CTkFrame):
     def _toggle(self, _event=None) -> None:
         if self._popover is not None and self._popover.winfo_exists():
             self._popover.destroy()
-            self._popover = None
             return
         self._popover = ModelDropdownPopover(self, self._models, self._select)
+        ModelDropdownButton._open.add(self)
 
     def _select(self, model: ModelInfo) -> None:
         self._selected = model
         self._dot.configure(fg_color=theme.provider_color(model.provider))
         self._label.configure(text=formatting.model_label(model))
-        self._popover = None
         self._on_select(model)
+
+    def _clear_popover(self) -> None:
+        self._popover = None
+        ModelDropdownButton._open.discard(self)
+
+    def close_popover(self) -> None:
+        if self._popover is not None and self._popover.winfo_exists():
+            self._popover.destroy()
+
+    @classmethod
+    def close_all(cls) -> None:
+        """Close every open dropdown popover, regardless of which screen opened it."""
+        for button in list(cls._open):
+            button.close_popover()
 
 
 class ModelDropdownPopover(ctk.CTkToplevel):
@@ -240,11 +262,12 @@ class ModelDropdownPopover(ctk.CTkToplevel):
 
     def __init__(
         self,
-        anchor: ctk.CTkFrame,
+        anchor: ModelDropdownButton,
         models: list[ModelInfo],
         on_select: Callable[[ModelInfo], None],
     ) -> None:
         super().__init__(anchor)
+        self._anchor = anchor
         self._on_select = on_select
         self.overrideredirect(True)
         self.configure(fg_color=COLORS["popover"])
@@ -294,13 +317,33 @@ class ModelDropdownPopover(ctk.CTkToplevel):
         self.after(100, self._close_if_unfocused)
 
     def _close_if_unfocused(self) -> None:
-        if self.winfo_exists() and self.focus_displayof() is None:
+        if not self.winfo_exists():
+            return
+        # Close whenever focus has moved outside this popover -- including
+        # to another widget in the *same* window (e.g. a sidebar nav item),
+        # not just when focus leaves the whole application. Checking only
+        # for `is None` here was the bug: clicking anything else in this
+        # app moves focus to that widget rather than clearing it, so the
+        # popover never noticed it should close.
+        if not self._contains(self.focus_displayof()):
             self.destroy()
+
+    def _contains(self, widget) -> bool:
+        while widget is not None:
+            if widget is self:
+                return True
+            widget = getattr(widget, "master", None)
+        return False
 
     def _pick(self, model: ModelInfo) -> None:
         self._on_select(model)
         if self.winfo_exists():
             self.destroy()
+
+    def destroy(self) -> None:
+        if self._anchor._popover is self:
+            self._anchor._clear_popover()
+        super().destroy()
 
 
 def bind_mousewheel(frame: ctk.CTkScrollableFrame) -> None:
