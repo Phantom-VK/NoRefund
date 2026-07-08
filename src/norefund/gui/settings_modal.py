@@ -1,122 +1,177 @@
-"""Settings dialog."""
+"""Settings modal — the one true modal dialog in the app (needs grab_set)."""
 
 from __future__ import annotations
+
+from collections.abc import Callable
 
 import customtkinter as ctk
 
 from norefund.core.settings import Settings
-from norefund.gui.formatting import parse_int
+from norefund.gui import formatting, theme
 from norefund.gui.theme import COLORS
-from norefund.gui.theme import font as themed_font
-from norefund.gui.widgets import IconButton
+
+_CURRENCIES = ["USD", "EUR", "GBP", "INR"]
+_GRAB_RETRY_MS = 30
+_MAX_GRAB_ATTEMPTS = 10
 
 
 class SettingsModal(ctk.CTkToplevel):
-    def __init__(self, parent) -> None:
+    def __init__(
+        self, parent, settings: Settings, on_save: Callable[[Settings], None]
+    ) -> None:
         super().__init__(parent)
-        self._parent = parent
+        self._parent_shell = parent
+        self._settings = settings
+        self._on_save = on_save
+
         self.title("Settings")
-        self.geometry("430x330")
+        self.geometry("420x360")
         self.resizable(False, False)
-        self.transient(parent)
-        # Defer grab_set until the window is fully mapped and viewable.
-        # Calling grab_set() synchronously in __init__ races against Tk's
-        # window-map event on some Linux compositors and raises:
-        #   TclError: grab failed: window not viewable
-        self.after(50, self._safe_grab)
+        self.configure(fg_color=COLORS["card"])
+        self.transient(parent.winfo_toplevel())
 
-        frame = ctk.CTkFrame(self, fg_color=COLORS["card"], corner_radius=8)
-        frame.pack(fill="both", expand=True, padx=16, pady=16)
+        self._build_ui()
+        self._grab_attempts = 0
+        self.after(_GRAB_RETRY_MS, self._try_grab)
 
-        header = ctk.CTkFrame(frame, fg_color="transparent")
-        header.pack(fill="x", padx=16, pady=(16, 8))
+    def _try_grab(self) -> None:
+        if not self.winfo_exists():
+            return
+        try:
+            self.grab_set()
+        except Exception:  # noqa: BLE001 — TclError if window not yet viewable
+            self._grab_attempts += 1
+            if self._grab_attempts < _MAX_GRAB_ATTEMPTS:
+                self.after(_GRAB_RETRY_MS, self._try_grab)
+
+    # ------------------------------------------------------------------
+
+    def _build_ui(self) -> None:
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=20, pady=(16, 4))
         ctk.CTkLabel(
             header,
             text="Settings",
-            font=themed_font(16, "bold"),
-            text_color=COLORS["text"],
+            font=theme.font(15, "bold"),
+            text_color=COLORS["fg"],
         ).pack(side="left")
-        IconButton(header, "x", width=30, command=self.destroy).pack(side="right")
+        ctk.CTkLabel(
+            header,
+            text="✕",
+            font=theme.font(13),
+            text_color=COLORS["muted_fg"],
+            cursor="hand2",
+        ).pack(side="right")
+        header.winfo_children()[-1].bind("<Button-1>", lambda _e: self._cancel())
 
-        body = ctk.CTkFrame(frame, fg_color="transparent")
-        body.pack(fill="both", expand=True, padx=16, pady=8)
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=20, pady=8)
 
         ctk.CTkLabel(
-            body, text="Default currency", text_color=COLORS["muted_text"], anchor="w"
-        ).pack(fill="x")
+            body,
+            text="Default currency",
+            font=theme.font(11, "bold"),
+            text_color=COLORS["muted_fg"],
+            anchor="w",
+        ).pack(fill="x", pady=(8, 6))
+        self._currency_var = ctk.StringVar(value=self._settings.currency)
         ctk.CTkOptionMenu(
             body,
-            values=["USD", "EUR", "GBP", "INR"],
-            variable=parent.currency,
-            fg_color=COLORS["input"],
-            button_color=COLORS["input"],
-            state="disabled",
-        ).pack(fill="x", pady=(4, 14))
+            values=_CURRENCIES,
+            variable=self._currency_var,
+            fg_color=COLORS["input_bg"],
+            button_color=COLORS["muted"],
+        ).pack(fill="x")
 
         ctk.CTkLabel(
             body,
             text="Default output tokens estimate",
-            text_color=COLORS["muted_text"],
+            font=theme.font(11, "bold"),
+            text_color=COLORS["muted_fg"],
             anchor="w",
-        ).pack(fill="x")
+        ).pack(fill="x", pady=(16, 6))
+        self._output_tokens_var = ctk.StringVar(
+            value=str(self._settings.default_output_tokens)
+        )
         ctk.CTkEntry(
             body,
-            textvariable=parent.default_output_tokens,
-            fg_color=COLORS["input"],
+            textvariable=self._output_tokens_var,
+            font=theme.mono_font(12),
+            fg_color=COLORS["input_bg"],
             border_width=0,
-        ).pack(fill="x", pady=(4, 14))
+        ).pack(fill="x")
 
-        ctk.CTkLabel(
-            body,
-            text="Currency conversion isn't implemented yet — prices remain in the "
-            "model's native currency (USD).",
-            text_color=COLORS["muted_text"],
-            font=themed_font(11),
-            anchor="w",
-            wraplength=360,
-            justify="left",
-        ).pack(fill="x", pady=(8, 0))
-
-        footer = ctk.CTkFrame(frame, fg_color="transparent")
-        footer.pack(fill="x", padx=16, pady=(4, 16))
-        IconButton(footer, "Cancel", width=88, command=self.destroy).pack(
-            side="right", padx=(8, 0)
+        toggle_row = ctk.CTkFrame(body, fg_color="transparent")
+        toggle_row.pack(fill="x", pady=(20, 0))
+        self._chunk_warnings_var = ctk.BooleanVar(
+            value=self._settings.show_chunk_warnings
         )
-        IconButton(
-            footer, "Save changes", variant="primary", width=120, command=self._save
+        text_col = ctk.CTkFrame(toggle_row, fg_color="transparent")
+        text_col.pack(side="left", fill="x", expand=True)
+        ctk.CTkLabel(
+            text_col,
+            text="Show chunk warnings",
+            font=theme.font(12),
+            text_color=COLORS["fg"],
+            anchor="w",
+        ).pack(fill="x")
+        ctk.CTkLabel(
+            text_col,
+            text="Alert when files exceed the context window",
+            font=theme.font(10),
+            text_color=COLORS["muted_fg"],
+            anchor="w",
+        ).pack(fill="x")
+        ctk.CTkSwitch(
+            toggle_row,
+            text="",
+            variable=self._chunk_warnings_var,
+            progress_color=COLORS["primary"],
         ).pack(side="right")
 
-    # ------------------------------------------------------------------
-    # Internal
+        footer = ctk.CTkFrame(self, fg_color="transparent")
+        footer.pack(fill="x", padx=20, pady=(8, 16), side="bottom")
+        ctk.CTkButton(
+            footer,
+            text="Save",
+            font=theme.font(12, "bold"),
+            fg_color=COLORS["primary"],
+            text_color=COLORS["primary_fg"],
+            hover_color=COLORS["primary_hover"],
+            command=self._save,
+        ).pack(side="right")
+        ctk.CTkButton(
+            footer,
+            text="Cancel",
+            font=theme.font(12),
+            fg_color=COLORS["muted"],
+            text_color=COLORS["fg"],
+            hover_color=COLORS["border"],
+            command=self._cancel,
+        ).pack(side="right", padx=(0, 8))
+
     # ------------------------------------------------------------------
 
     def _save(self) -> None:
-        parent = self._parent
-        parent.settings = Settings(
-            default_output_tokens=parse_int(parent.default_output_tokens.get()),
-            theme="dark" if parent.theme_dark else "light",
-            currency=parent.currency.get(),
+        new_settings = Settings(
+            default_output_tokens=formatting.parse_int(
+                self._output_tokens_var.get(), self._settings.default_output_tokens
+            ),
+            theme=self._settings.theme,
+            currency=self._currency_var.get(),
+            show_chunk_warnings=self._chunk_warnings_var.get(),
         )
-        parent.settings_store.save(parent.settings)
-        self.destroy()
+        self._parent_shell.settings_store.save(new_settings)
+        self._on_save(new_settings)
+        self._close()
 
-    def _safe_grab(self) -> None:
-        """Attempt grab_set only when the window is actually viewable.
+    def _cancel(self) -> None:
+        self._close()
 
-        The 50 ms delay scheduled in __init__ is enough on virtually all
-        platforms, but we guard with winfo_viewable() as a belt-and-braces
-        check.  If somehow still not viewable we retry once after another
-        100 ms before giving up (modal still works, just without grab).
-        """
-        if self.winfo_exists() and self.winfo_viewable():
-            self.grab_set()
-        else:
-            self.after(100, self._grab_final_attempt)
-
-    def _grab_final_attempt(self) -> None:
-        """Last-chance grab attempt; silently skip if window is gone."""
-        if self.winfo_exists() and self.winfo_viewable():
+    def _close(self) -> None:
+        if self.winfo_exists():
             try:
-                self.grab_set()
+                self.grab_release()
             except Exception:  # noqa: BLE001
-                pass  # Non-fatal — modal is visible, just not input-locked
+                pass
+            self.destroy()
