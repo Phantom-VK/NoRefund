@@ -25,6 +25,7 @@ _DEFAULTS: dict = {
     "default_output_tokens": 1024,
     "theme": "system",
     "currency": "USD",
+    "show_chunk_warnings": True,
 }
 
 
@@ -33,6 +34,7 @@ class Settings:
     default_output_tokens: int = 1024
     theme: Theme = "system"
     currency: str = "USD"
+    show_chunk_warnings: bool = True
 
 
 class SettingsStore:
@@ -70,6 +72,9 @@ class SettingsStore:
             ),
             theme=data.get("theme", _DEFAULTS["theme"]),  # type: ignore[arg-type]
             currency=data.get("currency", _DEFAULTS["currency"]),
+            show_chunk_warnings=bool(
+                data.get("show_chunk_warnings", _DEFAULTS["show_chunk_warnings"])
+            ),
         )
 
     def save(self, settings: Settings) -> None:

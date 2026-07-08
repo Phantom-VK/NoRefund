@@ -1,218 +1,370 @@
-"""Reusable CustomTkinter widgets used across GUI screens."""
+"""Reusable CTk widgets shared across views."""
 
 from __future__ import annotations
 
-from typing import Optional
+from collections.abc import Callable
+from typing import ClassVar
 
 import customtkinter as ctk
 
 from norefund.core.models_registry import ModelInfo
-from norefund.gui.formatting import context_color, model_label, provider_color, tint
-from norefund.gui.theme import COLORS, mono_font
-from norefund.gui.theme import font as themed_font
+from norefund.gui import formatting, theme
+from norefund.gui.theme import COLORS, ICONS
 
 
 class ContextBar(ctk.CTkFrame):
-    def __init__(self, parent, height: int = 7, **kw) -> None:
-        super().__init__(parent, fg_color="transparent", **kw)
+    """Thin, color-coded horizontal progress bar for context-window usage."""
+
+    def __init__(self, parent, height: int = 6, **kwargs) -> None:
+        super().__init__(parent, fg_color="transparent", **kwargs)
         self._bar = ctk.CTkProgressBar(
             self,
             height=height,
-            fg_color=COLORS["muted"],
+            corner_radius=height // 2,
             progress_color=COLORS["primary"],
+            fg_color=COLORS["muted"],
         )
-        self._bar.set(0)
         self._bar.pack(fill="x", expand=True)
+        self.set_value(None)
 
-    def set_value(self, pct: Optional[float]) -> None:
-        """Update bar fill and colour. None (no context window) renders empty/muted."""
-        if pct is None:
-            self._bar.set(0)
-            self._bar.configure(progress_color=context_color(None))
-            return
-        self._bar.set(min(max(pct, 0), 100) / 100)
-        self._bar.configure(progress_color=context_color(pct))
+    def set_value(
+        self, pct: float | None, color: tuple[str, str] | None = None
+    ) -> None:
+        fraction = 0.0 if pct is None else max(0.0, min(pct / 100, 1.0))
+        self._bar.set(fraction)
+        self._bar.configure(progress_color=color or formatting.context_color(pct))
 
 
 class StatPill(ctk.CTkFrame):
+    """Uppercase muted label stacked over a bold (usually mono) value."""
+
     def __init__(
         self,
         parent,
         label: str,
-        value: str = "-",
-        subtext: str = "",
-        value_size: int = 14,
-        value_color=None,
-        value_weight: str = "bold",
-        **kw,
+        value: str = "—",
+        *,
+        value_font: tuple | None = None,
+        **kwargs,
     ) -> None:
-        super().__init__(parent, fg_color="transparent", **kw)
+        super().__init__(parent, fg_color="transparent", **kwargs)
         ctk.CTkLabel(
             self,
             text=label.upper(),
-            font=themed_font(10, "bold"),
-            text_color=COLORS["muted_text"],
+            font=theme.font(10),
+            text_color=COLORS["muted_fg"],
             anchor="w",
-        ).pack(anchor="w")
-        self._value = ctk.CTkLabel(
+        ).pack(fill="x")
+        self._value_label = ctk.CTkLabel(
             self,
             text=value,
-            font=mono_font(value_size, value_weight),
-            text_color=value_color if value_color is not None else COLORS["text"],
+            font=value_font or theme.mono_font(16, "bold"),
+            text_color=COLORS["fg"],
             anchor="w",
         )
-        self._value.pack(anchor="w", pady=(2, 0))
-        self._subtext = None
-        if subtext:
-            self._subtext = ctk.CTkLabel(
-                self,
-                text=subtext,
-                font=themed_font(11),
-                text_color=COLORS["muted_text"],
-                anchor="w",
-            )
-            self._subtext.pack(anchor="w")
+        self._value_label.pack(fill="x")
 
     def set_text(self, value: str) -> None:
-        self._value.configure(text=value)
-
-    def set_subtext(self, text: str) -> None:
-        if self._subtext is None:
-            self._subtext = ctk.CTkLabel(
-                self,
-                text=text,
-                font=themed_font(11),
-                text_color=COLORS["muted_text"],
-                anchor="w",
-            )
-            self._subtext.pack(anchor="w")
-        else:
-            self._subtext.configure(text=text)
+        self._value_label.configure(text=value)
 
 
 class IconButton(ctk.CTkButton):
-    def __init__(self, parent, text: str, variant: str = "muted", **kw) -> None:
-        if variant == "primary":
-            colors = {
-                "fg_color": COLORS["primary"],
-                "hover_color": COLORS["primary_hover"],
-                "text_color": COLORS["primary_text"],
-            }
-        elif variant == "danger":
-            colors = {
-                "fg_color": COLORS["muted"],
-                "hover_color": ("#fee2e2", "#3a2428"),
-                "text_color": COLORS["danger"],
-            }
-        else:
-            colors = {
-                "fg_color": COLORS["muted"],
-                "hover_color": ("#dde2e8", "#303640"),
-                "text_color": COLORS["text"],
-            }
-        base = {
-            "corner_radius": 5,
-            "height": 30,
-            "font": themed_font(12, "bold"),
-        }
-        base.update(colors)
-        base.update(kw)
-        super().__init__(parent, text=text, **base)
+    """Small button with an optional icon glyph, styled by variant."""
 
+    _VARIANTS = {
+        "primary": ("primary", "primary_fg", "primary_hover"),
+        "muted": ("muted", "fg", "border"),
+        "danger": ("muted", "fg", "destructive"),
+    }
 
-class ProviderBadge(ctk.CTkLabel):
-    """Tinted pill showing a provider name, mirroring the reference's ProviderBadge."""
-
-    def __init__(self, parent, provider: str, **kw) -> None:
-        accent = provider_color(provider)
+    def __init__(
+        self,
+        parent,
+        text: str = "",
+        icon: str | None = None,
+        variant: str = "muted",
+        command: Callable[[], None] | None = None,
+        **kwargs,
+    ) -> None:
+        fg_key, text_key, hover_key = self._VARIANTS.get(
+            variant, self._VARIANTS["muted"]
+        )
+        label = f"{ICONS.get(icon, '')} {text}".strip() if icon else text
         super().__init__(
             parent,
-            text=provider.upper(),
-            fg_color=tint(accent, 0.18),
-            text_color=accent,
+            text=label,
+            font=theme.font(12),
+            fg_color=COLORS[fg_key],
+            text_color=COLORS[text_key],
+            hover_color=COLORS[hover_key],
             corner_radius=6,
-            font=themed_font(10, "bold"),
-            **kw,
+            height=28,
+            command=command,
+            **kwargs,
         )
 
 
-class ModelDropdown(ctk.CTkFrame):
-    """Compound widget: a provider-color dot next to a CTkOptionMenu.
+class ProviderBadge(ctk.CTkLabel):
+    """Small uppercase pill tinted with the provider's brand color."""
 
-    CTk's dropdown menu (raw tkinter.Menu under the hood) renders every row
-    with one uniform color, so only the trigger's dot can reflect the
-    selected model's provider color — the open dropdown's rows stay plain.
-    """
+    def __init__(self, parent, provider: str, **kwargs) -> None:
+        accent = theme.provider_color(provider)
+        bg_tint = (
+            formatting.tint(accent, COLORS["card"][0], 0.13),
+            formatting.tint(accent, COLORS["card"][1], 0.18),
+        )
+        super().__init__(
+            parent,
+            text=provider.upper(),
+            font=theme.font(9, "bold"),
+            fg_color=bg_tint,
+            text_color=accent,
+            corner_radius=8,
+            width=1,
+            height=18,
+            padx=8,
+            **kwargs,
+        )
+
+
+class SidebarItem(ctk.CTkButton):
+    """Full-width sidebar nav row with an active/inactive visual state."""
 
     def __init__(
-        self, parent, models: list[ModelInfo], command=None, width: int = 200, **kw
+        self,
+        parent,
+        text: str,
+        icon: str,
+        command: Callable[[], None] | None = None,
+        **kwargs,
     ) -> None:
-        super().__init__(parent, fg_color="transparent", **kw)
-        self.models = models
-        self.model_by_label = {model_label(model): model for model in models}
-        values = list(self.model_by_label)
-        self.var = ctk.StringVar(value=values[0] if values else "")
-        self._external_command = command
+        super().__init__(
+            parent,
+            text=f"{ICONS.get(icon, '')}  {text}",
+            font=theme.font(13),
+            anchor="w",
+            corner_radius=6,
+            height=34,
+            fg_color="transparent",
+            text_color=COLORS["muted_fg"],
+            hover_color=COLORS["sidebar_accent"],
+            command=command,
+            **kwargs,
+        )
+        self._active = False
 
-        self.dot = ctk.CTkLabel(
+    def set_active(self, active: bool) -> None:
+        self._active = active
+        if active:
+            self.configure(
+                fg_color=COLORS["sidebar_accent"],
+                text_color=COLORS["sidebar_accent_fg"],
+            )
+        else:
+            self.configure(fg_color="transparent", text_color=COLORS["muted_fg"])
+
+
+class ModelDropdownButton(ctk.CTkFrame):
+    """Trigger button showing a colored provider dot + model label + chevron.
+
+    Opens a non-modal ModelDropdownPopover on click (no grab_set — avoids the
+    grab-race bug class the old Settings modal used to hit).
+
+    Tracks every instance with an open popover in a class-level registry so
+    callers that switch screens (e.g. MainView.show_view) can force-close
+    any dropdown left open on the screen being navigated away from — the
+    popover is a separate CTkToplevel, so raising a different view frame on
+    top of it does nothing to make it go away on its own.
+    """
+
+    _open: ClassVar[set[ModelDropdownButton]] = set()
+
+    def __init__(
+        self,
+        parent,
+        models: list[ModelInfo],
+        selected: ModelInfo,
+        on_select: Callable[[ModelInfo], None],
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            parent,
+            fg_color=COLORS["input_bg"],
+            corner_radius=6,
+            cursor="hand2",
+            **kwargs,
+        )
+        self._models = models
+        self._selected = selected
+        self._on_select = on_select
+        self._popover: ModelDropdownPopover | None = None
+
+        self._dot = ctk.CTkLabel(
             self,
             text="",
             width=10,
             height=10,
             corner_radius=5,
-            fg_color=self._dot_color(),
+            fg_color=theme.provider_color(selected.provider),
         )
-        self.dot.pack(side="left", padx=(0, 6))
-
-        self.menu = ctk.CTkOptionMenu(
+        self._dot.pack(side="left", padx=(10, 6), pady=8)
+        self._label = ctk.CTkLabel(
             self,
-            values=values,
-            variable=self.var,
-            command=self._on_select,
-            fg_color=COLORS["muted"],
-            button_color=COLORS["muted"],
-            button_hover_color=("gray75", "gray25"),
-            text_color=COLORS["text"],
-            dropdown_fg_color=COLORS["card"],
-            dropdown_hover_color=COLORS["muted"],
-            dropdown_text_color=COLORS["text"],
-            corner_radius=5,
-            height=30,
-            width=width,
-            font=themed_font(12, "bold"),
+            text=formatting.model_label(selected),
+            font=theme.font(12),
+            anchor="w",
         )
-        self.menu.pack(side="left", fill="x", expand=True)
+        self._label.pack(side="left", fill="x", expand=True, pady=8)
+        self._chevron = ctk.CTkLabel(
+            self,
+            text=ICONS["chevron_down"],
+            font=theme.font(11),
+            text_color=COLORS["muted_fg"],
+        )
+        self._chevron.pack(side="right", padx=(6, 10), pady=8)
 
-    def _dot_color(self) -> str:
-        model = self.model_by_label.get(self.var.get())
-        return provider_color(model.provider) if model else COLORS["muted_text"][1]
-
-    def _on_select(self, value: str) -> None:
-        self.dot.configure(fg_color=self._dot_color())
-        if self._external_command is not None:
-            self._external_command(value)
+        for widget in (self, self._dot, self._label, self._chevron):
+            widget.bind("<Button-1>", self._toggle)
 
     def selected_model(self) -> ModelInfo:
-        return self.model_by_label[self.var.get()]
+        return self._selected
+
+    def _toggle(self, _event=None) -> None:
+        if self._popover is not None and self._popover.winfo_exists():
+            self._popover.destroy()
+            return
+        self._popover = ModelDropdownPopover(self, self._models, self._select)
+        ModelDropdownButton._open.add(self)
+
+    def _select(self, model: ModelInfo) -> None:
+        self._selected = model
+        self._dot.configure(fg_color=theme.provider_color(model.provider))
+        self._label.configure(text=formatting.model_label(model))
+        self._on_select(model)
+
+    def _clear_popover(self) -> None:
+        self._popover = None
+        ModelDropdownButton._open.discard(self)
+
+    def close_popover(self) -> None:
+        if self._popover is not None and self._popover.winfo_exists():
+            self._popover.destroy()
+
+    @classmethod
+    def close_all(cls) -> None:
+        """Close every open dropdown popover, regardless of which screen opened it."""
+        for button in list(cls._open):
+            button.close_popover()
 
 
-class SidebarItem(ctk.CTkButton):
-    def __init__(self, parent, label: str, icon: str, command) -> None:
-        super().__init__(
-            parent,
-            text=f"{icon}  {label}",
-            command=command,
-            anchor="w",
-            height=36,
-            corner_radius=5,
-            fg_color="transparent",
-            hover_color=COLORS["muted"],
-            text_color=COLORS["muted_text"],
-            font=themed_font(13, "bold"),
-        )
+class ModelDropdownPopover(ctk.CTkToplevel):
+    """Borderless, non-modal popover listing every model with a colored dot."""
 
-    def set_active(self, active: bool) -> None:
-        self.configure(
-            fg_color=COLORS["sidebar_accent"] if active else "transparent",
-            text_color=COLORS["primary"] if active else COLORS["muted_text"],
-        )
+    def __init__(
+        self,
+        anchor: ModelDropdownButton,
+        models: list[ModelInfo],
+        on_select: Callable[[ModelInfo], None],
+    ) -> None:
+        super().__init__(anchor)
+        self._anchor = anchor
+        self._on_select = on_select
+        self.overrideredirect(True)
+        self.configure(fg_color=COLORS["popover"])
+        self.attributes("-topmost", True)
+
+        anchor.update_idletasks()
+        x = anchor.winfo_rootx()
+        y = anchor.winfo_rooty() + anchor.winfo_height() + 2
+        width = max(anchor.winfo_width(), 220)
+        self.geometry(f"{width}x{min(36 * len(models), 320)}+{x}+{y}")
+
+        scroll = ctk.CTkScrollableFrame(self, fg_color=COLORS["popover"])
+        scroll.pack(fill="both", expand=True, padx=1, pady=1)
+        bind_mousewheel(scroll)
+
+        for model in models:
+            row = ctk.CTkFrame(scroll, fg_color="transparent", cursor="hand2")
+            row.pack(fill="x", pady=1)
+            dot = ctk.CTkLabel(
+                row,
+                text="",
+                width=10,
+                height=10,
+                corner_radius=5,
+                fg_color=theme.provider_color(model.provider),
+            )
+            dot.pack(side="left", padx=(8, 6), pady=6)
+            label = ctk.CTkLabel(
+                row,
+                text=formatting.model_label(model),
+                font=theme.font(12),
+                anchor="w",
+            )
+            label.pack(side="left", fill="x", expand=True, pady=6)
+            for widget in (row, dot, label):
+                widget.bind("<Button-1>", lambda _e, m=model: self._pick(m))
+
+        self.bind("<FocusOut>", self._maybe_close)
+        self.bind("<Escape>", lambda _e: self.destroy())
+        self.after(10, self._grab_focus)
+
+    def _grab_focus(self) -> None:
+        if self.winfo_exists():
+            self.focus_set()
+
+    def _maybe_close(self, _event=None) -> None:
+        self.after(100, self._close_if_unfocused)
+
+    def _close_if_unfocused(self) -> None:
+        if not self.winfo_exists():
+            return
+        # Close whenever focus has moved outside this popover -- including
+        # to another widget in the *same* window (e.g. a sidebar nav item),
+        # not just when focus leaves the whole application. Checking only
+        # for `is None` here was the bug: clicking anything else in this
+        # app moves focus to that widget rather than clearing it, so the
+        # popover never noticed it should close.
+        if not self._contains(self.focus_displayof()):
+            self.destroy()
+
+    def _contains(self, widget) -> bool:
+        while widget is not None:
+            if widget is self:
+                return True
+            widget = getattr(widget, "master", None)
+        return False
+
+    def _pick(self, model: ModelInfo) -> None:
+        self._on_select(model)
+        if self.winfo_exists():
+            self.destroy()
+
+    def destroy(self) -> None:
+        if self._anchor._popover is self:
+            self._anchor._clear_popover()
+        super().destroy()
+
+
+def bind_mousewheel(frame: ctk.CTkScrollableFrame) -> None:
+    """Wire up Linux (X11) mouse-wheel scrolling for a CTkScrollableFrame.
+
+    CustomTkinter only binds <MouseWheel> internally, which fires on
+    Windows/macOS. X11 sends <Button-4>/<Button-5> instead, so without this,
+    wheel scrolling silently does nothing on Linux.
+    """
+    canvas = frame._parent_canvas
+
+    def _on_wheel(event) -> None:
+        if not frame.check_if_master_is_canvas(event.widget):
+            return
+        top, bottom = canvas.yview()
+        scrolling_up = event.num == 4
+        if scrolling_up and top <= 0.0:
+            return  # already at the top - don't scroll into blank canvas
+        if not scrolling_up and bottom >= 1.0:
+            return  # already at the bottom
+        canvas.yview_scroll(-1 if scrolling_up else 1, "units")
+
+    frame.bind_all("<Button-4>", _on_wheel, add="+")
+    frame.bind_all("<Button-5>", _on_wheel, add="+")

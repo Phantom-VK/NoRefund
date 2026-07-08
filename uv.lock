@@ -444,6 +444,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "customtkinter" },
+    { name = "platformdirs" },
     { name = "pypdf" },
     { name = "python-docx" },
     { name = "python-pptx" },
@@ -470,15 +471,16 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "black", marker = "extra == 'dev'", specifier = ">=24.0.0" },
+    { name = "black", marker = "extra == 'dev'", specifier = ">=26.5.1" },
     { name = "customtkinter", specifier = ">=5.2.2" },
-    { name = "pyinstaller", marker = "extra == 'dev'", specifier = ">=6.6.0" },
+    { name = "platformdirs", specifier = ">=4.0" },
+    { name = "pyinstaller", marker = "extra == 'dev'", specifier = ">=6.21.0" },
     { name = "pypdf", specifier = ">=4.3.1" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.1.1" },
     { name = "python-docx", specifier = ">=1.1.2" },
     { name = "python-pptx", specifier = ">=1.0.2" },
     { name = "pyyaml", specifier = ">=6.0.2" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.19" },
     { name = "tiktoken", specifier = ">=0.7.0" },
     { name = "tokenizers", specifier = ">=0.23.1" },
 ]

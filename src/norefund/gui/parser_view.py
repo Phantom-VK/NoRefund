@@ -1,717 +1,620 @@
-"""File parser and analysis screen."""
+"""File Parser — pick files/folders, analyze against a model, view results/logs."""
 
 from __future__ import annotations
 
 import json
-import logging
 import threading
-import traceback
 from pathlib import Path
-from tkinter import TclError, filedialog, messagebox
-from typing import Optional
+from tkinter import TclError, filedialog
 
 import customtkinter as ctk
 
-from norefund.core.costing import output_cost
 from norefund.core.models_registry import ModelInfo
 from norefund.core.service import AnalysisResult, analyze_file, analyze_folder
-from norefund.gui.formatting import (
-    context_color,
-    fmt_cost,
-    fmt_float,
-    fmt_num,
-    parse_int,
-)
-from norefund.gui.theme import COLORS, ICONS, SUPPORTED_FILETYPES, mono_font
-from norefund.gui.theme import font as themed_font
-from norefund.gui.widgets import ContextBar, IconButton, ModelDropdown, StatPill
+from norefund.gui import formatting, theme
+from norefund.gui.theme import COLORS, ICONS, SUPPORTED_FILETYPES
+from norefund.gui.widgets import ContextBar, IconButton, ModelDropdownButton, StatPill
 from norefund.logging_config import latest_log_file
 
-_LOG = logging.getLogger(__name__)
-
-
-def _tail_lines(path: Path, n: int = 200, max_bytes: int = 32_000) -> list[str]:
-    """Read the last `n` lines from `path` without loading the whole file."""
-    with path.open("rb") as f:
-        f.seek(0, 2)
-        f.seek(max(0, f.tell() - max_bytes))
-        return f.read().decode("utf-8", errors="ignore").splitlines()[-n:]
+_ANALYZE_LABEL = f"{ICONS['zap']} Analyze"
+_ANALYZING_LABEL = f"{ICONS['refresh']} Analyzing…"
 
 
 class ResultsTable(ctk.CTkScrollableFrame):
-    HEADERS = ["File", "Tokens", "Context %", "Fits?", "Chunks", "Input Cost", "Words", "Chars"]
-    WIDTHS   = [230, 90, 130, 70, 70, 100, 90, 90]
+    _COLUMNS = [
+        "File",
+        "Tokens",
+        "Context %",
+        "Fits?",
+        "Chunks",
+        "Input Cost",
+        "Words",
+        "Chars",
+    ]
+    _WEIGHTS = [3, 1, 2, 1, 1, 1, 1, 1]
 
-    def __init__(self, parent) -> None:
-        super().__init__(parent, fg_color=COLORS["bg"], corner_radius=0)
-        self._draw_header()
+    def __init__(self, parent, **kwargs) -> None:
+        super().__init__(parent, fg_color=COLORS["bg"], **kwargs)
+        for i, weight in enumerate(self._WEIGHTS):
+            self.columnconfigure(i, weight=weight)
+        self._build_header()
+        self._row_frames: list[ctk.CTkFrame] = []
 
-    def _draw_header(self) -> None:
-        for col, (header, width) in enumerate(zip(self.HEADERS, self.WIDTHS)):
+    def _build_header(self) -> None:
+        header = ctk.CTkFrame(self, fg_color=COLORS["muted"], corner_radius=0)
+        header.grid(
+            row=0, column=0, columnspan=len(self._COLUMNS), sticky="ew", pady=(0, 2)
+        )
+        for i, weight in enumerate(self._WEIGHTS):
+            header.columnconfigure(i, weight=weight)
+        for i, col in enumerate(self._COLUMNS):
+            anchor = "w" if i == 0 else "e"
             ctk.CTkLabel(
-                self,
-                text=header.upper(),
-                width=width,
-                fg_color=COLORS["muted"],
-                text_color=COLORS["muted_text"],
-                font=themed_font(10, "bold"),
-                anchor="w",
-                corner_radius=0,
-            ).grid(row=0, column=col, sticky="ew", padx=(0, 1), pady=(0, 1))
+                header,
+                text=col.upper(),
+                font=theme.font(9, "bold"),
+                text_color=COLORS["muted_fg"],
+                anchor=anchor,
+            ).grid(row=0, column=i, sticky="ew", padx=6, pady=4)
 
     def clear(self) -> None:
-        for child in self.winfo_children():
-            info = child.grid_info()
-            if info and int(info["row"]) > 0:
-                child.destroy()
+        for frame in self._row_frames:
+            frame.destroy()
+        self._row_frames.clear()
 
     def set_results(self, results: list[AnalysisResult]) -> None:
         self.clear()
-        for idx, result in enumerate(results, start=1):
-            self._add_row(idx, result)
+        for i, result in enumerate(results, start=1):
+            self._add_row(i, result)
 
-    def _add_row(self, row: int, result: AnalysisResult) -> None:
-        bg  = COLORS["card"] if row % 2 else COLORS["bg"]
-        pct = result.context_usage_pct
-
-        pct_str    = f"{fmt_float(pct)}%" if pct is not None else "—"
-        pct_color  = context_color(pct) if pct is not None else COLORS["muted_text"]
-        fits_color = COLORS["primary"] if result.fits_in_context else COLORS["danger"]
+    def _add_row(self, row_index: int, result: AnalysisResult) -> None:
+        row = ctk.CTkFrame(self, fg_color="transparent")
+        row.grid(row=row_index, column=0, columnspan=len(self._COLUMNS), sticky="ew")
+        for i, weight in enumerate(self._WEIGHTS):
+            row.columnconfigure(i, weight=weight)
+        row.bind("<Enter>", lambda _e: row.configure(fg_color=COLORS["muted"]))
+        row.bind("<Leave>", lambda _e: row.configure(fg_color="transparent"))
+        self._row_frames.append(row)
 
         name = Path(result.file_path).name
-        if result.error:
-            name = f"⚠ {name}"
 
-        text_values = {
-            0: name,
-            1: fmt_num(result.token_count),
-            4: str(result.min_chunks_needed),
-            5: fmt_cost(result.estimated_input_cost),
-            6: fmt_num(result.word_count),
-            7: fmt_num(result.char_count),
-        }
-
-        for col, width in enumerate(self.WIDTHS):
-            if col == 2:
-                cell = ctk.CTkFrame(
-                    self, fg_color=bg, corner_radius=0, width=width, height=28
-                )
-                cell.grid_propagate(False)
-                bar_wrap = ctk.CTkFrame(
-                    cell, fg_color="transparent", width=44, height=5
-                )
-                bar_wrap.place(relx=0, rely=0.5, x=6, anchor="w")
-                bar_wrap.pack_propagate(False)
-                bar = ContextBar(bar_wrap, height=5)
-                bar.pack(fill="x", expand=True)
-                bar.set_value(pct)
-                ctk.CTkLabel(
-                    cell,
-                    text=pct_str,
-                    text_color=pct_color,
-                    font=mono_font(12, "bold"),
-                    anchor="w",
-                ).place(relx=0, rely=0.5, x=56, anchor="w")
-                cell.grid(row=row, column=col, sticky="ew", padx=(0, 1), pady=(0, 1))
-                continue
-            if col == 3:
-                glyph = ICONS["check"] if result.fits_in_context else ICONS["x_circle"]
-                ctk.CTkLabel(
-                    self,
-                    text=glyph,
-                    width=width,
-                    fg_color=bg,
-                    text_color=fits_color,
-                    font=themed_font(13, "bold"),
-                    anchor="center",
-                    corner_radius=0,
-                ).grid(row=row, column=col, sticky="ew", padx=(0, 1), pady=(0, 1))
-                continue
+        if result.error is not None:
             ctk.CTkLabel(
-                self,
-                text=text_values[col],
-                width=width,
-                fg_color=bg,
-                text_color=COLORS["text"],
-                font=themed_font(12, "bold" if col in {0, 1, 5} else "normal"),
+                row,
+                text=name,
+                font=theme.mono_font(11),
                 anchor="w",
-                corner_radius=0,
-            ).grid(row=row, column=col, sticky="ew", padx=(0, 1), pady=(0, 1))
+                text_color=COLORS["fg"],
+            ).grid(row=0, column=0, sticky="ew", padx=6, pady=4)
+            ctk.CTkLabel(
+                row,
+                text=f"{ICONS['x_circle']} {result.error}",
+                font=theme.font(11),
+                anchor="w",
+                text_color=COLORS["destructive"],
+            ).grid(
+                row=0,
+                column=1,
+                columnspan=len(self._COLUMNS) - 1,
+                sticky="ew",
+                padx=6,
+                pady=4,
+            )
+            return
 
+        ctk.CTkLabel(
+            row,
+            text=name,
+            font=theme.mono_font(11),
+            anchor="w",
+            text_color=COLORS["fg"],
+        ).grid(row=0, column=0, sticky="ew", padx=6, pady=4)
+        ctk.CTkLabel(
+            row,
+            text=formatting.fmt_num(result.token_count),
+            font=theme.mono_font(11),
+            anchor="e",
+        ).grid(row=0, column=1, sticky="ew", padx=6, pady=4)
 
-_LEVEL_TAGS = {
-    "INFO": "info",
-    "WARN": "warn",
-    "WARNING": "warn",
-    "OK": "ok",
-    "DONE": "done",
-    "ERROR": "err",
-    "CRITICAL": "err",
-}
+        ctx_cell = ctk.CTkFrame(row, fg_color="transparent")
+        ctx_cell.grid(row=0, column=2, sticky="ew", padx=6, pady=4)
+        bar = ContextBar(ctx_cell, height=5)
+        bar.pack(side="left", fill="x", expand=True, padx=(0, 6))
+        bar.set_value(result.context_usage_pct)
+        ctk.CTkLabel(
+            ctx_cell,
+            text=formatting.fmt_context_pct(result.context_usage_pct),
+            font=theme.mono_font(10),
+            text_color=formatting.context_color(result.context_usage_pct),
+        ).pack(side="left")
+
+        fits_icon = (
+            ICONS["check_circle"] if result.fits_in_context else ICONS["x_circle"]
+        )
+        fits_color = (
+            COLORS["primary"] if result.fits_in_context else COLORS["destructive"]
+        )
+        ctk.CTkLabel(
+            row,
+            text=fits_icon,
+            font=theme.font(11),
+            text_color=fits_color,
+            anchor="e",
+        ).grid(row=0, column=3, sticky="ew", padx=6, pady=4)
+
+        ctk.CTkLabel(
+            row,
+            text=str(result.min_chunks_needed),
+            font=theme.mono_font(11),
+            anchor="e",
+        ).grid(row=0, column=4, sticky="ew", padx=6, pady=4)
+        ctk.CTkLabel(
+            row,
+            text=formatting.fmt_cost(result.estimated_input_cost),
+            font=theme.mono_font(11),
+            anchor="e",
+        ).grid(row=0, column=5, sticky="ew", padx=6, pady=4)
+        ctk.CTkLabel(
+            row,
+            text=formatting.fmt_num(result.word_count),
+            font=theme.mono_font(11),
+            anchor="e",
+        ).grid(row=0, column=6, sticky="ew", padx=6, pady=4)
+        ctk.CTkLabel(
+            row,
+            text=formatting.fmt_num(result.char_count),
+            font=theme.mono_font(11),
+            anchor="e",
+        ).grid(row=0, column=7, sticky="ew", padx=6, pady=4)
 
 
 class LogsPanel(ctk.CTkFrame):
-    def __init__(self, parent) -> None:
-        super().__init__(parent, fg_color=COLORS["bg"])
-        self.text = ctk.CTkTextbox(
-            self,
-            fg_color=COLORS["bg"],
-            text_color=COLORS["muted_text"],
-            font=mono_font(12),
-            wrap="none",
-        )
-        self.text.pack(fill="both", expand=True, padx=18, pady=16)
-        self._configure_tags()
-        self.refresh()
+    _TAG_COLORS = {
+        "INFO": "muted_fg",
+        "WARNING": "warning",
+        "ERROR": "destructive",
+        "DEBUG": "muted_fg",
+    }
 
-    def _configure_tags(self) -> None:
-        """Colour-code log levels. Resolved once at construction against the
-        appearance mode active at that time; won't re-resolve on a later
-        theme toggle while this cached view stays alive (cosmetic-only).
-        """
-        self.text.tag_config("prefix", foreground=COLORS["primary"][1])
-        self.text.tag_config("dim", foreground=COLORS["muted_text"][1])
-        self.text.tag_config("info", foreground=COLORS["muted_text"][1])
-        self.text.tag_config("warn", foreground=COLORS["warning"][1])
-        self.text.tag_config("ok", foreground=COLORS["primary"][1])
-        self.text.tag_config("done", foreground=COLORS["primary"][1])
-        self.text.tag_config("err", foreground=COLORS["danger"][1])
+    def __init__(self, parent, **kwargs) -> None:
+        super().__init__(parent, fg_color=COLORS["bg"], **kwargs)
+        self._textbox = ctk.CTkTextbox(
+            self,
+            font=theme.mono_font(11),
+            fg_color=COLORS["bg"],
+            text_color=COLORS["muted_fg"],
+            wrap="none",
+            state="disabled",
+        )
+        self._textbox.pack(fill="both", expand=True)
+        for level, token in self._TAG_COLORS.items():
+            is_dark = ctk.get_appearance_mode() == "Dark"
+            self._textbox.tag_config(level, foreground=theme.resolve(token, is_dark))
 
     def refresh(self) -> None:
-        """Reload the current run log.
-
-        Reads only the last 32 KB / 200 lines. Each parsed line is inserted
-        with a level-specific colour tag; still bounded to <=200 lines so
-        the per-line insert cost stays negligible.
-        """
-        self.text.delete("1.0", "end")
-        path = latest_log_file()
-        if not path:
-            self.text.insert("end", "No logs yet. Run an analysis to see output here.\n")
+        if not self.winfo_exists():
             return
+        self._textbox.configure(state="normal")
+        self._textbox.delete("1.0", "end")
+        log_path = latest_log_file()
+        if log_path is None:
+            self._textbox.insert(
+                "end", "No logs yet — run an analysis to see activity here.\n"
+            )
+        else:
+            try:
+                lines = log_path.read_text(
+                    encoding="utf-8", errors="ignore"
+                ).splitlines()[-500:]
+            except OSError as exc:
+                lines = [
+                    f'{{"level": "ERROR", "message": "Failed to read log file: {exc}"}}'
+                ]
+            for line in lines:
+                self._insert_line(line)
+        self._textbox.configure(state="disabled")
+
+    def _insert_line(self, raw: str) -> None:
         try:
-            for line in _tail_lines(path):
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    obj     = json.loads(line)
-                    ctx     = obj.get("ctx") or {}
-                    message = obj.get("message", "log")
-                    level   = obj.get("level", "INFO")
-                    tag     = _LEVEL_TAGS.get(level, "info")
-                    self.text.insert("end", "› ", "prefix")
-                    self.text.insert("end", f"[{level}] ", "dim")
-                    self.text.insert("end", f"{message} {ctx}\n", tag)
-                except json.JSONDecodeError:
-                    self.text.insert("end", f"{line}\n")
-        except OSError as exc:
-            self.text.insert("end", f"Error reading log file: {exc}\n")
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            self._textbox.insert("end", raw + "\n")
+            return
+        level = data.get("level", "INFO")
+        message = data.get("message", "")
+        ctx = data.get("ctx") or {}
+        ctx_str = "  " + " ".join(f"{k}={v}" for k, v in ctx.items()) if ctx else ""
+        self._textbox.insert("end", f"›  [{level}]  {message}{ctx_str}\n", level)
 
 
 class ParserView(ctk.CTkFrame):
-    _ANALYZE_LABEL = f"{ICONS['zap']} Analyze"
-
-    def __init__(
-        self,
-        parent,
-        shell,
-        models: list[ModelInfo],
-        default_output: ctk.StringVar,
-    ) -> None:
+    def __init__(self, parent, shell) -> None:
         super().__init__(parent, fg_color=COLORS["bg"])
-        self.shell          = shell
-        self.models         = models
-        self.default_output = default_output
-        self.output_tokens  = ctk.StringVar(value=default_output.get())
-        self.paths:   list[Path]           = []
-        self.results: list[AnalysisResult] = []
-        self.active_tab = "results"
-        self.status     = ctk.StringVar(value="Ready - add a file or folder to begin.")
-        self.analyzing  = False
-        self.cancel_event: Optional[threading.Event] = None
-        self._files_processed = 0
-        self.last_model: Optional[ModelInfo] = None
-        self.has_run = False
+        self.shell = shell
+        self._paths: list[Path] = []
+        self._results: list[AnalysisResult] = []
+        self.analyzing = False
+        self.cancel_event: threading.Event | None = None
+        self._active_tab = "results"
 
-        self._build()
-        self._render_files()
-        self._render_results()
+        self._build_toolbar()
+        self._build_file_strip()
+        self._build_tabs()
+        self._build_content()
+        self._build_status_bar()
 
-    def _build(self) -> None:
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(3, weight=1)
+        self._refresh_file_strip()
+        self._show_empty_results()
 
+    # ------------------------------------------------------------------
+    # Layout
+    # ------------------------------------------------------------------
+
+    def _build_toolbar(self) -> None:
         toolbar = ctk.CTkFrame(self, fg_color=COLORS["card"], corner_radius=0)
-        toolbar.grid(row=0, column=0, sticky="ew")
-        IconButton(
-            toolbar, f"{ICONS['plus']} Add File", width=104, command=self._pick_file
-        ).pack(side="left", padx=(18, 6), pady=10)
-        IconButton(
-            toolbar,
-            f"{ICONS['folder_plus']} Add Folder",
-            width=114,
-            command=self._pick_folder,
-        ).pack(side="left", padx=6, pady=10)
-        IconButton(
-            toolbar,
-            f"{ICONS['x']} Clear",
-            variant="danger",
-            width=82,
-            command=self._clear,
-        ).pack(side="left", padx=6, pady=10)
-        ctk.CTkFrame(toolbar, width=1, fg_color=COLORS["border"]).pack(
-            side="left", fill="y", padx=8, pady=14
+        toolbar.pack(side="top", fill="x")
+        inner = ctk.CTkFrame(toolbar, fg_color="transparent")
+        inner.pack(fill="x", padx=12, pady=8)
+
+        IconButton(inner, "Add File", icon="plus", command=self._add_files).pack(
+            side="left", padx=(0, 6)
         )
-        self.model_select = ModelDropdown(toolbar, self.models, width=230)
-        self.model_select.pack(side="left", padx=(0, 10), pady=10)
+        IconButton(
+            inner, "Add Folder", icon="folder_plus", command=self._add_folder
+        ).pack(side="left", padx=6)
+        IconButton(
+            inner, "Clear", icon="x", variant="danger", command=self._clear
+        ).pack(side="left", padx=6)
+
+        ctk.CTkFrame(inner, fg_color=COLORS["border"], width=1).pack(
+            side="left", fill="y", padx=10, pady=4
+        )
+
+        self._model_dropdown = ModelDropdownButton(
+            inner, self.shell.models, self.shell.models[0], on_select=lambda _m: None
+        )
+        self._model_dropdown.pack(side="left", padx=6)
+
+        out_frame = ctk.CTkFrame(inner, fg_color="transparent")
+        out_frame.pack(side="left", padx=10)
         ctk.CTkLabel(
-            toolbar,
+            out_frame,
             text="Est. output:",
-            text_color=COLORS["muted_text"],
-            font=themed_font(12),
-        ).pack(side="left")
-        ctk.CTkEntry(
-            toolbar,
-            textvariable=self.output_tokens,
-            width=76,
-            fg_color=COLORS["input"],
-            border_width=0,
-            font=mono_font(12),
-        ).pack(side="left", padx=(6, 3), pady=10)
-        ctk.CTkLabel(
-            toolbar,
-            text="tokens",
-            text_color=COLORS["muted_text"],
-            font=themed_font(12),
-        ).pack(side="left")
-        self.analyze_btn = IconButton(
-            toolbar,
-            f"{ICONS['zap']} Analyze",
-            variant="primary",
-            width=120,
-            command=self._run_analysis,
-        )
-        self.analyze_btn.pack(side="right", padx=18, pady=10)
-
-        self.files_frame = ctk.CTkScrollableFrame(
-            self, height=94, fg_color=COLORS["bg"], corner_radius=0
-        )
-        self.files_frame.grid(row=1, column=0, sticky="ew")
-
-        tabs = ctk.CTkFrame(self, fg_color=COLORS["card"], corner_radius=0)
-        tabs.grid(row=2, column=0, sticky="ew")
-        self.results_tab = IconButton(
-            tabs, "Results", width=84, command=lambda: self._set_tab("results")
-        )
-        self.logs_tab = IconButton(
-            tabs, "Logs", width=70, command=lambda: self._set_tab("logs")
-        )
-        self.results_tab.pack(side="left", padx=(18, 0), pady=8)
-        self.logs_tab.pack(side="left",    padx=(4, 0),  pady=8)
-
-        self.content = ctk.CTkFrame(self, fg_color=COLORS["bg"], corner_radius=0)
-        self.content.grid(row=3, column=0, sticky="nsew")
-        self.content.grid_columnconfigure(0, weight=1)
-        self.content.grid_rowconfigure(0, weight=1)
-
-        self.results_panel = ctk.CTkFrame(
-            self.content, fg_color=COLORS["bg"], corner_radius=0
-        )
-        # Grid immediately (before children are built) so the whole subtree
-        # — including CTkScrollableFrame's internal canvas in ResultsTable —
-        # grows up already mapped. Building it fully offscreen and mapping it
-        # only later left canvas-backed widgets (CTkLabel, CTkScrollableFrame)
-        # with stale/zero geometry that a later grid() didn't fix.
-        self.results_panel.grid(row=0, column=0, sticky="nsew")
-        self.results_panel.grid_columnconfigure(0, weight=1)
-        self.results_panel.grid_rowconfigure(1, weight=1)
-
-        self.summary = ctk.CTkFrame(
-            self.results_panel, fg_color=COLORS["card"], corner_radius=0
-        )
-        self.summary.grid(row=0, column=0, sticky="ew")
-        self.summary.grid_columnconfigure((0, 1, 2, 3, 4), weight=1, uniform="summary")
-        self.stat_files       = StatPill(self.summary, "Files")
-        self.stat_tokens      = StatPill(self.summary, "Total tokens")
-        self.stat_cost        = StatPill(self.summary, "Input cost")
-        self.stat_output_cost = StatPill(self.summary, "Est. output cost")
-        self.stat_context     = StatPill(self.summary, "Avg context")
-        for idx, stat in enumerate(
-            [
-                self.stat_files,
-                self.stat_tokens,
-                self.stat_cost,
-                self.stat_output_cost,
-                self.stat_context,
-            ]
-        ):
-            stat.grid(row=0, column=idx, sticky="ew", padx=18, pady=12)
-
-        self.table = ResultsTable(self.results_panel)
-        self.table.grid(row=1, column=0, sticky="nsew")
-
-        self.empty_state = ctk.CTkFrame(
-            self.content, fg_color=COLORS["bg"], corner_radius=0
-        )
-        ctk.CTkLabel(
-            self.empty_state,
-            text=ICONS["bar_chart"],
-            font=themed_font(32),
-            text_color=COLORS["muted_text"],
-        ).pack(pady=(80, 8))
-        ctk.CTkLabel(
-            self.empty_state,
-            text="Add files and click Analyze to see results",
-            font=themed_font(13),
-            text_color=COLORS["muted_text"],
-        ).pack()
-        self.logs_panel = LogsPanel(self.content)
-
-        footer = ctk.CTkFrame(self, fg_color=COLORS["card"], corner_radius=0)
-        footer.grid(row=4, column=0, sticky="ew")
-        ctk.CTkLabel(
-            footer,
-            textvariable=self.status,
-            text_color=COLORS["muted_text"],
-            font=mono_font(11),
-            anchor="w",
-        ).pack(side="left", padx=18, pady=8)
-
-        # Packed unconditionally here (not lazily inside _render_results) so
-        # the footer's layout is stable from the very first render.
-        self.footer_stats = ctk.CTkFrame(footer, fg_color="transparent")
-        self.footer_stats.pack(side="right", padx=18, pady=8)
-        self.footer_tokens_val = self._footer_stat(self.footer_stats, "Total tokens:")
-        self.footer_cost_val = self._footer_stat(self.footer_stats, "Est. input cost:")
-
-        # Text-only (no embedded ContextBar/CTkProgressBar): a CTkProgressBar
-        # nested in a narrow pack_propagate(False) wrapper here reproducibly
-        # left sibling canvas widgets (StatPills, ResultsTable rows) unpainted
-        # under Xvfb once this view was embedded in MainView's tkraise'd
-        # container — isolated via bisection. The results-table's own
-        # per-row ContextBar (a wider cell inside a CTkScrollableFrame) does
-        # not exhibit this, so only the footer usage is avoided.
-        ctx_block = ctk.CTkFrame(self.footer_stats, fg_color="transparent")
-        ctx_block.pack(side="left")
-        ctk.CTkLabel(
-            ctx_block,
-            text="Avg context:",
-            text_color=COLORS["muted_text"],
-            font=mono_font(11),
+            font=theme.font(11),
+            text_color=COLORS["muted_fg"],
         ).pack(side="left", padx=(0, 6))
-        self.footer_context_val = ctk.CTkLabel(
-            ctx_block,
-            text="-",
-            text_color=COLORS["primary"],
-            font=mono_font(11, "bold"),
+        self._output_var = ctk.StringVar(
+            value=str(self.shell.settings.default_output_tokens)
         )
-        self.footer_context_val.pack(side="left")
-
-        self._set_tab("results")
-
-    def _footer_stat(self, parent, label: str) -> ctk.CTkLabel:
-        """Build a footer label/value pair; returns the value label to update later."""
-        frame = ctk.CTkFrame(parent, fg_color="transparent")
-        frame.pack(side="left", padx=(0, 16))
+        ctk.CTkEntry(
+            out_frame,
+            textvariable=self._output_var,
+            width=90,
+            font=theme.mono_font(11),
+            fg_color=COLORS["input_bg"],
+            border_width=0,
+        ).pack(side="left")
         ctk.CTkLabel(
-            frame, text=label, text_color=COLORS["muted_text"], font=mono_font(11)
-        ).pack(side="left", padx=(0, 4))
-        value = ctk.CTkLabel(
-            frame, text="-", text_color=COLORS["text"], font=mono_font(11, "bold")
+            out_frame, text="tokens", font=theme.font(11), text_color=COLORS["muted_fg"]
+        ).pack(side="left", padx=(6, 0))
+
+        self._analyze_btn = IconButton(
+            inner, "Analyze", icon="zap", variant="primary", command=self._run_analysis
         )
-        value.pack(side="left")
-        return value
+        self._analyze_btn.pack(side="right")
+        self._analyze_btn.configure(state="disabled")
+
+    def _build_file_strip(self) -> None:
+        wrapper = ctk.CTkFrame(self, fg_color=COLORS["bg"], corner_radius=0, height=100)
+        wrapper.pack(side="top", fill="x")
+        wrapper.pack_propagate(False)
+        self._file_strip = ctk.CTkScrollableFrame(wrapper, fg_color=COLORS["bg"])
+        self._file_strip.pack(fill="both", expand=True, padx=12, pady=6)
+
+    def _build_tabs(self) -> None:
+        tabs = ctk.CTkFrame(self, fg_color=COLORS["card"], corner_radius=0)
+        tabs.pack(side="top", fill="x")
+        self._tab_buttons: dict[str, ctk.CTkButton] = {}
+        for tab_id, label in [("results", "Results"), ("logs", "Logs")]:
+            btn = ctk.CTkButton(
+                tabs,
+                text=label,
+                font=theme.font(12),
+                corner_radius=0,
+                height=32,
+                width=90,
+                fg_color="transparent",
+                hover_color=COLORS["muted"],
+                text_color=COLORS["muted_fg"],
+                command=lambda t=tab_id: self._switch_tab(t),
+            )
+            btn.pack(
+                side="left", padx=(12 if tab_id == "results" else 0, 0), pady=(4, 0)
+            )
+            self._tab_buttons[tab_id] = btn
+        self._sync_tab_styles()
+
+    def _sync_tab_styles(self) -> None:
+        for tab_id, btn in self._tab_buttons.items():
+            active = tab_id == self._active_tab
+            btn.configure(
+                text_color=COLORS["primary"] if active else COLORS["muted_fg"]
+            )
+
+    def _build_content(self) -> None:
+        self._content = ctk.CTkFrame(self, fg_color=COLORS["bg"], corner_radius=0)
+        self._content.pack(side="top", fill="both", expand=True)
+
+        self._results_frame = ctk.CTkFrame(self._content, fg_color=COLORS["bg"])
+        self._logs_frame = LogsPanel(self._content)
+
+        for frame in (self._results_frame, self._logs_frame):
+            frame.place(x=0, y=0, relwidth=1, relheight=1)
+        self._results_frame.tkraise()
+
+    def _build_status_bar(self) -> None:
+        self._status_bar = ctk.CTkFrame(
+            self, fg_color=COLORS["card"], corner_radius=0, height=32
+        )
+        self._status_left = ctk.CTkLabel(
+            self._status_bar,
+            text="",
+            font=theme.font(11),
+            text_color=COLORS["muted_fg"],
+        )
+        self._status_left.pack(side="left", padx=12)
+        self._status_right = ctk.CTkLabel(
+            self._status_bar,
+            text="",
+            font=theme.mono_font(11),
+            text_color=COLORS["muted_fg"],
+        )
+        self._status_right.pack(side="right", padx=12)
 
     # ------------------------------------------------------------------
-    # File management
+    # File selection
     # ------------------------------------------------------------------
 
-    def _pick_file(self) -> None:
-        path = filedialog.askopenfilename(
-            title="Select a document", filetypes=SUPPORTED_FILETYPES
-        )
-        if path:
-            self._add_path(Path(path))
+    def _add_files(self) -> None:
+        paths = filedialog.askopenfilenames(filetypes=SUPPORTED_FILETYPES)
+        for p in paths:
+            self._paths.append(Path(p))
+        self._refresh_file_strip()
 
-    def _pick_folder(self) -> None:
-        path = filedialog.askdirectory(title="Select a folder")
-        if path:
-            self._add_path(Path(path))
-
-    def _add_path(self, path: Path) -> None:
-        if path not in self.paths:
-            self.paths.append(path)
-            self.status.set(f"Added {path.name}")
-            self._render_files()
-            self.shell.update_header_count(len(self.paths))
+    def _add_folder(self) -> None:
+        folder = filedialog.askdirectory()
+        if folder:
+            self._paths.append(Path(folder))
+        self._refresh_file_strip()
 
     def _remove_path(self, path: Path) -> None:
-        self.paths = [item for item in self.paths if item != path]
-        self.status.set(f"Removed {path.name}")
-        self._render_files()
-        self.shell.update_header_count(len(self.paths))
+        self._paths = [p for p in self._paths if p != path]
+        self._refresh_file_strip()
 
     def _clear(self) -> None:
-        self.paths.clear()
-        self.results.clear()
-        self.last_model = None
-        self.has_run = False
-        # Force-reset stuck analyzing state so Clear always unblocks the UI.
-        if self.cancel_event is not None:
+        if self.analyzing and self.cancel_event is not None:
             self.cancel_event.set()
-        self.cancel_event = None
-        self.analyzing = False
-        self.analyze_btn.configure(
-            state="normal", text=self._ANALYZE_LABEL, command=self._run_analysis
-        )
-        self.status.set("Cleared. Add a file or folder to begin.")
-        self._render_files()
-        self._render_results()
+        self._reset_busy_state()
+        self._paths = []
+        self._results = []
+        self._refresh_file_strip()
+        self._show_empty_results()
+        self._status_bar.pack_forget()
         self.shell.update_header_count(0)
 
-    def _render_files(self) -> None:
-        for child in self.files_frame.winfo_children():
+    def _refresh_file_strip(self) -> None:
+        for child in self._file_strip.winfo_children():
             child.destroy()
-        if not self.paths:
-            row = ctk.CTkFrame(self.files_frame, fg_color="transparent")
-            row.pack(fill="x", padx=18, pady=14)
+
+        if not self._paths:
             ctk.CTkLabel(
-                row,
-                text='No files selected. Click "Add File" or "Add Folder" to get started.',
-                text_color=COLORS["muted_text"],
-                anchor="w",
-            ).pack(fill="x")
-            return
-        for path in self.paths:
-            row = ctk.CTkFrame(
-                self.files_frame, fg_color=COLORS["muted"], corner_radius=5
-            )
-            row.pack(fill="x", padx=18, pady=3)
-            prefix = "[folder]" if path.is_dir() else "[file]"
-            ctk.CTkLabel(
-                row,
-                text=f"{prefix} {path}",
-                text_color=COLORS["muted_text"],
-                font=mono_font(11),
-                anchor="w",
-            ).pack(side="left", fill="x", expand=True, padx=10, pady=5)
-            IconButton(
-                row,
-                ICONS["x"],
-                variant="danger",
-                width=28,
-                command=lambda p=path: self._remove_path(p),
-            ).pack(side="right", padx=5, pady=4)
-
-    # ------------------------------------------------------------------
-    # Tab switching
-    # ------------------------------------------------------------------
-
-    def _set_tab(self, tab: str) -> None:
-        self.active_tab = tab
-        self.results_tab.configure(
-            fg_color=COLORS["primary"] if tab == "results" else COLORS["muted"]
-        )
-        self.logs_tab.configure(
-            fg_color=COLORS["primary"] if tab == "logs" else COLORS["muted"]
-        )
-        if tab == "results":
-            self.logs_panel.grid_remove()
-            self._update_results_visibility()
+                self._file_strip,
+                text=(
+                    "No files selected. Click 'Add File' or 'Add Folder' "
+                    "to get started."
+                ),
+                font=theme.font(11),
+                text_color=COLORS["muted_fg"],
+            ).pack(pady=10)
         else:
-            self.logs_panel.refresh()
-            self.results_panel.grid_remove()
-            self.empty_state.grid_remove()
-            self.logs_panel.grid(row=0, column=0, sticky="nsew")
+            for path in self._paths:
+                self._build_file_row(path)
 
-    def _update_results_visibility(self) -> None:
-        """Show the empty-state placeholder until the first analysis run completes."""
-        if self.has_run:
-            self.empty_state.grid_remove()
-            self.results_panel.grid(row=0, column=0, sticky="nsew")
-        else:
-            self.results_panel.grid_remove()
-            self.empty_state.grid(row=0, column=0, sticky="nsew")
+        self._analyze_btn.configure(
+            state="normal" if (self._paths and not self.analyzing) else "disabled"
+        )
+        self.shell.update_header_count(len(self._paths))
+
+    def _build_file_row(self, path: Path) -> None:
+        row = ctk.CTkFrame(self._file_strip, fg_color="transparent")
+        row.pack(fill="x", pady=1)
+        icon = ICONS["folder_open"] if path.is_dir() else ICONS["file_text"]
+        ctk.CTkLabel(
+            row,
+            text=f"{icon}  {path}",
+            font=theme.mono_font(11),
+            text_color=COLORS["fg"],
+            anchor="w",
+        ).pack(side="left", fill="x", expand=True)
+        remove_btn = ctk.CTkLabel(
+            row,
+            text=ICONS["x"],
+            font=theme.font(11),
+            text_color=COLORS["muted_fg"],
+            cursor="hand2",
+        )
+        remove_btn.pack(side="right", padx=6)
+        remove_btn.bind("<Button-1>", lambda _e, p=path: self._remove_path(p))
 
     # ------------------------------------------------------------------
-    # Analysis
+    # Results tab state
+    # ------------------------------------------------------------------
+
+    def _show_empty_results(self) -> None:
+        for child in self._results_frame.winfo_children():
+            child.destroy()
+        ctk.CTkLabel(
+            self._results_frame,
+            text=f"{ICONS['bar_chart']}\n\nAdd files and click Analyze to see results",
+            font=theme.font(13),
+            text_color=COLORS["muted_fg"],
+            justify="center",
+        ).pack(expand=True)
+
+    def _render_results(self, results: list[AnalysisResult]) -> None:
+        for child in self._results_frame.winfo_children():
+            child.destroy()
+
+        stats_row = ctk.CTkFrame(self._results_frame, fg_color="transparent")
+        stats_row.pack(fill="x", padx=12, pady=(10, 6))
+
+        successful = [r for r in results if r.error is None]
+        total_tokens = sum(r.token_count for r in successful)
+        total_input_cost = sum(r.estimated_input_cost for r in successful)
+        pct_values = [
+            r.context_usage_pct for r in successful if r.context_usage_pct is not None
+        ]
+        avg_pct = sum(pct_values) / len(pct_values) if pct_values else None
+
+        StatPill(stats_row, "Files", formatting.fmt_num(len(results))).pack(
+            side="left", padx=(0, 24)
+        )
+        StatPill(stats_row, "Total tokens", formatting.fmt_num(total_tokens)).pack(
+            side="left", padx=24
+        )
+        StatPill(stats_row, "Input cost", formatting.fmt_cost(total_input_cost)).pack(
+            side="left", padx=24
+        )
+        StatPill(stats_row, "Avg context", formatting.fmt_context_pct(avg_pct)).pack(
+            side="left", padx=24
+        )
+
+        table = ResultsTable(self._results_frame)
+        table.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        table.set_results(results)
+
+    # ------------------------------------------------------------------
+    # Tabs
+    # ------------------------------------------------------------------
+
+    def _switch_tab(self, tab_id: str) -> None:
+        self._active_tab = tab_id
+        self._sync_tab_styles()
+        if tab_id == "logs":
+            self._logs_frame.tkraise()
+            self._logs_frame.refresh()
+        else:
+            self._results_frame.tkraise()
+
+    # ------------------------------------------------------------------
+    # Analysis / threading
     # ------------------------------------------------------------------
 
     def _run_analysis(self) -> None:
-        if self.analyzing:
-            return
-        if not self.paths:
-            self.status.set("No files selected. Use Add File or Add Folder first.")
+        if self.analyzing or not self._paths:
             return
         self.analyzing = True
-        self._files_processed = 0
         self.cancel_event = threading.Event()
-        self.analyze_btn.configure(text="Cancel", command=self._cancel_analysis)
-        self.status.set("Analyzing - please wait...")
-        threading.Thread(target=self._analysis_worker, daemon=True).start()
+        self._analyze_btn.configure(
+            text=f"{ICONS['x']} Cancel", command=self._cancel_analysis, state="normal"
+        )
+
+        model = self._model_dropdown.selected_model()
+        paths = list(self._paths)
+        cancel_event = self.cancel_event
+        threading.Thread(
+            target=self._analysis_worker,
+            args=(paths, model, cancel_event),
+            daemon=True,
+        ).start()
 
     def _cancel_analysis(self) -> None:
-        """Signal the worker to stop after the file it's currently on."""
         if self.cancel_event is not None:
             self.cancel_event.set()
-        self.analyze_btn.configure(state="disabled", text="Cancelling...")
-        self.status.set("Cancelling - finishing current file...")
+        self._analyze_btn.configure(text="Cancelling…", state="disabled")
+
+    def _analysis_worker(
+        self, paths: list[Path], model: ModelInfo, cancel_event: threading.Event
+    ) -> None:
+        results: list[AnalysisResult] = []
+        try:
+            for path in paths:
+                if cancel_event.is_set():
+                    break
+                if path.is_dir():
+                    results.extend(
+                        analyze_folder(
+                            path,
+                            model.id,
+                            on_progress=lambda r: self._schedule(
+                                self._on_file_progress, r
+                            ),
+                            cancel_event=cancel_event,
+                        )
+                    )
+                else:
+                    result = analyze_file(path, model.id)
+                    results.append(result)
+                    self._schedule(self._on_file_progress, result)
+        except Exception as exc:  # noqa: BLE001
+            self._schedule(self._analysis_error, str(exc))
+            return
+        self._schedule(self._analysis_complete, results, model, cancel_event.is_set())
 
     def _schedule(self, callback, *args) -> None:
-        """Schedule *callback* on the main thread; no-op if the window is gone.
-
-        Called from the background analysis thread, which may finish after
-        the user has already closed the window/app. self.after() itself can
-        raise TclError once the underlying Tk interpreter is torn down.
-        """
+        if not self.winfo_exists():
+            return
         try:
-            if self.winfo_exists():
-                self.after(0, callback, *args)
+            self.after(0, callback, *args)
         except (TclError, RuntimeError):
             pass
 
-    def _on_file_progress(self, result: AnalysisResult) -> None:
-        """Called on the main thread after each file finishes analysing."""
-        if not self.winfo_exists():
-            return
-        self._files_processed += 1
-        self.status.set(f"Analyzing... {self._files_processed} file(s) processed")
+    def _on_file_progress(self, _result: AnalysisResult) -> None:
+        pass
 
-    def _analysis_worker(self) -> None:
-        """Run in a background thread.
-
-        MUST always schedule either _analysis_complete or _analysis_error
-        back on the main thread — even on unexpected exceptions — so the
-        button is never permanently stuck on 'Analyzing...'.
-        """
-        cancel_event = self.cancel_event
-        try:
-            model   = self.model_select.selected_model()
-            results: list[AnalysisResult] = []
-            errors:  list[str]            = []
-            for path in list(self.paths):
-                if cancel_event.is_set():
-                    break
-                try:
-                    if path.is_dir():
-                        results.extend(
-                            analyze_folder(
-                                path,
-                                model.id,
-                                on_progress=lambda r: self._schedule(
-                                    self._on_file_progress, r
-                                ),
-                                cancel_event=cancel_event,
-                            )
-                        )
-                    else:
-                        result = analyze_file(path, model.id)
-                        results.append(result)
-                        self._schedule(self._on_file_progress, result)
-                except Exception as exc:
-                    errors.append(f"{path.name}: {exc}")
-            self._schedule(
-                self._analysis_complete, results, model, errors, cancel_event.is_set()
-            )
-        except Exception as exc:
-            tb = traceback.format_exc()
-            _LOG.error(
-                "analysis_worker_crashed",
-                extra={"ctx": {"error": str(exc), "traceback": tb}},
-            )
-            self._schedule(self._analysis_error, str(exc))
-
-    def _analysis_error(self, message: str) -> None:
-        """Called on the main thread when the worker crashes unexpectedly."""
-        if not self.winfo_exists():
-            return
+    def _reset_busy_state(self) -> None:
         self.analyzing = False
         self.cancel_event = None
-        self.analyze_btn.configure(
-            state="normal", text=self._ANALYZE_LABEL, command=self._run_analysis
-        )
-        self.status.set(f"Error: {message}")
-        messagebox.showerror(
-            "Analysis failed",
-            f"An unexpected error stopped the analysis:\n\n{message}\n\n"
-            "Check the Logs tab for the full traceback.",
+        if not self.winfo_exists():
+            return
+        self._analyze_btn.configure(
+            text=_ANALYZE_LABEL,
+            command=self._run_analysis,
+            state="normal" if self._paths else "disabled",
         )
 
     def _analysis_complete(
-        self,
-        results: list[AnalysisResult],
-        model: ModelInfo,
-        errors: list[str],
-        cancelled: bool = False,
+        self, results: list[AnalysisResult], model: ModelInfo, cancelled: bool
     ) -> None:
         if not self.winfo_exists():
             return
-        self.analyzing = False
-        self.cancel_event = None
-        self.analyze_btn.configure(
-            state="normal", text=self._ANALYZE_LABEL, command=self._run_analysis
+        self._reset_busy_state()
+        self._results = results
+        self._render_results(results)
+        self.shell.update_header_count(len(results))
+
+        successful = [r for r in results if r.error is None]
+        total_tokens = sum(r.token_count for r in successful)
+        total_input_cost = sum(r.estimated_input_cost for r in successful)
+        prefix = "Cancelled — " if cancelled else "Done — "
+        self._status_left.configure(
+            text=f"{prefix}{len(results)} file(s) analysed with {model.display_name}"
         )
-        self.results = results
-        self.last_model = model
-        self.has_run = True
-        self._render_results()
-        self._set_tab("results")
-        if errors:
-            messagebox.showwarning(
-                "Analysis completed with errors", "\n".join(errors[:8])
-            )
-        if cancelled:
-            self.status.set(
-                f"Cancelled - {len(results)} file(s) analysed before stopping."
-            )
+        tokens_str = formatting.fmt_num(total_tokens)
+        cost_str = formatting.fmt_cost(total_input_cost)
+        self._status_right.configure(
+            text=f"Total tokens: {tokens_str}    Est. input cost: {cost_str}"
+        )
+        self._status_bar.pack(side="bottom", fill="x")
+        if self._active_tab == "logs":
+            self._logs_frame.refresh()
+
+    def _analysis_error(self, message: str) -> None:
+        if not self.winfo_exists():
             return
-        self.status.set(
-            f"Done - {len(results)} file(s) analysed with {model.display_name}."
+        self._reset_busy_state()
+        self._status_left.configure(
+            text=f"{ICONS['x_circle']} Analysis failed: {message}"
         )
-
-    def _render_results(self) -> None:
-        """Populate summary pills and results table.
-
-        Guards against None context_usage_pct returned when a model has no
-        context window defined or when a file failed to parse. Visibility is
-        updated first so widgets are mapped before their text is set — CTk's
-        canvas-based labels can end up with stale (unmapped-time) geometry
-        if text changes while still hidden behind grid_remove().
-        """
-        if self.active_tab == "results":
-            self._update_results_visibility()
-        self.table.set_results(self.results)
-        count        = len(self.results)
-        total_tokens = sum(item.token_count for item in self.results)
-        total_cost   = sum(item.estimated_input_cost for item in self.results)
-        valid_pcts   = [
-            item.context_usage_pct
-            for item in self.results
-            if item.context_usage_pct is not None
-        ]
-        avg_context  = sum(valid_pcts) / len(valid_pcts) if valid_pcts else 0.0
-
-        # Est. output cost = (per-file output-token estimate) x file count,
-        # priced against the model actually used for the last analysis run.
-        if self.last_model is not None and count > 0:
-            est_output_tokens = parse_int(self.output_tokens.get())
-            total_output_cost = count * output_cost(est_output_tokens, self.last_model)
-            output_cost_str = fmt_cost(total_output_cost)
-        else:
-            output_cost_str = "—"
-
-        self.stat_files.set_text(str(count))
-        self.stat_tokens.set_text(fmt_num(total_tokens))
-        self.stat_cost.set_text(fmt_cost(total_cost))
-        self.stat_output_cost.set_text(output_cost_str)
-        self.stat_context.set_text(f"{fmt_float(avg_context)}%")
-
-        if self.has_run:
-            self.footer_tokens_val.configure(text=fmt_num(total_tokens))
-            self.footer_cost_val.configure(text=fmt_cost(total_cost))
-            self.footer_context_val.configure(text=f"{fmt_float(avg_context)}%")
-        else:
-            self.footer_tokens_val.configure(text="-")
-            self.footer_cost_val.configure(text="-")
-            self.footer_context_val.configure(text="-")
+        self._status_right.configure(text="")
+        self._status_bar.pack(side="bottom", fill="x")

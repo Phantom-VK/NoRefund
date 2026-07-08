@@ -1,21 +1,26 @@
-"""CustomTkinter root window."""
+"""GUI entry point."""
+
+from __future__ import annotations
 
 import customtkinter as ctk
 
-ctk.set_appearance_mode("Dark")
-ctk.set_default_color_theme("blue")
+from norefund.core.settings import SettingsStore
+from norefund.gui.main_view import MainView
+
+_APPEARANCE_MODE = {"system": "System", "light": "Light", "dark": "Dark"}
 
 
 class App(ctk.CTk):
     def __init__(self) -> None:
         super().__init__()
-        self.title("NoRefund — Token & Cost Analyzer")
-        self.geometry("1280x780")
-        self.minsize(1040, 640)
-        self._setup_views()
 
-    def _setup_views(self) -> None:
-        from norefund.gui.main_view import MainView
+        settings = SettingsStore().load()
+        ctk.set_appearance_mode(_APPEARANCE_MODE.get(settings.theme, "System"))
+        ctk.set_default_color_theme("blue")
+
+        self.title("NoRefund — Token & Cost Analyzer")
+        self.geometry("1360x800")
+        self.minsize(1040, 640)
 
         MainView(self).pack(fill="both", expand=True)
 

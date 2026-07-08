@@ -1,195 +1,283 @@
-"""Token calculator screen."""
+"""Manual token/cost calculator — no file I/O, pure recompute on input change."""
 
 from __future__ import annotations
 
 import customtkinter as ctk
 
-from norefund.core.costing import context_usage_pct, fits_in_context, min_chunks
-from norefund.core.models_registry import ModelInfo
-from norefund.gui.formatting import (
-    context_color,
-    fmt_cost,
-    fmt_float,
-    fmt_num,
-    parse_int,
-)
-from norefund.gui.theme import COLORS, mono_font
-from norefund.gui.theme import font as themed_font
-from norefund.gui.widgets import ContextBar, ModelDropdown, StatPill
+from norefund.core import costing
+from norefund.gui import formatting, theme
+from norefund.gui.theme import COLORS, ICONS
+from norefund.gui.widgets import ContextBar, ModelDropdownButton
 
 
 class CalculatorView(ctk.CTkFrame):
-    def __init__(
-        self, parent, models: list[ModelInfo], default_output: ctk.StringVar
-    ) -> None:
+    def __init__(self, parent, shell) -> None:
         super().__init__(parent, fg_color=COLORS["bg"])
-        self.models = models
-        self.default_output = default_output
-        self.input_tokens = ctk.StringVar(value="10000")
-        self.output_tokens = ctk.StringVar(value=default_output.get())
+        self.shell = shell
 
-        self._build()
+        scroll = ctk.CTkScrollableFrame(self, fg_color=COLORS["bg"])
+        scroll.pack(fill="both", expand=True, padx=24, pady=20)
+
+        ctk.CTkLabel(
+            scroll,
+            text="Manually estimate token cost for any LLM before making an API call.",
+            font=theme.font(12),
+            text_color=COLORS["muted_fg"],
+            anchor="w",
+        ).pack(fill="x", pady=(0, 16))
+
+        self._build_config_card(scroll)
+        self._build_context_card(scroll)
+        self._build_cost_card(scroll)
+
         self._recalculate()
 
-    def _build(self) -> None:
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1)
-        shell = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        shell.grid(row=0, column=0, sticky="nsew", padx=24, pady=20)
-        shell.grid_columnconfigure(0, weight=1)
-
-        ctk.CTkLabel(
-            shell,
-            text="Token Calculator",
-            font=themed_font(17, "bold"),
-            text_color=COLORS["text"],
-            anchor="w",
-        ).grid(row=0, column=0, sticky="ew")
-        ctk.CTkLabel(
-            shell,
-            text="Manually estimate token cost for any LLM before making an API call.",
-            text_color=COLORS["muted_text"],
-            font=themed_font(12),
-            anchor="w",
-        ).grid(row=1, column=0, sticky="ew", pady=(2, 18))
-
-        config = self._card(shell)
-        config.grid(row=2, column=0, sticky="ew", pady=(0, 14))
-        ctk.CTkLabel(
-            config,
-            text="CONFIGURATION",
-            font=themed_font(11, "bold"),
-            text_color=COLORS["muted_text"],
-            anchor="w",
-        ).pack(fill="x", padx=18, pady=(16, 10))
-        self.model_select = ModelDropdown(
-            config, self.models, command=lambda _: self._recalculate()
-        )
-        self.model_select.pack(fill="x", padx=18, pady=(0, 14))
-
-        inputs = ctk.CTkFrame(config, fg_color="transparent")
-        inputs.pack(fill="x", padx=18, pady=(0, 18))
-        inputs.grid_columnconfigure((0, 1), weight=1, uniform="calc")
-        self._input_block(inputs, "Input tokens", self.input_tokens, 0)
-        self._input_block(inputs, "Est. output tokens", self.output_tokens, 1)
-
-        context = self._card(shell)
-        context.grid(row=3, column=0, sticky="ew", pady=(0, 14))
-        top = ctk.CTkFrame(context, fg_color="transparent")
-        top.pack(fill="x", padx=18, pady=(16, 8))
-        ctk.CTkLabel(
-            top,
-            text="CONTEXT WINDOW",
-            font=themed_font(11, "bold"),
-            text_color=COLORS["muted_text"],
-        ).pack(side="left")
-        self.context_pct_label = ctk.CTkLabel(
-            top,
-            text="-",
-            font=mono_font(12, "bold"),
-        )
-        self.context_pct_label.pack(side="right")
-        self.context_bar = ContextBar(context)
-        self.context_bar.pack(fill="x", padx=18, pady=(0, 8))
-        self.context_detail = ctk.CTkLabel(
-            context,
-            text="-",
-            text_color=COLORS["muted_text"],
-            font=mono_font(12),
-            anchor="w",
-        )
-        self.context_detail.pack(fill="x", padx=18)
-        self.fit_label = ctk.CTkLabel(
-            context,
-            text="-",
-            font=themed_font(12, "bold"),
-            anchor="w",
-        )
-        self.fit_label.pack(fill="x", padx=18, pady=(8, 16))
-
-        cost = self._card(shell)
-        cost.grid(row=4, column=0, sticky="ew")
-        ctk.CTkLabel(
-            cost,
-            text="COST ESTIMATE",
-            font=themed_font(11, "bold"),
-            text_color=COLORS["muted_text"],
-            anchor="w",
-        ).pack(fill="x", padx=18, pady=(16, 10))
-        row = ctk.CTkFrame(cost, fg_color="transparent")
-        row.pack(fill="x", padx=18, pady=(0, 16))
-        row.grid_columnconfigure((0, 1, 3), weight=1, uniform="cost")
-        self.input_cost = StatPill(row, "Input", value_size=18)
-        self.output_cost = StatPill(row, "Output", value_size=18)
-        divider = ctk.CTkFrame(row, width=1, fg_color=COLORS["border"])
-        self.total_cost = StatPill(
-            row,
-            "Total",
-            value_size=18,
-            value_color=COLORS["primary"],
-            value_weight="bold",
-        )
-        self.input_cost.grid(row=0, column=0, sticky="ew")
-        self.output_cost.grid(row=0, column=1, sticky="ew", padx=12)
-        divider.grid(row=0, column=2, sticky="ns", padx=(0, 12))
-        self.total_cost.grid(row=0, column=3, sticky="ew")
-        ctk.CTkLabel(
-            cost,
-            text="Prices are estimates. Check each provider's pricing page for exact rates.",
-            text_color=COLORS["muted_text"],
-            font=themed_font(11),
-            anchor="w",
-        ).pack(fill="x", padx=18, pady=(0, 16))
+    # ------------------------------------------------------------------
 
     def _card(self, parent) -> ctk.CTkFrame:
-        return ctk.CTkFrame(parent, fg_color=COLORS["card"], corner_radius=6)
+        card = ctk.CTkFrame(parent, fg_color=COLORS["card"], corner_radius=6)
+        card.pack(fill="x", pady=(0, 16))
+        return card
 
-    def _input_block(
-        self, parent, label: str, variable: ctk.StringVar, column: int
-    ) -> None:
-        block = ctk.CTkFrame(parent, fg_color="transparent")
-        block.grid(
-            row=0, column=column, sticky="ew", padx=(0, 8) if column == 0 else (8, 0)
+    def _build_config_card(self, parent) -> None:
+        card = self._card(parent)
+        inner = ctk.CTkFrame(card, fg_color="transparent")
+        inner.pack(fill="x", padx=20, pady=20)
+
+        ctk.CTkLabel(
+            inner,
+            text="Model",
+            font=theme.font(11, "bold"),
+            text_color=COLORS["muted_fg"],
+            anchor="w",
+        ).pack(fill="x", pady=(0, 6))
+        self._model_dropdown = ModelDropdownButton(
+            inner,
+            self.shell.models,
+            self.shell.models[0],
+            on_select=self._on_model_change,
+        )
+        self._model_dropdown.pack(fill="x", pady=(0, 16))
+
+        grid = ctk.CTkFrame(inner, fg_color="transparent")
+        grid.pack(fill="x")
+        grid.columnconfigure((0, 1), weight=1)
+
+        in_col = ctk.CTkFrame(grid, fg_color="transparent")
+        in_col.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+        ctk.CTkLabel(
+            in_col,
+            text="Input tokens",
+            font=theme.font(11, "bold"),
+            text_color=COLORS["muted_fg"],
+            anchor="w",
+        ).pack(fill="x", pady=(0, 6))
+        self._input_var = ctk.StringVar(value="0")
+        input_entry = ctk.CTkEntry(
+            in_col,
+            textvariable=self._input_var,
+            font=theme.mono_font(13),
+            fg_color=COLORS["input_bg"],
+            border_width=0,
+        )
+        input_entry.pack(fill="x")
+        input_entry.bind("<KeyRelease>", lambda _e: self._recalculate())
+
+        out_col = ctk.CTkFrame(grid, fg_color="transparent")
+        out_col.grid(row=0, column=1, sticky="ew", padx=(8, 0))
+        ctk.CTkLabel(
+            out_col,
+            text="Est. output tokens",
+            font=theme.font(11, "bold"),
+            text_color=COLORS["muted_fg"],
+            anchor="w",
+        ).pack(fill="x", pady=(0, 6))
+        self._output_var = ctk.StringVar(
+            value=str(self.shell.settings.default_output_tokens)
+        )
+        output_entry = ctk.CTkEntry(
+            out_col,
+            textvariable=self._output_var,
+            font=theme.mono_font(13),
+            fg_color=COLORS["input_bg"],
+            border_width=0,
+        )
+        output_entry.pack(fill="x")
+        output_entry.bind("<KeyRelease>", lambda _e: self._recalculate())
+
+    def _build_context_card(self, parent) -> None:
+        card = self._card(parent)
+        inner = ctk.CTkFrame(card, fg_color="transparent")
+        inner.pack(fill="x", padx=20, pady=20)
+
+        header_row = ctk.CTkFrame(inner, fg_color="transparent")
+        header_row.pack(fill="x", pady=(0, 8))
+        ctk.CTkLabel(
+            header_row,
+            text="Context window usage",
+            font=theme.font(12, "bold"),
+            text_color=COLORS["fg"],
+            anchor="w",
+        ).pack(side="left")
+        self._pct_label = ctk.CTkLabel(
+            header_row, text="—", font=theme.mono_font(12, "bold")
+        )
+        self._pct_label.pack(side="right")
+
+        self._context_bar = ContextBar(inner)
+        self._context_bar.pack(fill="x", pady=(0, 8))
+
+        self._stat_label = ctk.CTkLabel(
+            inner,
+            text="",
+            font=theme.mono_font(11),
+            text_color=COLORS["muted_fg"],
+            anchor="w",
+        )
+        self._stat_label.pack(fill="x", pady=(0, 8))
+
+        self._status_row = ctk.CTkFrame(inner, fg_color="transparent")
+        self._status_row.pack(fill="x")
+        self._status_icon = ctk.CTkLabel(self._status_row, text="", font=theme.font(12))
+        self._status_icon.pack(side="left", padx=(0, 6))
+        self._status_text = ctk.CTkLabel(
+            self._status_row,
+            text="",
+            font=theme.font(12),
+            anchor="w",
+        )
+        self._status_text.pack(side="left")
+
+    def _build_cost_card(self, parent) -> None:
+        card = self._card(parent)
+        inner = ctk.CTkFrame(card, fg_color="transparent")
+        inner.pack(fill="both", padx=20, pady=20)
+
+        grid = ctk.CTkFrame(inner, fg_color="transparent")
+        grid.pack(fill="x")
+        grid.columnconfigure((0, 1, 2), weight=1)
+
+        self._input_cost_label, self._input_rate_label = self._cost_column(
+            grid, 0, "Input cost", border=False
+        )
+        self._output_cost_label, self._output_rate_label = self._cost_column(
+            grid, 1, "Output cost", border=True
+        )
+        self._total_cost_label, self._total_rate_label = self._cost_column(
+            grid, 2, "Total cost", border=True
+        )
+
+        ctk.CTkFrame(inner, fg_color=COLORS["border"], height=1).pack(
+            fill="x", pady=(16, 8)
         )
         ctk.CTkLabel(
-            block, text=label, text_color=COLORS["muted_text"], anchor="w"
+            inner,
+            text=(
+                f"{ICONS['warning']}  Prices are estimates based on offline pricing "
+                "data and may not reflect current provider rates."
+            ),
+            font=theme.font(10),
+            text_color=COLORS["muted_fg"],
+            anchor="w",
+            wraplength=560,
+            justify="left",
         ).pack(fill="x")
-        entry = ctk.CTkEntry(
-            block, textvariable=variable, fg_color=COLORS["input"], border_width=0
+
+    def _cost_column(self, grid, col: int, label: str, border: bool):
+        col_frame = ctk.CTkFrame(
+            grid,
+            fg_color="transparent",
+            border_width=1 if border else 0,
+            border_color=COLORS["border"],
         )
-        entry.pack(fill="x", pady=(4, 0))
-        variable.trace_add("write", lambda *_: self._recalculate())
+        col_frame.grid(row=0, column=col, sticky="nsew", padx=(16 if border else 0, 0))
+        pad = ctk.CTkFrame(col_frame, fg_color="transparent")
+        pad.pack(padx=(12, 0) if border else 0, fill="x")
+        ctk.CTkLabel(
+            pad,
+            text=label.upper(),
+            font=theme.font(9, "bold"),
+            text_color=COLORS["muted_fg"],
+            anchor="w",
+        ).pack(fill="x")
+        value_label = ctk.CTkLabel(
+            pad,
+            text="$0.00",
+            font=theme.mono_font(20, "bold"),
+            text_color=COLORS["primary"],
+            anchor="w",
+        )
+        value_label.pack(fill="x")
+        rate_label = ctk.CTkLabel(
+            pad,
+            text="",
+            font=theme.font(10),
+            text_color=COLORS["muted_fg"],
+            anchor="w",
+        )
+        rate_label.pack(fill="x")
+        return value_label, rate_label
+
+    # ------------------------------------------------------------------
+
+    def _on_model_change(self, _model) -> None:
+        self._output_var.set(str(self.shell.settings.default_output_tokens))
+        self._recalculate()
 
     def _recalculate(self) -> None:
-        model = self.model_select.selected_model()
-        in_tok = parse_int(self.input_tokens.get())
-        out_tok = parse_int(self.output_tokens.get())
-        in_cost = (in_tok / 1_000_000) * model.input_price_per_million
-        out_cost = (out_tok / 1_000_000) * model.output_price_per_million
-        pct = context_usage_pct(in_tok, model.context_window)
-        color = context_color(pct)
+        model = self._model_dropdown.selected_model()
+        input_tokens = formatting.parse_int(self._input_var.get())
+        output_tokens = formatting.parse_int(self._output_var.get())
 
-        self.context_bar.set_value(pct)
-        self.context_pct_label.configure(text=f"{fmt_float(pct)}%", text_color=color)
-        self.context_detail.configure(
-            text=f"{fmt_num(in_tok)} input tokens of {fmt_num(model.context_window)} max"
+        pct = costing.context_usage_pct(input_tokens, model.context_window)
+        fits = costing.fits_in_context(input_tokens, model.context_window)
+        in_cost = costing.input_cost(input_tokens, model)
+        out_cost = costing.output_cost(output_tokens, model)
+        total = in_cost + out_cost
+
+        color = (
+            formatting.context_color(pct)
+            if self.shell.settings.show_chunk_warnings
+            else COLORS["primary"]
         )
-        if fits_in_context(in_tok, model.context_window):
-            self.fit_label.configure(
-                text="OK  Fits in one context window", text_color=COLORS["primary"]
+        self._pct_label.configure(
+            text=formatting.fmt_context_pct(pct), text_color=color
+        )
+        self._context_bar.set_value(pct, color=color)
+        input_str = formatting.fmt_num(input_tokens)
+        max_tokens = formatting.fmt_num(model.context_window)
+        self._stat_label.configure(
+            text=f"{input_str} input tokens · of {max_tokens} max"
+        )
+
+        if fits:
+            self._status_icon.configure(
+                text=ICONS["check_circle"], text_color=COLORS["primary"]
+            )
+            self._status_text.configure(
+                text="Fits in one context window", text_color=COLORS["muted_fg"]
             )
         else:
-            overage = in_tok - model.context_window
-            self.fit_label.configure(
-                text=(
-                    f"Exceeds by {fmt_num(overage)} tokens - "
-                    f"{min_chunks(in_tok, model.context_window)} chunks required"
-                ),
-                text_color=COLORS["danger"],
+            exceed_by = max(0, input_tokens - model.context_window)
+            icon_color = (
+                COLORS["destructive"]
+                if self.shell.settings.show_chunk_warnings
+                else COLORS["muted_fg"]
             )
-        self.input_cost.set_text(fmt_cost(in_cost))
-        self.input_cost.set_subtext(f"${model.input_price_per_million:g}/M tokens")
-        self.output_cost.set_text(fmt_cost(out_cost))
-        self.output_cost.set_subtext(f"${model.output_price_per_million:g}/M tokens")
-        self.total_cost.set_text(fmt_cost(in_cost + out_cost))
-        self.total_cost.set_subtext("USD")
+            self._status_icon.configure(text=ICONS["x_circle"], text_color=icon_color)
+            exceed_str = formatting.fmt_num(exceed_by)
+            self._status_text.configure(
+                text=f"Exceeds by {exceed_str} tokens — chunking required",
+                text_color=COLORS["muted_fg"],
+            )
+
+        self._input_cost_label.configure(text=formatting.fmt_cost(in_cost))
+        self._input_rate_label.configure(
+            text=f"${model.input_price_per_million:,.2f} / 1M tokens"
+        )
+        self._output_cost_label.configure(text=formatting.fmt_cost(out_cost))
+        self._output_rate_label.configure(
+            text=f"${model.output_price_per_million:,.2f} / 1M tokens"
+        )
+        self._total_cost_label.configure(text=formatting.fmt_cost(total))
+        self._total_rate_label.configure(text=f"{model.currency}")

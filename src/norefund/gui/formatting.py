@@ -1,38 +1,36 @@
-"""Formatting helpers for GUI views."""
+"""Pure, None-safe formatting helpers shared by every GUI view.
+
+Kept side-effect free and independent of any live widget so it can be
+unit-tested without a Tk root (see tests/test_formatting.py).
+"""
 
 from __future__ import annotations
 
-from typing import Optional
-
 from norefund.core.models_registry import ModelInfo
-from norefund.gui.theme import COLORS, PROVIDER_COLORS
+from norefund.gui.theme import COLORS
 
 
-def fmt_num(value: int | float) -> str:
-    return f"{value:,.0f}"
+def model_label(model: ModelInfo) -> str:
+    label = f"{model.display_name}  ·  {model.provider}"
+    if model.tokenizer_is_approximate:
+        label += "  (approx.)"
+    return label
 
 
-def fmt_float(value: Optional[float], decimals: int = 1) -> str:
-    """Format a float to *decimals* decimal places with thousand separators.
+def fmt_num(n: int) -> str:
+    return f"{n:,}"
 
-    Returns '\u2014' (em-dash) when *value* is None so the GUI renders a
-    clean placeholder instead of crashing.  This is the expected path for
-    context_usage_pct when context_window <= 0.
-    """
+
+def fmt_float(value: float | None, decimals: int = 1) -> str:
     if value is None:
-        return "\u2014"
+        return "—"
     return f"{value:,.{decimals}f}"
 
 
-def fmt_context_pct(pct: Optional[float]) -> str:
-    """Format context-window usage percentage for table cells.
-
-    Returns '\u2014' when *pct* is None (e.g. model has no context window set).
-    Returns e.g. '42.3%' otherwise.
-    """
+def fmt_context_pct(pct: float | None) -> str:
     if pct is None:
-        return "\u2014"
-    return f"{pct:,.1f}%"
+        return "—"
+    return f"{pct:.1f}%"
 
 
 def fmt_cost(value: float) -> str:
@@ -41,53 +39,42 @@ def fmt_cost(value: float) -> str:
     return f"${value:,.2f}"
 
 
-def parse_int(value: str) -> int:
+def fmt_context_window(n: int) -> str:
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M tokens".replace(".0M", "M")
+    if n >= 1_000:
+        return f"{n / 1_000:.0f}K tokens"
+    return f"{n} tokens"
+
+
+def parse_int(value: str, default: int = 0) -> int:
+    cleaned = value.replace(",", "").strip()
+    if not cleaned:
+        return default
     try:
-        return max(0, int(value.replace(",", "").strip() or "0"))
+        return int(float(cleaned))
     except ValueError:
-        return 0
+        return default
 
 
-def context_color(pct: Optional[float]) -> str:
-    """Return the appropriate accent colour for a context-usage percentage.
-
-    Falls back to primary colour when *pct* is None so callers never crash.
-    """
-    if pct is None:
-        return COLORS["primary"][1]
-    if pct >= 100:
-        return COLORS["danger"][1]
-    if pct >= 75:
-        return COLORS["warning"][1]
-    return COLORS["primary"][1]
+def context_color(pct: float | None) -> tuple[str, str]:
+    """Returns a (light_hex, dark_hex) COLORS-style tuple for the given
+    context-usage percentage: primary <75%, warning 75-100%, destructive >=100%."""
+    if pct is None or pct < 75:
+        return COLORS["primary"]
+    if pct < 100:
+        return COLORS["warning"]
+    return COLORS["destructive"]
 
 
-def provider_color(provider: str) -> str:
-    return PROVIDER_COLORS.get(provider, COLORS["primary"][1])
-
-
-def _blend(fg_hex: str, bg_hex: str, alpha: float) -> str:
-    """Blend fg_hex over bg_hex at the given alpha (0-1), returning a hex color."""
-    fg = tuple(int(fg_hex.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4))
-    bg = tuple(int(bg_hex.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4))
-    blended = tuple(round(f * alpha + b * (1 - alpha)) for f, b in zip(fg, bg))
+def tint(accent_hex: str, bg_hex: str, alpha: float) -> str:
+    """Alpha-blend accent_hex over bg_hex, returning a flat hex color."""
+    a = _hex_to_rgb(accent_hex)
+    b = _hex_to_rgb(bg_hex)
+    blended = tuple(round(b[i] + (a[i] - b[i]) * alpha) for i in range(3))
     return "#{:02x}{:02x}{:02x}".format(*blended)
 
 
-def tint(accent_hex: str, alpha: float = 0.09) -> tuple[str, str]:
-    """Blend an accent color over the card background for light/dark mode.
-
-    CTk widget fg_color can't do real alpha compositing, so this pre-blends
-    the accent into a flat hex per mode instead.
-    """
-    return (
-        _blend(accent_hex, COLORS["card"][0], alpha),
-        _blend(accent_hex, COLORS["card"][1], alpha),
-    )
-
-
-def model_label(model: ModelInfo) -> str:
-    label = f"{model.display_name}  \u00b7  {model.provider}"
-    if model.tokenizer_is_approximate:
-        label += "  (approx.)"
-    return label
+def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
+    h = hex_color.lstrip("#")
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
