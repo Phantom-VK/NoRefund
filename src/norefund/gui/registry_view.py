@@ -47,7 +47,7 @@ class RegistryView(ctk.CTkFrame):
         providers = sorted({m.provider for m in self.shell.models})
         subtitle = (
             f"{len(self.shell.models)} models across {len(providers)} providers"
-            " — offline pricing data."
+            " — locally stored pricing data."
         )
         ctk.CTkLabel(
             left,

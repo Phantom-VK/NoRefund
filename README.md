@@ -2,7 +2,7 @@
 
 > **Know before you run. Because APIs don't care about your feelings.**
 
-NoRefund is a free, open-source, offline-first desktop utility for AI engineers.
+NoRefund is a free, open-source, desktop-first utility for AI engineers.
 It counts tokens in documents (PDF, PPTX, DOCX, TXT, MD, etc.) and estimates the cost
 of running them through any major LLM — before you make a single API call.
 
@@ -10,9 +10,12 @@ of running them through any major LLM — before you make a single API call.
 
 ## Why NoRefund?
 
-APIs charge you the moment tokens run. No refund, no mercy.  
+APIs charge you the moment tokens run. No refund, no mercy.
 NoRefund tells you exactly how many tokens your document will consume, whether it fits in
-a model's context window, and what it will cost — all 100% offline.
+a model's context window, and what it will cost.
+
+Analysis is 100% local — your documents never leave your machine. Network access is
+used only when you explicitly download a tokenizer, from the app's Resources view.
 
 ---
 
@@ -21,7 +24,9 @@ a model's context window, and what it will cost — all 100% offline.
 - Parse PDF, PPTX, DOCX, TXT, MD files
 - Count tokens for 10+ LLM models (GPT-4o, Claude, Gemini, DeepSeek, Llama, Mistral)
 - Context window usage percentage with fit/chunk analysis
-- Offline cost estimation per model
+- Local cost estimation per model, with no data ever sent anywhere
+- Resources view: see which tokenizers are downloaded, where they live on disk, and
+  their size, with a one-click download for anything missing
 - CLI and Desktop GUI (CustomTkinter)
 
 ---
@@ -54,13 +59,13 @@ src/norefund/
     models_registry.py # Model/pricing config
     service.py         # Orchestration
   config/
-    default_models.yaml  # Offline model registry
+    default_models.yaml  # Local model registry
 tests/
 ```
 
 ---
 
-## Supported Models (offline)
+## Supported Models
 
 | Model | Provider | Context Window |
 |---|---|---|
@@ -80,10 +85,12 @@ provider's real tokenizer. Anthropic and Google don't publish a local tokenizer 
 Claude or Gemini, so those counts are a `cl100k_base` approximation — the app marks
 them `(approx.)` wherever they're shown.
 
-**Staying fully offline:** the first time you use a given tokenizer, NoRefund needs to
-cache its vocab files locally (one-time, requires internet). After that it never
-touches the network again for that model. If a tokenizer isn't cached yet, NoRefund
-raises a clear error with the exact command to run, instead of silently downloading it.
+**Tokenizer downloads:** the first time you use a given tokenizer, NoRefund needs its
+vocab files cached locally (one-time, requires internet). Open the **Resources** view
+in the app to see what's downloaded, where it's stored on disk, how much space it
+takes, and to download anything missing with one click. Once cached, NoRefund never
+touches the network again for that tokenizer. If it isn't cached yet, NoRefund raises
+a clear error pointing you to the Resources view instead of silently downloading it.
 
 ---
 

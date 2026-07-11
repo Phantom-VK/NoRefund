@@ -5,12 +5,18 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from norefund.core.settings import SettingsStore
+from norefund.gui.dnd import dnd_root_class
 from norefund.gui.main_view import MainView
 
 _APPEARANCE_MODE = {"system": "System", "light": "Light", "dark": "Dark"}
 
+# customtkinter's CTk isn't a TkinterDnD.Tk subclass, so when tkinterdnd2 is
+# installed we mix it in to get drop-target support; otherwise plain CTk.
+_DndMixin = dnd_root_class()
+_BaseWindow = (_DndMixin, ctk.CTk) if _DndMixin is not None else (ctk.CTk,)
 
-class App(ctk.CTk):
+
+class App(*_BaseWindow):
     def __init__(self) -> None:
         super().__init__()
 

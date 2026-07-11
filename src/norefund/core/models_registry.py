@@ -8,7 +8,9 @@ from typing import Optional
 
 import yaml
 
-_DEFAULT_REGISTRY_PATH = Path(__file__).parent.parent / "config" / "default_models.yaml"
+from norefund.core.paths import bundled_resource
+
+_DEFAULT_REGISTRY_PATH = bundled_resource("config/default_models.yaml")
 
 _cache: dict[Path, dict[str, ModelInfo]] = {}
 

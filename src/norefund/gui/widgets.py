@@ -346,6 +346,123 @@ class ModelDropdownPopover(ctk.CTkToplevel):
         super().destroy()
 
 
+class NoticeBanner(ctk.CTkFrame):
+    """Dismissible, non-modal notice bar with an optional action link."""
+
+    def __init__(
+        self,
+        parent,
+        text: str,
+        *,
+        action_text: str | None = None,
+        on_action: Callable[[], None] | None = None,
+        on_dismiss: Callable[[], None] | None = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(parent, fg_color=COLORS["warning"], corner_radius=0, **kwargs)
+        self._on_dismiss = on_dismiss
+
+        inner = ctk.CTkFrame(self, fg_color="transparent")
+        inner.pack(fill="x", padx=16, pady=8)
+        ctk.CTkLabel(
+            inner,
+            text=f"{ICONS['warning']}  {text}",
+            font=theme.font(11),
+            text_color=COLORS["warning_fg"],
+            anchor="w",
+        ).pack(side="left")
+
+        if action_text and on_action is not None:
+            action = ctk.CTkLabel(
+                inner,
+                text=action_text,
+                font=theme.font(11, "bold"),
+                text_color=COLORS["warning_fg"],
+                cursor="hand2",
+            )
+            action.pack(side="left", padx=(12, 0))
+            action.bind("<Button-1>", lambda _e: on_action())
+
+        close = ctk.CTkLabel(
+            inner,
+            text=ICONS["x"],
+            font=theme.font(11),
+            text_color=COLORS["warning_fg"],
+            cursor="hand2",
+        )
+        close.pack(side="right")
+        close.bind("<Button-1>", lambda _e: self._dismiss())
+
+    def _dismiss(self) -> None:
+        self.pack_forget()
+        if self._on_dismiss is not None:
+            self._on_dismiss()
+
+
+class ModelCheckList(ctk.CTkScrollableFrame):
+    """Scrollable list of model checkboxes, all checked by default."""
+
+    def __init__(
+        self,
+        parent,
+        models: list[ModelInfo],
+        on_change: Callable[[], None] | None = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(parent, fg_color=COLORS["card"], **kwargs)
+        self._models = models
+        self._on_change = on_change
+        self._vars: dict[str, ctk.BooleanVar] = {}
+
+        for model in models:
+            var = ctk.BooleanVar(value=True)
+            self._vars[model.id] = var
+            row = ctk.CTkFrame(self, fg_color="transparent")
+            row.pack(fill="x", pady=1)
+            ctk.CTkCheckBox(
+                row,
+                text="",
+                variable=var,
+                width=20,
+                command=self._notify_change,
+                fg_color=COLORS["primary"],
+            ).pack(side="left", padx=(4, 4))
+            dot = ctk.CTkLabel(
+                row,
+                text="",
+                width=10,
+                height=10,
+                corner_radius=5,
+                fg_color=theme.provider_color(model.provider),
+            )
+            dot.pack(side="left", padx=(0, 6))
+            ctk.CTkLabel(
+                row,
+                text=formatting.model_label(model),
+                font=theme.font(12),
+                anchor="w",
+            ).pack(side="left", fill="x", expand=True)
+
+        bind_mousewheel(self)
+
+    def _notify_change(self) -> None:
+        if self._on_change is not None:
+            self._on_change()
+
+    def selected_models(self) -> list[ModelInfo]:
+        return [m for m in self._models if self._vars[m.id].get()]
+
+    def select_all(self) -> None:
+        for var in self._vars.values():
+            var.set(True)
+        self._notify_change()
+
+    def select_none(self) -> None:
+        for var in self._vars.values():
+            var.set(False)
+        self._notify_change()
+
+
 def bind_mousewheel(frame: ctk.CTkScrollableFrame) -> None:
     """Wire up Linux (X11) mouse-wheel scrolling for a CTkScrollableFrame.
 

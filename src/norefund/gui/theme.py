@@ -73,6 +73,8 @@ ICONS: dict[str, str] = {
     "external_link": "↗",
     "file_text": "\U0001f4c4",
     "refresh": "↻",
+    "download": "⤓",
+    "hard_drive": "\U0001f4be",
 }
 
 SUPPORTED_FILETYPES: list[tuple[str, str]] = [

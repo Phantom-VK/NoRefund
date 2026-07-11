@@ -32,14 +32,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from norefund.core.paths import app_log_dir
+
 
 # ---------------------------------------------------------------------------
 # Log directory helpers
 # ---------------------------------------------------------------------------
 
 
-def _default_log_dir() -> Path:
-    """Return platform-appropriate log directory for the current user.
+def _legacy_log_dir() -> Path:
+    """Old, pre-platformdirs log location — kept only so it can be surfaced
+    in the Resources view. New runs never write here.
 
     - Linux/macOS: ~/.norefund/logs
     - Windows:     %LOCALAPPDATA%/NoRefund/logs
@@ -51,7 +54,9 @@ def _default_log_dir() -> Path:
     return Path.home() / ".norefund" / "logs"
 
 
-LOG_DIR: Path = _default_log_dir()
+LEGACY_LOG_DIR: Path = _legacy_log_dir()
+
+LOG_DIR: Path = app_log_dir()
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # One log file per app run, timestamped in UTC

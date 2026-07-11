@@ -2,18 +2,31 @@
 
 from __future__ import annotations
 
+import threading
+from importlib.metadata import PackageNotFoundError, version
+from tkinter import TclError
+
 import customtkinter as ctk
 
 from norefund.core.models_registry import list_models
 from norefund.core.settings import SettingsStore
 from norefund.gui import theme
 from norefund.gui.theme import COLORS, ICONS
-from norefund.gui.widgets import ModelDropdownButton, SidebarItem
+from norefund.gui.widgets import ModelDropdownButton, NoticeBanner, SidebarItem
+
+_FALLBACK_VERSION = "0.1.0"
+
+try:
+    _APP_VERSION = version("norefund")
+except PackageNotFoundError:
+    _APP_VERSION = _FALLBACK_VERSION
 
 _TITLES = {
     "calculator": "Token Calculator",
     "parser": "File Parser",
     "registry": "Model Registry",
+    "resources": "Resources",
+    "compare": "Compare Models",
 }
 
 
@@ -21,6 +34,8 @@ class MainView(ctk.CTkFrame):
     VIEW_CALCULATOR = "calculator"
     VIEW_PARSER = "parser"
     VIEW_REGISTRY = "registry"
+    VIEW_RESOURCES = "resources"
+    VIEW_COMPARE = "compare"
 
     def __init__(self, parent) -> None:
         super().__init__(parent, fg_color=COLORS["bg"])
@@ -40,10 +55,72 @@ class MainView(ctk.CTkFrame):
         right.pack(side="right", fill="both", expand=True)
         self._build_header(right)
 
+        self._banner: NoticeBanner | None = None
         self._content = ctk.CTkFrame(right, fg_color=COLORS["bg"], corner_radius=0)
         self._content.pack(side="top", fill="both", expand=True)
 
         self.show_view(self.VIEW_CALCULATOR)
+        self._bind_shortcuts()
+        if not self.settings.onboarding_dismissed:
+            threading.Thread(target=self._check_onboarding, daemon=True).start()
+
+    # ------------------------------------------------------------------
+    # First-run onboarding banner
+    # ------------------------------------------------------------------
+
+    def _check_onboarding(self) -> None:
+        from norefund.core.resources import build_resource_report
+
+        report = build_resource_report(self.models)
+        if not any(t.is_cached for t in report.tokenizers):
+            self._schedule(self._show_onboarding_banner)
+
+    def _show_onboarding_banner(self) -> None:
+        if not self.winfo_exists() or self.settings.onboarding_dismissed:
+            return
+        self._banner = NoticeBanner(
+            self._content.master,
+            "No tokenizers downloaded yet — counts will be rough approximations.",
+            action_text="Open Resources",
+            on_action=lambda: self.show_view(self.VIEW_RESOURCES),
+            on_dismiss=self._dismiss_onboarding,
+        )
+        self._banner.pack(side="top", fill="x", before=self._content)
+
+    def _dismiss_onboarding(self) -> None:
+        self.settings.onboarding_dismissed = True
+        self.settings_store.save(self.settings)
+
+    def _schedule(self, callback, *args) -> None:
+        if not self.winfo_exists():
+            return
+        try:
+            self.after(0, callback, *args)
+        except (TclError, RuntimeError):
+            pass
+
+    # ------------------------------------------------------------------
+    # Keyboard shortcuts
+    # ------------------------------------------------------------------
+
+    def _bind_shortcuts(self) -> None:
+        root = self.winfo_toplevel()
+        view_order = [
+            self.VIEW_CALCULATOR,
+            self.VIEW_PARSER,
+            self.VIEW_COMPARE,
+            self.VIEW_REGISTRY,
+            self.VIEW_RESOURCES,
+        ]
+        for i, view_id in enumerate(view_order, start=1):
+            root.bind(f"<Control-Key-{i}>", lambda _e, v=view_id: self.show_view(v))
+        root.bind("<Escape>", self._cancel_active_work)
+
+    def _cancel_active_work(self, _event=None) -> None:
+        view = self._view_cache.get(self._current_view)
+        cancel_event = getattr(view, "cancel_event", None)
+        if cancel_event is not None:
+            cancel_event.set()
 
     # ------------------------------------------------------------------
     # Sidebar
@@ -91,6 +168,7 @@ class MainView(ctk.CTkFrame):
             [
                 (self.VIEW_CALCULATOR, "Token Calculator", "calculator"),
                 (self.VIEW_PARSER, "File Parser", "folder_open"),
+                (self.VIEW_COMPARE, "Compare Models", "bar_chart"),
             ],
         )
         self._nav_section(
@@ -98,6 +176,7 @@ class MainView(ctk.CTkFrame):
             "Data",
             [
                 (self.VIEW_REGISTRY, "Model Registry", "layers"),
+                (self.VIEW_RESOURCES, "Resources", "hard_drive"),
             ],
         )
 
@@ -107,7 +186,10 @@ class MainView(ctk.CTkFrame):
         warn.pack(fill="x")
         ctk.CTkLabel(
             warn,
-            text=f"{ICONS['warning']}  100% offline. No API calls made.",
+            text=(
+                f"{ICONS['check']}  Local analysis. "
+                "Your files never leave this machine."
+            ),
             font=theme.font(10),
             text_color=COLORS["muted_fg"],
             wraplength=170,
@@ -115,7 +197,7 @@ class MainView(ctk.CTkFrame):
         ).pack(padx=8, pady=8, fill="x")
         ctk.CTkLabel(
             footer,
-            text="v0.1.0 · open-source",
+            text=f"v{_APP_VERSION} · open-source",
             font=theme.font(9),
             text_color=COLORS["muted_fg"],
         ).pack(pady=(8, 0))
@@ -258,4 +340,12 @@ class MainView(ctk.CTkFrame):
             from norefund.gui.registry_view import RegistryView
 
             return RegistryView(self._content, self)
+        if view_id == self.VIEW_RESOURCES:
+            from norefund.gui.resources_view import ResourcesView
+
+            return ResourcesView(self._content, self)
+        if view_id == self.VIEW_COMPARE:
+            from norefund.gui.compare_view import CompareView
+
+            return CompareView(self._content, self)
         raise ValueError(f"Unknown view: {view_id}")

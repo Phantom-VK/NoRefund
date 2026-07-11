@@ -26,6 +26,7 @@ _DEFAULTS: dict = {
     "theme": "system",
     "currency": "USD",
     "show_chunk_warnings": True,
+    "onboarding_dismissed": False,
 }
 
 
@@ -35,6 +36,7 @@ class Settings:
     theme: Theme = "system"
     currency: str = "USD"
     show_chunk_warnings: bool = True
+    onboarding_dismissed: bool = False
 
 
 class SettingsStore:
@@ -74,6 +76,9 @@ class SettingsStore:
             currency=data.get("currency", _DEFAULTS["currency"]),
             show_chunk_warnings=bool(
                 data.get("show_chunk_warnings", _DEFAULTS["show_chunk_warnings"])
+            ),
+            onboarding_dismissed=bool(
+                data.get("onboarding_dismissed", _DEFAULTS["onboarding_dismissed"])
             ),
         )
 

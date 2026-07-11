@@ -60,7 +60,7 @@ def test_tiktoken_backend_works_when_encoding_already_cached(monkeypatch):
 def test_tiktoken_backend_raises_offline_error_when_not_cached(tmp_path, monkeypatch):
     _reset_tiktoken_registry(monkeypatch)
     monkeypatch.setenv("TIKTOKEN_CACHE_DIR", str(tmp_path))
-    with pytest.raises(TikTokenOfflineError, match="offline"):
+    with pytest.raises(TikTokenOfflineError, match="Resources view"):
         TikTokenBackend("gpt2")
 
 
@@ -69,13 +69,13 @@ def test_tiktoken_backend_fallback_path_raises_offline_error_when_not_cached(
 ):
     _reset_tiktoken_registry(monkeypatch)
     monkeypatch.setenv("TIKTOKEN_CACHE_DIR", str(tmp_path))
-    with pytest.raises(TikTokenOfflineError, match="offline"):
+    with pytest.raises(TikTokenOfflineError, match="Resources view"):
         TikTokenBackend("unknown-model-xyz")
 
 
 def test_hf_tokenizer_backend_raises_clear_error_when_not_cached(tmp_path, monkeypatch):
     monkeypatch.setenv("HF_HOME", str(tmp_path))
-    with pytest.raises(RuntimeError, match="not available in the local cache"):
+    with pytest.raises(RuntimeError, match="not downloaded yet"):
         HFTokenizerBackend("deepseek-ai/DeepSeek-V3")
 
 

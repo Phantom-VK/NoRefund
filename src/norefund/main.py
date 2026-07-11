@@ -1,9 +1,25 @@
 """Entry point: launch GUI or run CLI."""
 
 import argparse
+import os
 
-from norefund.core.service import analyze_file
-from norefund.gui.app import App
+from norefund.core.paths import tiktoken_cache_dir
+
+
+def _init_tiktoken_cache_dir() -> None:
+    """Point tiktoken at a persistent cache dir before it's imported anywhere.
+
+    tiktoken defaults to a tempdir that gets wiped by the OS, which would
+    make downloaded encodings silently disappear between runs.
+    """
+    if "TIKTOKEN_CACHE_DIR" not in os.environ:
+        os.environ["TIKTOKEN_CACHE_DIR"] = str(tiktoken_cache_dir())
+
+
+_init_tiktoken_cache_dir()
+
+from norefund.core.service import analyze_file  # noqa: E402
+from norefund.gui.app import App  # noqa: E402
 
 
 def main() -> None:

@@ -9,9 +9,12 @@ from tkinter import TclError, filedialog
 
 import customtkinter as ctk
 
+from norefund.core.export import analysis_results_to_csv, analysis_results_to_markdown
 from norefund.core.models_registry import ModelInfo
+from norefund.core.parsing import SUPPORTED_EXTENSIONS
 from norefund.core.service import AnalysisResult, analyze_file, analyze_folder
 from norefund.gui import formatting, theme
+from norefund.gui.dnd import enable_file_drop
 from norefund.gui.theme import COLORS, ICONS, SUPPORTED_FILETYPES
 from norefund.gui.widgets import ContextBar, IconButton, ModelDropdownButton, StatPill
 from norefund.logging_config import latest_log_file
@@ -310,6 +313,7 @@ class ParserView(ctk.CTkFrame):
         wrapper.pack_propagate(False)
         self._file_strip = ctk.CTkScrollableFrame(wrapper, fg_color=COLORS["bg"])
         self._file_strip.pack(fill="both", expand=True, padx=12, pady=6)
+        enable_file_drop(wrapper, self._on_files_dropped, suffixes=SUPPORTED_EXTENSIONS)
 
     def _build_tabs(self) -> None:
         tabs = ctk.CTkFrame(self, fg_color=COLORS["card"], corner_radius=0)
@@ -385,6 +389,10 @@ class ParserView(ctk.CTkFrame):
         folder = filedialog.askdirectory()
         if folder:
             self._paths.append(Path(folder))
+        self._refresh_file_strip()
+
+    def _on_files_dropped(self, paths: list[Path]) -> None:
+        self._paths.extend(paths)
         self._refresh_file_strip()
 
     def _remove_path(self, path: Path) -> None:
@@ -488,10 +496,42 @@ class ParserView(ctk.CTkFrame):
         StatPill(stats_row, "Avg context", formatting.fmt_context_pct(avg_pct)).pack(
             side="left", padx=24
         )
+        IconButton(
+            stats_row, "Export CSV", icon="file_text", command=self._export_csv
+        ).pack(side="right", padx=(6, 0))
+        IconButton(
+            stats_row, "Export MD", icon="file_text", command=self._export_md
+        ).pack(side="right")
 
         table = ResultsTable(self._results_frame)
         table.pack(fill="both", expand=True, padx=12, pady=(0, 12))
         table.set_results(results)
+
+    # ------------------------------------------------------------------
+    # Export
+    # ------------------------------------------------------------------
+
+    def _export_csv(self) -> None:
+        if not self._results:
+            return
+        path = filedialog.asksaveasfilename(
+            defaultextension=".csv", filetypes=[("CSV", "*.csv")]
+        )
+        if path:
+            Path(path).write_text(
+                analysis_results_to_csv(self._results), encoding="utf-8"
+            )
+
+    def _export_md(self) -> None:
+        if not self._results:
+            return
+        path = filedialog.asksaveasfilename(
+            defaultextension=".md", filetypes=[("Markdown", "*.md")]
+        )
+        if path:
+            Path(path).write_text(
+                analysis_results_to_markdown(self._results), encoding="utf-8"
+            )
 
     # ------------------------------------------------------------------
     # Tabs

@@ -173,8 +173,8 @@ class CalculatorView(ctk.CTkFrame):
         ctk.CTkLabel(
             inner,
             text=(
-                f"{ICONS['warning']}  Prices are estimates based on offline pricing "
-                "data and may not reflect current provider rates."
+                f"{ICONS['warning']}  Prices are estimates based on locally stored "
+                "pricing data and may not reflect current provider rates."
             ),
             font=theme.font(10),
             text_color=COLORS["muted_fg"],

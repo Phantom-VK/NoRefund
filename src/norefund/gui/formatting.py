@@ -47,6 +47,17 @@ def fmt_context_window(n: int) -> str:
     return f"{n} tokens"
 
 
+def fmt_bytes(n: int | None) -> str:
+    if n is None:
+        return "—"
+    value = float(n)
+    for unit in ("B", "KB", "MB", "GB"):
+        if value < 1024 or unit == "GB":
+            return f"{value:.0f} {unit}" if unit == "B" else f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{value:.1f} GB"
+
+
 def parse_int(value: str, default: int = 0) -> int:
     cleaned = value.replace(",", "").strip()
     if not cleaned:

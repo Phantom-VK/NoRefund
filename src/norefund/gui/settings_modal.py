@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 import customtkinter as ctk
 
+from norefund.core import secrets
 from norefund.core.settings import Settings
 from norefund.gui import formatting, theme
 from norefund.gui.theme import COLORS
@@ -25,7 +26,7 @@ class SettingsModal(ctk.CTkToplevel):
         self._on_save = on_save
 
         self.title("Settings")
-        self.geometry("420x360")
+        self.geometry("420x540")
         self.resizable(False, False)
         self.configure(fg_color=COLORS["card"])
         self.transient(parent.winfo_toplevel())
@@ -101,6 +102,68 @@ class SettingsModal(ctk.CTkToplevel):
             border_width=0,
         ).pack(fill="x")
 
+        ctk.CTkLabel(
+            body,
+            text="API tokens & secrets",
+            font=theme.font(11, "bold"),
+            text_color=COLORS["muted_fg"],
+            anchor="w",
+        ).pack(fill="x", pady=(20, 2))
+
+        self._keyring_ok = secrets.keyring_available()
+        has_token = self._keyring_ok and secrets.get_hf_token() is not None
+
+        if self._keyring_ok:
+            note_text = (
+                "Stored in your OS keychain, never written to disk in plaintext. "
+                "Used only for HuggingFace tokenizer downloads."
+            )
+        else:
+            note_text = (
+                "No system keychain found — secure token storage is unavailable "
+                "here."
+            )
+        ctk.CTkLabel(
+            body,
+            text=note_text,
+            font=theme.font(10),
+            text_color=COLORS["muted_fg"],
+            anchor="w",
+            justify="left",
+            wraplength=360,
+        ).pack(fill="x", pady=(0, 6))
+
+        token_row = ctk.CTkFrame(body, fg_color="transparent")
+        token_row.pack(fill="x")
+        self._hf_token_var = ctk.StringVar(value="")
+        self._hf_token_entry = ctk.CTkEntry(
+            token_row,
+            textvariable=self._hf_token_var,
+            show="•",
+            placeholder_text=(
+                "Token saved — leave blank to keep"
+                if has_token
+                else "hf_xxx (optional)"
+            ),
+            font=theme.mono_font(12),
+            fg_color=COLORS["input_bg"],
+            border_width=0,
+            state="normal" if self._keyring_ok else "disabled",
+        )
+        self._hf_token_entry.pack(side="left", fill="x", expand=True)
+        self._clear_token_btn = ctk.CTkButton(
+            token_row,
+            text="Clear",
+            width=56,
+            font=theme.font(11),
+            fg_color=COLORS["muted"],
+            text_color=COLORS["fg"],
+            hover_color=COLORS["border"],
+            state="normal" if has_token else "disabled",
+            command=self._clear_hf_token,
+        )
+        self._clear_token_btn.pack(side="left", padx=(8, 0))
+
         toggle_row = ctk.CTkFrame(body, fg_color="transparent")
         toggle_row.pack(fill="x", pady=(20, 0))
         self._chunk_warnings_var = ctk.BooleanVar(
@@ -152,7 +215,18 @@ class SettingsModal(ctk.CTkToplevel):
 
     # ------------------------------------------------------------------
 
+    def _clear_hf_token(self) -> None:
+        secrets.delete_hf_token()
+        self._hf_token_var.set("")
+        self._hf_token_entry.configure(placeholder_text="hf_xxx (optional)")
+        self._clear_token_btn.configure(state="disabled")
+
     def _save(self) -> None:
+        if self._keyring_ok:
+            new_token = self._hf_token_var.get().strip()
+            if new_token:
+                secrets.set_hf_token(new_token)
+
         new_settings = Settings(
             default_output_tokens=formatting.parse_int(
                 self._output_tokens_var.get(), self._settings.default_output_tokens
@@ -160,6 +234,7 @@ class SettingsModal(ctk.CTkToplevel):
             theme=self._settings.theme,
             currency=self._currency_var.get(),
             show_chunk_warnings=self._chunk_warnings_var.get(),
+            onboarding_dismissed=self._settings.onboarding_dismissed,
         )
         self._parent_shell.settings_store.save(new_settings)
         self._on_save(new_settings)
