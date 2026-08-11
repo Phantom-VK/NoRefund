@@ -29,10 +29,10 @@ class TokenizerResource:
     name: str
     model_ids: tuple[str, ...]
     is_cached: bool
-    cache_path: Optional[Path]
-    size_bytes: Optional[int]
-    source_url: Optional[str]
-    notes: Optional[str] = None
+    cache_path: Path | None
+    size_bytes: int | None
+    source_url: str | None
+    notes: str | None = None
 
 
 @dataclass(frozen=True)
@@ -59,7 +59,7 @@ class DownloadCancelled(Exception):
     """Raised internally when a caller cancels an in-progress download."""
 
 
-ProgressFn = Callable[[int, Optional[int]], None]
+ProgressFn = Callable[[int, int | None], None]
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ def canonical_tiktoken_encoding(tokenizer_name: str) -> str:
 
 
 def required_tokenizers(
-    models: Optional[list[ModelInfo]] = None,
+    models: list[ModelInfo] | None = None,
 ) -> list[tuple[str, str, str]]:
     """Return deduped (backend, canonical_name, model_id) rows for enumeration.
 
@@ -98,7 +98,7 @@ def required_tokenizers(
 
 
 def _group_by_resource(
-    models: Optional[list[ModelInfo]] = None,
+    models: list[ModelInfo] | None,
 ) -> dict[tuple[str, str], list[str]]:
     grouped: dict[tuple[str, str], list[str]] = {}
     for backend, name, model_id in required_tokenizers(models):
@@ -112,13 +112,13 @@ def _group_by_resource(
 
 
 class _CaptureBlobInfo(Exception):
-    def __init__(self, blobpath: str, expected_hash: Optional[str]) -> None:
+    def __init__(self, blobpath: str, expected_hash: str | None) -> None:
         super().__init__(blobpath)
         self.blobpath = blobpath
         self.expected_hash = expected_hash
 
 
-def _capture_tiktoken_blob(encoding_name: str) -> tuple[str, Optional[str]]:
+def _capture_tiktoken_blob(encoding_name: str) -> tuple[str, str | None]:
     """Return (blob_url, expected_hash) for an encoding without downloading
     or parsing its vocab file.
 
@@ -133,7 +133,7 @@ def _capture_tiktoken_blob(encoding_name: str) -> tuple[str, Optional[str]]:
     if constructors is None or encoding_name not in constructors:
         raise ValueError(f"Unknown tiktoken encoding: '{encoding_name}'")
 
-    def _capture(blobpath: str, expected_hash: Optional[str] = None) -> bytes:
+    def _capture(blobpath: str, expected_hash: str | None = None) -> bytes:
         raise _CaptureBlobInfo(blobpath, expected_hash)
 
     original = tiktoken_load.read_file_cached
@@ -264,7 +264,7 @@ def _managed_dir(label: str, path: Path) -> ManagedDir:
     )
 
 
-def build_resource_report(models: Optional[list[ModelInfo]] = None) -> ResourceReport:
+def build_resource_report(models: list[ModelInfo] | None = None) -> ResourceReport:
     grouped = _group_by_resource(models)
 
     tokenizers: list[TokenizerResource] = []
@@ -313,7 +313,7 @@ def build_resource_report(models: Optional[list[ModelInfo]] = None) -> ResourceR
 def _download_tiktoken(
     resource: TokenizerResource,
     *,
-    on_progress: Optional[ProgressFn],
+    on_progress: ProgressFn | None,
     cancel_event,
 ) -> TokenizerResource:
     import urllib.request
@@ -370,7 +370,7 @@ def _download_tiktoken(
 def _download_hf(
     resource: TokenizerResource,
     *,
-    on_progress: Optional[ProgressFn],
+    on_progress: ProgressFn | None,
     cancel_event,
 ) -> TokenizerResource:
     from huggingface_hub import hf_hub_download
@@ -408,7 +408,7 @@ def _download_hf(
 def download_tokenizer(
     resource: TokenizerResource,
     *,
-    on_progress: Optional[ProgressFn] = None,
+    on_progress: ProgressFn | None = None,
     cancel_event=None,
 ) -> TokenizerResource:
     if resource.backend == "tiktoken":

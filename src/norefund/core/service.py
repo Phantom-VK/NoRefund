@@ -7,9 +7,9 @@ JSON log lines in the per-user log directory.
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, List, Optional
 
 from norefund.core.costing import (
     context_usage_pct,
@@ -21,7 +21,6 @@ from norefund.core.models_registry import get_model
 from norefund.core.parsing import extract_text
 from norefund.core.tokenization import get_tokenizer
 from norefund.logging_config import get_logger
-
 
 _LOG = get_logger(__name__)
 _SUPPORTED = {".txt", ".md", ".pdf", ".pptx", ".docx", ".py", ".json"}
@@ -35,11 +34,11 @@ class AnalysisResult:
     word_count: int
     token_count: int
     context_window: int
-    context_usage_pct: Optional[float]   # None when context_window <= 0
+    context_usage_pct: float | None# None when context_window <= 0
     fits_in_context: bool
     min_chunks_needed: int
     estimated_input_cost: float
-    error: Optional[str] = None          # Non-None means analysis failed for this file
+    error: str | None = None          # Non-None means analysis failed for this file
 
 
 def analyze_file(path: Path, model_id: str) -> AnalysisResult:
@@ -108,9 +107,9 @@ def analyze_folder(
     folder: Path,
     model_id: str,
     *,
-    on_progress: Optional[Callable[[AnalysisResult], None]] = None,
-    cancel_event: Optional[threading.Event] = None,
-) -> List[AnalysisResult]:
+    on_progress: Callable[[AnalysisResult], None] | None = None,
+    cancel_event: threading.Event | None = None,
+) -> list[AnalysisResult]:
     """Analyse every supported file under *folder*.
 
     Args:
@@ -127,7 +126,7 @@ def analyze_folder(
         List of AnalysisResult — one per supported file found. Results with
         `error` set represent files that failed to parse or tokenise.
     """
-    results: List[AnalysisResult] = []
+    results: list[AnalysisResult] = []
 
     for f in sorted(folder.rglob("*")):
         if cancel_event is not None and cancel_event.is_set():

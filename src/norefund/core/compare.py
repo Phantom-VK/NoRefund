@@ -51,8 +51,8 @@ class CompareReport:
 def _tokenizer_key(model: ModelInfo) -> tuple[str, str]:
     """Group models sharing one tokenizer so text is tokenized once per key."""
     if model.tokenizer_backend != "tiktoken":
-        return (model.tokenizer_backend, model.tokenizer_name)
-    return ("tiktoken", canonical_tiktoken_encoding(model.tokenizer_name))
+        return model.tokenizer_backend, model.tokenizer_name
+    return "tiktoken", canonical_tiktoken_encoding(model.tokenizer_name)
 
 
 def _build_comparison(

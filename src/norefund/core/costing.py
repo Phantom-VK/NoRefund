@@ -11,7 +11,7 @@ from norefund.core.models_registry import ModelInfo
 _RESERVED_OUTPUT = 1_024
 
 
-def context_usage_pct(token_count: int, context_window: int) -> Optional[float]:
+def context_usage_pct(token_count: int, context_window: int) -> float | None:
     """Return percentage of context window used (rounded to 2 dp).
 
     Returns None (not 0) when context_window is zero or negative so the
