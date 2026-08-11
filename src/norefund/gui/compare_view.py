@@ -243,9 +243,9 @@ class CompareView(ctk.CTkFrame):
         )
 
     def _schedule(self, callback, *args) -> None:
-        if not self.winfo_exists():
-            return
         try:
+            if not self.winfo_exists():
+                return
             self.after(0, callback, *args)
         except (TclError, RuntimeError):
             pass

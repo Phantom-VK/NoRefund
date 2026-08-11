@@ -22,17 +22,37 @@ def _reset_tiktoken_registry(monkeypatch):
     monkeypatch.setattr(tiktoken_registry, "ENCODINGS", {})
 
 
+def _skip_unless_cached(encoding_name: str) -> None:
+    """Skip (not fail) when the real vocab file isn't cached on this machine.
+
+    These tests exercise TikTokenBackend.count(), which parses real cached
+    vocab bytes -- it can't be satisfied with planted fake bytes the way
+    test_resources.py's probe tests can. Reuses the already-tested cache
+    probe instead of duplicating cache-detection logic.
+    """
+    from norefund.core.resources import probe_tiktoken
+
+    if not probe_tiktoken(encoding_name).is_cached:
+        pytest.skip(
+            f"'{encoding_name}' not cached locally — open Resources in the "
+            "app (or run the CLI hint in TikTokenOfflineError) to cache it"
+        )
+
+
 def test_tiktoken_backend_count_positive():
+    _skip_unless_cached("o200k_base")
     backend = TikTokenBackend("gpt-4o")
     assert backend.count("Hello world") > 0
 
 
 def test_tiktoken_backend_empty_string():
+    _skip_unless_cached("o200k_base")
     backend = TikTokenBackend("gpt-4o")
     assert backend.count("") == 0
 
 
 def test_tiktoken_backend_longer_text_more_tokens():
+    _skip_unless_cached("o200k_base")
     backend = TikTokenBackend("gpt-4o")
     short = backend.count("Hi")
     long = backend.count("Hi " * 100)
@@ -40,18 +60,21 @@ def test_tiktoken_backend_longer_text_more_tokens():
 
 
 def test_tiktoken_fallback_unknown_model():
+    _skip_unless_cached("cl100k_base")
     # Should not raise — falls back to cl100k_base
     backend = TikTokenBackend("unknown-model-xyz")
     assert backend.count("test") > 0
 
 
 def test_get_tokenizer_returns_tiktoken_for_gpt4o():
+    _skip_unless_cached("o200k_base")
     model = get_model("openai:gpt-4o")
     backend = get_tokenizer(model)
     assert isinstance(backend, TikTokenBackend)
 
 
 def test_tiktoken_backend_works_when_encoding_already_cached(monkeypatch):
+    _skip_unless_cached("o200k_base")
     _reset_tiktoken_registry(monkeypatch)
     backend = TikTokenBackend("gpt-4o")
     assert backend.count("Hello world") > 0
