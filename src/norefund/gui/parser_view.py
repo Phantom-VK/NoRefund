@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import threading
 from pathlib import Path
-from tkinter import TclError, filedialog
+from tkinter import filedialog
 
 import customtkinter as ctk
 
@@ -16,7 +16,16 @@ from norefund.core.service import AnalysisResult, analyze_file, analyze_folder
 from norefund.gui import formatting, theme
 from norefund.gui.dnd import enable_file_drop
 from norefund.gui.theme import COLORS, ICONS, SUPPORTED_FILETYPES
-from norefund.gui.widgets import ContextBar, IconButton, ModelDropdownButton, StatPill
+from norefund.gui.widgets import (
+    ContextBar,
+    EmptyState,
+    IconButton,
+    ModelDropdownButton,
+    StatPill,
+    ThreadSafeSchedulerMixin,
+    export_via_dialog,
+    section_label,
+)
 from norefund.logging_config import latest_log_file
 
 _ANALYZE_LABEL = f"{ICONS['zap']} Analyze"
@@ -52,13 +61,9 @@ class ResultsTable(ctk.CTkScrollableFrame):
             header.columnconfigure(i, weight=weight)
         for i, col in enumerate(self._COLUMNS):
             anchor = "w" if i == 0 else "e"
-            ctk.CTkLabel(
-                header,
-                text=col.upper(),
-                font=theme.font(9, "bold"),
-                text_color=COLORS["muted_fg"],
-                anchor=anchor,
-            ).grid(row=0, column=i, sticky="ew", padx=6, pady=4)
+            section_label(header, col, anchor=anchor).grid(
+                row=0, column=i, sticky="ew", padx=6, pady=4
+            )
 
     def clear(self) -> None:
         for frame in self._row_frames:
@@ -230,7 +235,7 @@ class LogsPanel(ctk.CTkFrame):
         self._textbox.insert("end", f"›  [{level}]  {message}{ctx_str}\n", level)
 
 
-class ParserView(ctk.CTkFrame):
+class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
     def __init__(self, parent, shell) -> None:
         super().__init__(parent, fg_color=COLORS["bg"])
         self.shell = shell
@@ -461,12 +466,10 @@ class ParserView(ctk.CTkFrame):
     def _show_empty_results(self) -> None:
         for child in self._results_frame.winfo_children():
             child.destroy()
-        ctk.CTkLabel(
+        EmptyState(
             self._results_frame,
-            text=f"{ICONS['bar_chart']}\n\nAdd files and click Analyze to see results",
-            font=theme.font(13),
-            text_color=COLORS["muted_fg"],
-            justify="center",
+            ICONS["bar_chart"],
+            "Add files and click Analyze to see results",
         ).pack(expand=True)
 
     def _render_results(self, results: list[AnalysisResult]) -> None:
@@ -512,26 +515,20 @@ class ParserView(ctk.CTkFrame):
     # ------------------------------------------------------------------
 
     def _export_csv(self) -> None:
-        if not self._results:
-            return
-        path = filedialog.asksaveasfilename(
-            defaultextension=".csv", filetypes=[("CSV", "*.csv")]
+        export_via_dialog(
+            has_data=bool(self._results),
+            extension="csv",
+            filetype_label="CSV",
+            content_fn=lambda: analysis_results_to_csv(self._results),
         )
-        if path:
-            Path(path).write_text(
-                analysis_results_to_csv(self._results), encoding="utf-8"
-            )
 
     def _export_md(self) -> None:
-        if not self._results:
-            return
-        path = filedialog.asksaveasfilename(
-            defaultextension=".md", filetypes=[("Markdown", "*.md")]
+        export_via_dialog(
+            has_data=bool(self._results),
+            extension="md",
+            filetype_label="Markdown",
+            content_fn=lambda: analysis_results_to_markdown(self._results),
         )
-        if path:
-            Path(path).write_text(
-                analysis_results_to_markdown(self._results), encoding="utf-8"
-            )
 
     # ------------------------------------------------------------------
     # Tabs
@@ -600,14 +597,6 @@ class ParserView(ctk.CTkFrame):
             self._schedule(self._analysis_error, str(exc))
             return
         self._schedule(self._analysis_complete, results, model, cancel_event.is_set())
-
-    def _schedule(self, callback, *args) -> None:
-        try:
-            if not self.winfo_exists():
-                return
-            self.after(0, callback, *args)
-        except (TclError, RuntimeError):
-            pass
 
     def _on_file_progress(self, _result: AnalysisResult) -> None:
         pass

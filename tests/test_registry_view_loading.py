@@ -42,11 +42,11 @@ def test_loading_text_shows_first_then_atomic_reveal(root):
     # this up synchronously in __init__.
     assert view._loading is True
     assert view._cards == []
-    assert view._loading_label.place_info() != {}
+    assert view._loading_overlay._label.place_info() != {}
 
     _pump_until(root, lambda: not view._loading)
 
-    assert view._loading_label.place_info() == {}
+    assert view._loading_overlay._label.place_info() == {}
     assert len(view._cards) == len(shell.models)
     for _model, card in view._cards:
         assert card.grid_info() != {}

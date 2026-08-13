@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import threading
 from importlib.metadata import PackageNotFoundError, version
-from tkinter import TclError
 
 import customtkinter as ctk
 
@@ -12,7 +11,13 @@ from norefund.core.models_registry import list_models
 from norefund.core.settings import SettingsStore
 from norefund.gui import theme
 from norefund.gui.theme import COLORS, ICONS
-from norefund.gui.widgets import ModelDropdownButton, NoticeBanner, SidebarItem
+from norefund.gui.widgets import (
+    ModelDropdownButton,
+    NoticeBanner,
+    SidebarItem,
+    ThreadSafeSchedulerMixin,
+    section_label,
+)
 
 _FALLBACK_VERSION = "0.1.0"
 
@@ -30,7 +35,7 @@ _TITLES = {
 }
 
 
-class MainView(ctk.CTkFrame):
+class MainView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
     VIEW_CALCULATOR = "calculator"
     VIEW_PARSER = "parser"
     VIEW_REGISTRY = "registry"
@@ -90,14 +95,6 @@ class MainView(ctk.CTkFrame):
     def _dismiss_onboarding(self) -> None:
         self.settings.onboarding_dismissed = True
         self.settings_store.save(self.settings)
-
-    def _schedule(self, callback, *args) -> None:
-        try:
-            if not self.winfo_exists():
-                return
-            self.after(0, callback, *args)
-        except (TclError, RuntimeError):
-            pass
 
     # ------------------------------------------------------------------
     # Keyboard shortcuts
@@ -205,13 +202,7 @@ class MainView(ctk.CTkFrame):
     def _nav_section(
         self, parent, label: str, items: list[tuple[str, str, str]]
     ) -> None:
-        ctk.CTkLabel(
-            parent,
-            text=label.upper(),
-            font=theme.font(9, "bold"),
-            text_color=COLORS["muted_fg"],
-            anchor="w",
-        ).pack(fill="x", padx=16, pady=(12, 4))
+        section_label(parent, label).pack(fill="x", padx=16, pady=(12, 4))
         for view_id, text, icon in items:
             item = SidebarItem(
                 parent, text, icon, command=lambda v=view_id: self.show_view(v)

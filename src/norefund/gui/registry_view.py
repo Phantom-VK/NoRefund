@@ -9,7 +9,8 @@ import customtkinter as ctk
 from norefund.core.models_registry import ModelInfo
 from norefund.gui import formatting, theme
 from norefund.gui.theme import COLORS, ICONS
-from norefund.gui.widgets import ProviderBadge, bind_mousewheel
+from norefund.gui.widgets import LoadingOverlay, ProviderBadge, bind_mousewheel
+from norefund.gui.widgets import card as card_factory
 
 _MIN_CARD_WIDTH = 300
 
@@ -94,16 +95,7 @@ class RegistryView(ctk.CTkFrame):
         self._scroll = ctk.CTkScrollableFrame(self, fg_color=COLORS["bg"])
         self._scroll.pack(fill="both", expand=True, padx=24, pady=(0, 20))
         self._scroll.bind("<Configure>", lambda _e: self._relayout())
-        # Parented on the canvas (the scroll area's actual visible viewport,
-        # not the inner content frame that grows/shrinks with card count) so
-        # relx/rely=0.5 centers it on the screen the user sees, regardless
-        # of scroll position or how many cards end up being built.
-        self._loading_label = ctk.CTkLabel(
-            self._scroll._parent_canvas,
-            text="Loading models…",
-            font=theme.font(12),
-            text_color=COLORS["muted_fg"],
-        )
+        self._loading_overlay = LoadingOverlay(self._scroll, "Loading models…")
 
     # ------------------------------------------------------------------
     # Loading: build every real card off-screen first, then reveal them
@@ -115,7 +107,7 @@ class RegistryView(ctk.CTkFrame):
         self._loading = True
         self._cards = []
         self._sync_pill_enabled()
-        self._loading_label.place(relx=0.5, rely=0.5, anchor="center")
+        self._loading_overlay.show()
         self.after(1, self._build_next_card, 0, [])
 
     def _build_next_card(
@@ -136,7 +128,7 @@ class RegistryView(ctk.CTkFrame):
         if not self.winfo_exists():
             return
         self._loading = False
-        self._loading_label.place_forget()
+        self._loading_overlay.hide()
         self._cards = built
         self._sync_pill_enabled()
         self._relayout(force=True)
@@ -156,13 +148,13 @@ class RegistryView(ctk.CTkFrame):
 
     def _build_card(self, model: ModelInfo) -> ctk.CTkFrame:
         accent = theme.provider_color(model.provider)
-        card = ctk.CTkFrame(self._scroll, fg_color=COLORS["card"], corner_radius=6)
+        model_card = card_factory(self._scroll)
 
         header_tint = (
             formatting.tint(accent, COLORS["card"][0], 0.09),
             formatting.tint(accent, COLORS["card"][1], 0.09),
         )
-        header = ctk.CTkFrame(card, fg_color=header_tint, corner_radius=0)
+        header = ctk.CTkFrame(model_card, fg_color=header_tint, corner_radius=0)
         header.pack(fill="x")
         header_inner = ctk.CTkFrame(header, fg_color="transparent")
         header_inner.pack(fill="x", padx=14, pady=10)
@@ -184,7 +176,7 @@ class RegistryView(ctk.CTkFrame):
             anchor="w",
         ).pack(fill="x", pady=(2, 0))
 
-        body = ctk.CTkFrame(card, fg_color="transparent")
+        body = ctk.CTkFrame(model_card, fg_color="transparent")
         body.pack(fill="x", padx=14, pady=12)
         ctk.CTkLabel(
             body,
@@ -207,7 +199,7 @@ class RegistryView(ctk.CTkFrame):
         self._price_cell(pricing, 0, "Input / 1M", model.input_price_per_million)
         self._price_cell(pricing, 1, "Output / 1M", model.output_price_per_million)
 
-        footer = ctk.CTkFrame(card, fg_color="transparent", border_width=0)
+        footer = ctk.CTkFrame(model_card, fg_color="transparent", border_width=0)
         ctk.CTkFrame(footer, fg_color=COLORS["border"], height=1).pack(fill="x")
         footer_inner = ctk.CTkFrame(footer, fg_color="transparent")
         footer_inner.pack(fill="x", padx=14, pady=8)
@@ -232,7 +224,7 @@ class RegistryView(ctk.CTkFrame):
             )
         footer.pack(fill="x")
 
-        return card
+        return model_card
 
     def _price_cell(self, parent, col: int, label: str, price: float) -> None:
         cell = ctk.CTkFrame(parent, fg_color=COLORS["muted"], corner_radius=4)
