@@ -8,7 +8,6 @@ import sys
 import threading
 import webbrowser
 from pathlib import Path
-from tkinter import TclError
 
 import customtkinter as ctk
 
@@ -22,7 +21,15 @@ from norefund.core.resources import (
 )
 from norefund.gui import formatting, theme
 from norefund.gui.theme import COLORS, ICONS
-from norefund.gui.widgets import IconButton, StatPill, bind_mousewheel
+from norefund.gui.widgets import (
+    IconButton,
+    LoadingOverlay,
+    StatPill,
+    ThreadSafeSchedulerMixin,
+    bind_mousewheel,
+    section_label,
+    status_dot,
+)
 
 
 def _open_folder(path: Path) -> None:
@@ -49,9 +56,7 @@ class _TokenizerRow(ctk.CTkFrame):
         inner.pack(fill="x", padx=14, pady=10)
         inner.columnconfigure(1, weight=1)
 
-        self._status_dot = ctk.CTkLabel(
-            inner, text="", width=10, height=10, corner_radius=5
-        )
+        self._status_dot = status_dot(inner)
         self._status_dot.grid(row=0, column=0, rowspan=2, padx=(0, 10), sticky="n")
 
         title_row = ctk.CTkFrame(inner, fg_color="transparent")
@@ -244,7 +249,7 @@ class _DirRow(ctk.CTkFrame):
         ).grid(row=0, column=2)
 
 
-class ResourcesView(ctk.CTkFrame):
+class ResourcesView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
     def __init__(self, parent, shell) -> None:
         super().__init__(parent, fg_color=COLORS["bg"])
         self.shell = shell
@@ -308,12 +313,7 @@ class ResourcesView(ctk.CTkFrame):
         self._scroll = ctk.CTkScrollableFrame(self, fg_color=COLORS["bg"])
         self._scroll.pack(fill="both", expand=True, padx=24, pady=(0, 20))
         bind_mousewheel(self._scroll)
-        self._loading_label = ctk.CTkLabel(
-            self._scroll._parent_canvas,
-            text="Scanning…",
-            font=theme.font(12),
-            text_color=COLORS["muted_fg"],
-        )
+        self._loading_overlay = LoadingOverlay(self._scroll, "Scanning…")
 
     # ------------------------------------------------------------------
     # Scan
@@ -327,7 +327,7 @@ class ResourcesView(ctk.CTkFrame):
         for child in self._scroll.winfo_children():
             child.destroy()
         self._rows = {}
-        self._loading_label.place(relx=0.5, rely=0.5, anchor="center")
+        self._loading_overlay.show()
         threading.Thread(target=self._scan_worker, daemon=True).start()
 
     def _scan_worker(self) -> None:
@@ -338,7 +338,7 @@ class ResourcesView(ctk.CTkFrame):
         if not self.winfo_exists():
             return
         self._loading = False
-        self._loading_label.place_forget()
+        self._loading_overlay.hide()
         self._refresh_btn.configure(state="normal")
         self._report = report
         self._render(report)
@@ -348,25 +348,15 @@ class ResourcesView(ctk.CTkFrame):
         self._downloaded_pill.set_text(f"{cached} of {len(report.tokenizers)}")
         self._size_pill.set_text(formatting.fmt_bytes(report.total_tokenizer_bytes))
 
-        ctk.CTkLabel(
-            self._scroll,
-            text="TOKENIZERS",
-            font=theme.font(10, "bold"),
-            text_color=COLORS["muted_fg"],
-            anchor="w",
-        ).pack(fill="x", pady=(0, 6))
+        section_label(self._scroll, "Tokenizers", size=10).pack(
+            fill="x", pady=(0, 6)
+        )
         for resource in report.tokenizers:
             row = _TokenizerRow(self._scroll, resource, self)
             row.pack(fill="x", pady=4)
             self._rows[resource.key] = row
 
-        ctk.CTkLabel(
-            self._scroll,
-            text="STORAGE",
-            font=theme.font(10, "bold"),
-            text_color=COLORS["muted_fg"],
-            anchor="w",
-        ).pack(fill="x", pady=(16, 6))
+        section_label(self._scroll, "Storage", size=10).pack(fill="x", pady=(16, 6))
         for managed_dir in report.dirs:
             _DirRow(self._scroll, managed_dir).pack(fill="x", pady=4)
 
@@ -493,11 +483,3 @@ class ResourcesView(ctk.CTkFrame):
         for r in self._rows.values():
             r._render_action()
         self._advance_queue()
-
-    def _schedule(self, callback, *args) -> None:
-        if not self.winfo_exists():
-            return
-        try:
-            self.after(0, callback, *args)
-        except (TclError, RuntimeError):
-            pass

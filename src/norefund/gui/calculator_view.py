@@ -7,7 +7,7 @@ import customtkinter as ctk
 from norefund.core import costing
 from norefund.gui import formatting, theme
 from norefund.gui.theme import COLORS, ICONS
-from norefund.gui.widgets import ContextBar, ModelDropdownButton
+from norefund.gui.widgets import ContextBar, ModelDropdownButton, card, section_label
 
 
 class CalculatorView(ctk.CTkFrame):
@@ -34,14 +34,10 @@ class CalculatorView(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
 
-    def _card(self, parent) -> ctk.CTkFrame:
-        card = ctk.CTkFrame(parent, fg_color=COLORS["card"], corner_radius=6)
-        card.pack(fill="x", pady=(0, 16))
-        return card
-
     def _build_config_card(self, parent) -> None:
-        card = self._card(parent)
-        inner = ctk.CTkFrame(card, fg_color="transparent")
+        card_frame = card(parent)
+        card_frame.pack(fill="x", pady=(0, 16))
+        inner = ctk.CTkFrame(card_frame, fg_color="transparent")
         inner.pack(fill="x", padx=20, pady=20)
 
         ctk.CTkLabel(
@@ -106,8 +102,9 @@ class CalculatorView(ctk.CTkFrame):
         output_entry.bind("<KeyRelease>", lambda _e: self._recalculate())
 
     def _build_context_card(self, parent) -> None:
-        card = self._card(parent)
-        inner = ctk.CTkFrame(card, fg_color="transparent")
+        card_frame = card(parent)
+        card_frame.pack(fill="x", pady=(0, 16))
+        inner = ctk.CTkFrame(card_frame, fg_color="transparent")
         inner.pack(fill="x", padx=20, pady=20)
 
         header_row = ctk.CTkFrame(inner, fg_color="transparent")
@@ -149,8 +146,9 @@ class CalculatorView(ctk.CTkFrame):
         self._status_text.pack(side="left")
 
     def _build_cost_card(self, parent) -> None:
-        card = self._card(parent)
-        inner = ctk.CTkFrame(card, fg_color="transparent")
+        card_frame = card(parent)
+        card_frame.pack(fill="x", pady=(0, 16))
+        inner = ctk.CTkFrame(card_frame, fg_color="transparent")
         inner.pack(fill="both", padx=20, pady=20)
 
         grid = ctk.CTkFrame(inner, fg_color="transparent")
@@ -193,13 +191,7 @@ class CalculatorView(ctk.CTkFrame):
         col_frame.grid(row=0, column=col, sticky="nsew", padx=(16 if border else 0, 0))
         pad = ctk.CTkFrame(col_frame, fg_color="transparent")
         pad.pack(padx=(12, 0) if border else 0, fill="x")
-        ctk.CTkLabel(
-            pad,
-            text=label.upper(),
-            font=theme.font(9, "bold"),
-            text_color=COLORS["muted_fg"],
-            anchor="w",
-        ).pack(fill="x")
+        section_label(pad, label).pack(fill="x")
         value_label = ctk.CTkLabel(
             pad,
             text="$0.00",

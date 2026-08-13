@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
-from tkinter import TclError, filedialog
+from tkinter import filedialog
 
 import customtkinter as ctk
 
@@ -19,10 +19,19 @@ from norefund.core.parsing import SUPPORTED_EXTENSIONS
 from norefund.gui import formatting, theme
 from norefund.gui.dnd import enable_file_drop
 from norefund.gui.theme import COLORS, ICONS, SUPPORTED_FILETYPES
-from norefund.gui.widgets import ContextBar, IconButton, ModelCheckList, StatPill
+from norefund.gui.widgets import (
+    ContextBar,
+    EmptyState,
+    IconButton,
+    ModelCheckList,
+    StatPill,
+    ThreadSafeSchedulerMixin,
+    card,
+    export_via_dialog,
+)
 
 
-class CompareView(ctk.CTkFrame):
+class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
     def __init__(self, parent, shell) -> None:
         super().__init__(parent, fg_color=COLORS["bg"])
         self.shell = shell
@@ -53,14 +62,10 @@ class CompareView(ctk.CTkFrame):
         right.grid(row=0, column=1, sticky="nsew", padx=(8, 16), pady=16)
         self._build_results_area(right)
 
-    def _card(self, parent) -> ctk.CTkFrame:
-        card = ctk.CTkFrame(parent, fg_color=COLORS["card"], corner_radius=6)
-        card.pack(fill="x", pady=(0, 12))
-        return card
-
     def _build_input_card(self, parent) -> None:
-        card = self._card(parent)
-        inner = ctk.CTkFrame(card, fg_color="transparent")
+        card_frame = card(parent)
+        card_frame.pack(fill="x", pady=(0, 12))
+        inner = ctk.CTkFrame(card_frame, fg_color="transparent")
         inner.pack(fill="x", padx=14, pady=14)
 
         ctk.CTkLabel(
@@ -121,8 +126,9 @@ class CompareView(ctk.CTkFrame):
         self._run_btn.pack(fill="x", pady=(10, 0))
 
     def _build_models_card(self, parent) -> None:
-        card = self._card(parent)
-        inner = ctk.CTkFrame(card, fg_color="transparent")
+        card_frame = card(parent)
+        card_frame.pack(fill="x", pady=(0, 12))
+        inner = ctk.CTkFrame(card_frame, fg_color="transparent")
         inner.pack(fill="both", padx=14, pady=14)
 
         header = ctk.CTkFrame(inner, fg_color="transparent")
@@ -231,7 +237,7 @@ class CompareView(ctk.CTkFrame):
         if not self.winfo_exists():
             return
         self._reset_busy_state()
-        self._show_empty_state(message=f"{ICONS['x_circle']} {message}")
+        self._show_empty_state(message=message)
 
     def _reset_busy_state(self) -> None:
         self._running = False
@@ -241,14 +247,6 @@ class CompareView(ctk.CTkFrame):
         self._run_btn.configure(
             text=f"{ICONS['zap']} Compare", command=self._run_compare, state="normal"
         )
-
-    def _schedule(self, callback, *args) -> None:
-        if not self.winfo_exists():
-            return
-        try:
-            self.after(0, callback, *args)
-        except (TclError, RuntimeError):
-            pass
 
     # ------------------------------------------------------------------
     # What-if: recompute cost only, no re-tokenization
@@ -278,16 +276,10 @@ class CompareView(ctk.CTkFrame):
         for child in self._stats_row.winfo_children():
             child.destroy()
         text = message or (
-            f"{ICONS['bar_chart']}\n\nEnter text or pick a file, choose models, "
-            "and click Compare"
+            "Enter text or pick a file, choose models, and click Compare"
         )
-        ctk.CTkLabel(
-            self._results_scroll,
-            text=text,
-            font=theme.font(13),
-            text_color=COLORS["muted_fg"],
-            justify="center",
-        ).pack(expand=True, pady=40)
+        icon = ICONS["x_circle"] if message else ICONS["bar_chart"]
+        EmptyState(self._results_scroll, icon, text).pack(expand=True, pady=40)
 
     def _render_results(self, report: CompareReport) -> None:
         for child in self._results_scroll.winfo_children():
@@ -405,21 +397,17 @@ class CompareView(ctk.CTkFrame):
     # ------------------------------------------------------------------
 
     def _export_csv(self) -> None:
-        if self._report is None:
-            return
-        path = filedialog.asksaveasfilename(
-            defaultextension=".csv", filetypes=[("CSV", "*.csv")]
+        export_via_dialog(
+            has_data=self._report is not None,
+            extension="csv",
+            filetype_label="CSV",
+            content_fn=lambda: comparison_to_csv(self._report),
         )
-        if path:
-            csv_text = comparison_to_csv(self._report)
-            Path(path).write_text(csv_text, encoding="utf-8")
 
     def _export_md(self) -> None:
-        if self._report is None:
-            return
-        path = filedialog.asksaveasfilename(
-            defaultextension=".md", filetypes=[("Markdown", "*.md")]
+        export_via_dialog(
+            has_data=self._report is not None,
+            extension="md",
+            filetype_label="Markdown",
+            content_fn=lambda: comparison_to_markdown(self._report),
         )
-        if path:
-            md_text = comparison_to_markdown(self._report)
-            Path(path).write_text(md_text, encoding="utf-8")

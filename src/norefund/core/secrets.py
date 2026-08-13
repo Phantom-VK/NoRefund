@@ -28,7 +28,7 @@ def keyring_available() -> bool:
         return False
 
 
-def get_hf_token() -> Optional[str]:
+def get_hf_token() -> str | None:
     """Return the stored HuggingFace token, or None if unset/unavailable."""
     try:
         return keyring.get_password(_SERVICE_NAME, HF_TOKEN_KEY)

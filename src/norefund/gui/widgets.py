@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
+from tkinter import TclError, filedialog
 from typing import ClassVar
 
 import customtkinter as ctk
@@ -10,6 +12,25 @@ import customtkinter as ctk
 from norefund.core.models_registry import ModelInfo
 from norefund.gui import formatting, theme
 from norefund.gui.theme import COLORS, ICONS
+
+
+class ThreadSafeSchedulerMixin:
+    """Adds `_schedule()` for safely posting callbacks from worker threads.
+
+    Mix into any CTk widget that starts background threads (downloads,
+    scans, tokenization) and needs to update the UI from them. Swallows the
+    Tcl/RuntimeError that `winfo_exists()`/`after()` can raise when the
+    widget (or the whole app) has been destroyed while the thread was still
+    running, so a callback firing during shutdown doesn't crash the app.
+    """
+
+    def _schedule(self, callback, *args) -> None:
+        try:
+            if not self.winfo_exists():
+                return
+            self.after(0, callback, *args)
+        except (TclError, RuntimeError):
+            pass
 
 
 class ContextBar(ctk.CTkFrame):
@@ -485,3 +506,101 @@ def bind_mousewheel(frame: ctk.CTkScrollableFrame) -> None:
 
     frame.bind_all("<Button-4>", _on_wheel, add="+")
     frame.bind_all("<Button-5>", _on_wheel, add="+")
+
+
+def export_via_dialog(
+    *,
+    has_data: bool,
+    extension: str,
+    filetype_label: str,
+    content_fn: Callable[[], str],
+) -> None:
+    """Prompt a save-file dialog and write `content_fn()`'s result to it.
+
+    No-op if `has_data` is False (nothing to export yet) or the dialog is
+    cancelled.
+    """
+    if not has_data:
+        return
+    path = filedialog.asksaveasfilename(
+        defaultextension=f".{extension}",
+        filetypes=[(filetype_label, f"*.{extension}")],
+    )
+    if path:
+        Path(path).write_text(content_fn(), encoding="utf-8")
+
+
+def card(parent, **kwargs) -> ctk.CTkFrame:
+    """Standard card container: `COLORS['card']` background, corner_radius=6.
+
+    Unpacked — the caller still calls `.pack(...)`/`.grid(...)` themselves,
+    since callers vary in their own spacing (padx/pady).
+    """
+    return ctk.CTkFrame(parent, fg_color=COLORS["card"], corner_radius=6, **kwargs)
+
+
+def status_dot(parent, color: str | tuple = COLORS["muted"], **kwargs) -> ctk.CTkLabel:
+    """Small colored circle used for status/provider-identity indicators."""
+    return ctk.CTkLabel(
+        parent,
+        text="",
+        width=10,
+        height=10,
+        corner_radius=5,
+        fg_color=color,
+        **kwargs,
+    )
+
+
+def section_label(
+    parent, text: str, *, size: int = 9, anchor: str = "w", **kwargs
+) -> ctk.CTkLabel:
+    """Uppercase, bold, muted header label for a section heading."""
+    return ctk.CTkLabel(
+        parent,
+        text=text.upper(),
+        font=theme.font(size, "bold"),
+        text_color=COLORS["muted_fg"],
+        anchor=anchor,
+        **kwargs,
+    )
+
+
+class LoadingOverlay:
+    """Centered muted label placed over a `CTkScrollableFrame`'s canvas.
+
+    Parented on `_parent_canvas` (the scroll area's actual visible viewport,
+    not the inner content frame that grows/shrinks with content) so
+    relx/rely=0.5 centers it on the screen the user sees, regardless of
+    scroll position or how much content ends up being built. Owns the one
+    place that reaches into CTkScrollableFrame's private `_parent_canvas`
+    attribute, so callers don't each have to.
+    """
+
+    def __init__(self, scrollable_frame: ctk.CTkScrollableFrame, text: str) -> None:
+        self._label = ctk.CTkLabel(
+            scrollable_frame._parent_canvas,
+            text=text,
+            font=theme.font(12),
+            text_color=COLORS["muted_fg"],
+        )
+
+    def show(self) -> None:
+        self._label.place(relx=0.5, rely=0.5, anchor="center")
+
+    def hide(self) -> None:
+        self._label.place_forget()
+
+
+class EmptyState(ctk.CTkLabel):
+    """Centered muted icon+message shown where results would otherwise go."""
+
+    def __init__(self, parent, icon: str, text: str, **kwargs) -> None:
+        super().__init__(
+            parent,
+            text=f"{icon}\n\n{text}",
+            font=theme.font(13),
+            text_color=COLORS["muted_fg"],
+            justify="center",
+            **kwargs,
+        )

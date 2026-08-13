@@ -7,7 +7,6 @@ policy while still giving CI something to run when a display exists.
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass
 
 import pytest
@@ -17,36 +16,12 @@ ctk = pytest.importorskip("customtkinter")
 from norefund.core.models_registry import list_models  # noqa: E402
 from norefund.gui.registry_view import RegistryView  # noqa: E402
 
+from .conftest import _pump, _pump_until  # noqa: E402
+
 
 @dataclass
 class _FakeShell:
     models: list
-
-
-@pytest.fixture
-def root():
-    try:
-        r = ctk.CTk()
-        r.withdraw()
-    except Exception as exc:  # no display available
-        pytest.skip(f"no Tk display available: {exc}")
-    yield r
-    r.destroy()
-
-
-def _pump(root, ms: int) -> None:
-    deadline = time.monotonic() + ms / 1000
-    while time.monotonic() < deadline:
-        root.update()
-
-
-def _pump_until(root, predicate, timeout_ms: int = 3000) -> None:
-    deadline = time.monotonic() + timeout_ms / 1000
-    while time.monotonic() < deadline:
-        root.update()
-        if predicate():
-            return
-    pytest.fail("condition not met within timeout")
 
 
 def test_loading_text_shows_first_then_atomic_reveal(root):
@@ -67,11 +42,11 @@ def test_loading_text_shows_first_then_atomic_reveal(root):
     # this up synchronously in __init__.
     assert view._loading is True
     assert view._cards == []
-    assert view._loading_label.place_info() != {}
+    assert view._loading_overlay._label.place_info() != {}
 
     _pump_until(root, lambda: not view._loading)
 
-    assert view._loading_label.place_info() == {}
+    assert view._loading_overlay._label.place_info() == {}
     assert len(view._cards) == len(shell.models)
     for _model, card in view._cards:
         assert card.grid_info() != {}

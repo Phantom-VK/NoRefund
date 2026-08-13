@@ -44,7 +44,7 @@ class SettingsStore:
 
     def __init__(self) -> None:
         cfg_dir = Path(
-            user_config_dir(appname="NoRefund", appauthor="PhantomVK", ensure_exists=True)
+            user_config_dir(appname="NoRefund", appauthor="PhantomVK", ensure_exists=True)  # noqa: E501
         )
         self._path = cfg_dir / "settings.json"
         _LOG.info("settings_store_init", extra={"ctx": {"path": str(self._path)}})

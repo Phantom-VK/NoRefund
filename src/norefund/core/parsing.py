@@ -14,7 +14,7 @@ def extract_text(path: Path) -> str:
     """Dispatch to the right parser based on file extension."""
     ext = path.suffix.lower()
     if ext not in SUPPORTED_EXTENSIONS:
-        raise ValueError(f"Unsupported file type: '{ext}'. Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}")
+        raise ValueError(f"Unsupported file type: '{ext}'. Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}")  # noqa: E501
     parsers = {
         ".pdf": _read_pdf,
         ".pptx": _read_pptx,
