@@ -30,6 +30,7 @@ dependencies = [
     "platformdirs>=4.0",
     "huggingface_hub>=0.25.0",
     "keyring>=25.0",
+    "Pillow>=10.0",
 ]
 
 [project.optional-dependencies]

@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import threading
 from pathlib import Path
-from tkinter import filedialog
 
 import customtkinter as ctk
 
@@ -13,9 +12,9 @@ from norefund.core.export import analysis_results_to_csv, analysis_results_to_ma
 from norefund.core.models_registry import ModelInfo
 from norefund.core.parsing import SUPPORTED_EXTENSIONS
 from norefund.core.service import AnalysisResult, analyze_file, analyze_folder
-from norefund.gui import formatting, theme
+from norefund.gui import formatting, motion, native_dialog, theme
 from norefund.gui.dnd import enable_file_drop
-from norefund.gui.theme import COLORS, ICONS, SUPPORTED_FILETYPES
+from norefund.gui.theme import COLORS, SUPPORTED_FILETYPES
 from norefund.gui.widgets import (
     ContextBar,
     EmptyState,
@@ -23,13 +22,11 @@ from norefund.gui.widgets import (
     ModelDropdownButton,
     StatPill,
     ThreadSafeSchedulerMixin,
+    bind_mousewheel,
     export_via_dialog,
     section_label,
 )
 from norefund.logging_config import latest_log_file
-
-_ANALYZE_LABEL = f"{ICONS['zap']} Analyze"
-_ANALYZING_LABEL = f"{ICONS['refresh']} Analyzing…"
 
 
 class ResultsTable(ctk.CTkScrollableFrame):
@@ -51,6 +48,7 @@ class ResultsTable(ctk.CTkScrollableFrame):
             self.columnconfigure(i, weight=weight)
         self._build_header()
         self._row_frames: list[ctk.CTkFrame] = []
+        bind_mousewheel(self)
 
     def _build_header(self) -> None:
         header = ctk.CTkFrame(self, fg_color=COLORS["muted"], corner_radius=0)
@@ -62,7 +60,7 @@ class ResultsTable(ctk.CTkScrollableFrame):
         for i, col in enumerate(self._COLUMNS):
             anchor = "w" if i == 0 else "e"
             section_label(header, col, anchor=anchor).grid(
-                row=0, column=i, sticky="ew", padx=6, pady=4
+                row=0, column=i, sticky="ew", padx=theme.SPACE_2, pady=theme.SPACE_1
             )
 
     def clear(self) -> None:
@@ -85,19 +83,24 @@ class ResultsTable(ctk.CTkScrollableFrame):
         self._row_frames.append(row)
 
         name = Path(result.file_path).name
+        pad = {"padx": theme.SPACE_2, "pady": theme.SPACE_1}
 
         if result.error is not None:
             ctk.CTkLabel(
                 row,
                 text=name,
-                font=theme.mono_font(11),
+                font=theme.mono_font(theme.FONT_BODY),
                 anchor="w",
                 text_color=COLORS["fg"],
-            ).grid(row=0, column=0, sticky="ew", padx=6, pady=4)
+            ).grid(row=0, column=0, sticky="ew", **pad)
             ctk.CTkLabel(
                 row,
-                text=f"{ICONS['x_circle']} {result.error}",
-                font=theme.font(11),
+                text=result.error,
+                image=theme.icon_image(
+                    "x_circle", size=14, color=COLORS["destructive"]
+                ),
+                compound="left",
+                font=theme.font(theme.FONT_BODY),
                 anchor="w",
                 text_color=COLORS["destructive"],
             ).grid(
@@ -105,75 +108,71 @@ class ResultsTable(ctk.CTkScrollableFrame):
                 column=1,
                 columnspan=len(self._COLUMNS) - 1,
                 sticky="ew",
-                padx=6,
-                pady=4,
+                **pad,
             )
             return
 
         ctk.CTkLabel(
             row,
             text=name,
-            font=theme.mono_font(11),
+            font=theme.mono_font(theme.FONT_BODY),
             anchor="w",
             text_color=COLORS["fg"],
-        ).grid(row=0, column=0, sticky="ew", padx=6, pady=4)
+        ).grid(row=0, column=0, sticky="ew", **pad)
         ctk.CTkLabel(
             row,
             text=formatting.fmt_num(result.token_count),
-            font=theme.mono_font(11),
+            font=theme.mono_font(theme.FONT_BODY),
             anchor="e",
-        ).grid(row=0, column=1, sticky="ew", padx=6, pady=4)
+        ).grid(row=0, column=1, sticky="ew", **pad)
 
         ctx_cell = ctk.CTkFrame(row, fg_color="transparent")
-        ctx_cell.grid(row=0, column=2, sticky="ew", padx=6, pady=4)
-        bar = ContextBar(ctx_cell, height=5)
-        bar.pack(side="left", fill="x", expand=True, padx=(0, 6))
+        ctx_cell.grid(row=0, column=2, sticky="ew", **pad)
+        bar = ContextBar(ctx_cell, height=theme.SPACE_1 + 2)
+        bar.pack(side="left", fill="x", expand=True, padx=(0, theme.SPACE_2))
         bar.set_value(result.context_usage_pct)
         ctk.CTkLabel(
             ctx_cell,
             text=formatting.fmt_context_pct(result.context_usage_pct),
-            font=theme.mono_font(10),
+            font=theme.mono_font(theme.FONT_SMALL),
             text_color=formatting.context_color(result.context_usage_pct),
         ).pack(side="left")
 
-        fits_icon = (
-            ICONS["check_circle"] if result.fits_in_context else ICONS["x_circle"]
-        )
+        fits_icon = "check_circle" if result.fits_in_context else "x_circle"
         fits_color = (
             COLORS["primary"] if result.fits_in_context else COLORS["destructive"]
         )
         ctk.CTkLabel(
             row,
-            text=fits_icon,
-            font=theme.font(11),
-            text_color=fits_color,
+            text="",
+            image=theme.icon_image(fits_icon, size=14, color=fits_color),
             anchor="e",
-        ).grid(row=0, column=3, sticky="ew", padx=6, pady=4)
+        ).grid(row=0, column=3, sticky="ew", **pad)
 
         ctk.CTkLabel(
             row,
             text=str(result.min_chunks_needed),
-            font=theme.mono_font(11),
+            font=theme.mono_font(theme.FONT_BODY),
             anchor="e",
-        ).grid(row=0, column=4, sticky="ew", padx=6, pady=4)
+        ).grid(row=0, column=4, sticky="ew", **pad)
         ctk.CTkLabel(
             row,
             text=formatting.fmt_cost(result.estimated_input_cost),
-            font=theme.mono_font(11),
+            font=theme.mono_font(theme.FONT_BODY),
             anchor="e",
-        ).grid(row=0, column=5, sticky="ew", padx=6, pady=4)
+        ).grid(row=0, column=5, sticky="ew", **pad)
         ctk.CTkLabel(
             row,
             text=formatting.fmt_num(result.word_count),
-            font=theme.mono_font(11),
+            font=theme.mono_font(theme.FONT_BODY),
             anchor="e",
-        ).grid(row=0, column=6, sticky="ew", padx=6, pady=4)
+        ).grid(row=0, column=6, sticky="ew", **pad)
         ctk.CTkLabel(
             row,
             text=formatting.fmt_num(result.char_count),
-            font=theme.mono_font(11),
+            font=theme.mono_font(theme.FONT_BODY),
             anchor="e",
-        ).grid(row=0, column=7, sticky="ew", padx=6, pady=4)
+        ).grid(row=0, column=7, sticky="ew", **pad)
 
 
 class LogsPanel(ctk.CTkFrame):
@@ -188,7 +187,7 @@ class LogsPanel(ctk.CTkFrame):
         super().__init__(parent, fg_color=COLORS["bg"], **kwargs)
         self._textbox = ctk.CTkTextbox(
             self,
-            font=theme.mono_font(11),
+            font=theme.mono_font(theme.FONT_BODY),
             fg_color=COLORS["bg"],
             text_color=COLORS["muted_fg"],
             wrap="none",
@@ -262,35 +261,35 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         toolbar = ctk.CTkFrame(self, fg_color=COLORS["card"], corner_radius=0)
         toolbar.pack(side="top", fill="x")
         inner = ctk.CTkFrame(toolbar, fg_color="transparent")
-        inner.pack(fill="x", padx=12, pady=8)
+        inner.pack(fill="x", padx=theme.SPACE_3, pady=theme.SPACE_2)
 
         IconButton(inner, "Add File", icon="plus", command=self._add_files).pack(
-            side="left", padx=(0, 6)
+            side="left", padx=(0, theme.SPACE_2)
         )
         IconButton(
             inner, "Add Folder", icon="folder_plus", command=self._add_folder
-        ).pack(side="left", padx=6)
+        ).pack(side="left", padx=theme.SPACE_2)
         IconButton(
             inner, "Clear", icon="x", variant="danger", command=self._clear
-        ).pack(side="left", padx=6)
+        ).pack(side="left", padx=theme.SPACE_2)
 
         ctk.CTkFrame(inner, fg_color=COLORS["border"], width=1).pack(
-            side="left", fill="y", padx=10, pady=4
+            side="left", fill="y", padx=theme.SPACE_3, pady=theme.SPACE_1
         )
 
         self._model_dropdown = ModelDropdownButton(
             inner, self.shell.models, self.shell.models[0], on_select=lambda _m: None
         )
-        self._model_dropdown.pack(side="left", padx=6)
+        self._model_dropdown.pack(side="left", padx=theme.SPACE_2)
 
         out_frame = ctk.CTkFrame(inner, fg_color="transparent")
-        out_frame.pack(side="left", padx=10)
+        out_frame.pack(side="left", padx=theme.SPACE_3)
         ctk.CTkLabel(
             out_frame,
             text="Est. output:",
-            font=theme.font(11),
+            font=theme.font(theme.FONT_BODY),
             text_color=COLORS["muted_fg"],
-        ).pack(side="left", padx=(0, 6))
+        ).pack(side="left", padx=(0, theme.SPACE_2))
         self._output_var = ctk.StringVar(
             value=str(self.shell.settings.default_output_tokens)
         )
@@ -298,13 +297,16 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             out_frame,
             textvariable=self._output_var,
             width=90,
-            font=theme.mono_font(11),
+            font=theme.mono_font(theme.FONT_BODY),
             fg_color=COLORS["input_bg"],
             border_width=0,
         ).pack(side="left")
         ctk.CTkLabel(
-            out_frame, text="tokens", font=theme.font(11), text_color=COLORS["muted_fg"]
-        ).pack(side="left", padx=(6, 0))
+            out_frame,
+            text="tokens",
+            font=theme.font(theme.FONT_BODY),
+            text_color=COLORS["muted_fg"],
+        ).pack(side="left", padx=(theme.SPACE_2, 0))
 
         self._analyze_btn = IconButton(
             inner, "Analyze", icon="zap", variant="primary", command=self._run_analysis
@@ -313,11 +315,14 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         self._analyze_btn.configure(state="disabled")
 
     def _build_file_strip(self) -> None:
-        wrapper = ctk.CTkFrame(self, fg_color=COLORS["bg"], corner_radius=0, height=100)
+        wrapper = ctk.CTkFrame(self, fg_color=COLORS["bg"], corner_radius=0, height=132)
         wrapper.pack(side="top", fill="x")
         wrapper.pack_propagate(False)
         self._file_strip = ctk.CTkScrollableFrame(wrapper, fg_color=COLORS["bg"])
-        self._file_strip.pack(fill="both", expand=True, padx=12, pady=6)
+        self._file_strip.pack(
+            fill="both", expand=True, padx=theme.SPACE_3, pady=theme.SPACE_2
+        )
+        bind_mousewheel(self._file_strip)
         enable_file_drop(wrapper, self._on_files_dropped, suffixes=SUPPORTED_EXTENSIONS)
 
     def _build_tabs(self) -> None:
@@ -328,18 +333,21 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             btn = ctk.CTkButton(
                 tabs,
                 text=label,
-                font=theme.font(12),
+                font=theme.font(theme.FONT_LABEL),
                 corner_radius=0,
-                height=32,
-                width=90,
+                height=theme.CONTROL_LG,
+                width=100,
                 fg_color="transparent",
                 hover_color=COLORS["muted"],
                 text_color=COLORS["muted_fg"],
                 command=lambda t=tab_id: self._switch_tab(t),
             )
             btn.pack(
-                side="left", padx=(12 if tab_id == "results" else 0, 0), pady=(4, 0)
+                side="left",
+                padx=(theme.SPACE_3 if tab_id == "results" else 0, 0),
+                pady=(theme.SPACE_1, 0),
             )
+            motion.press_feedback(btn)
             self._tab_buttons[tab_id] = btn
         self._sync_tab_styles()
 
@@ -363,35 +371,35 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
 
     def _build_status_bar(self) -> None:
         self._status_bar = ctk.CTkFrame(
-            self, fg_color=COLORS["card"], corner_radius=0, height=32
+            self, fg_color=COLORS["card"], corner_radius=0, height=theme.CONTROL_MD
         )
         self._status_left = ctk.CTkLabel(
             self._status_bar,
             text="",
-            font=theme.font(11),
+            font=theme.font(theme.FONT_BODY),
             text_color=COLORS["muted_fg"],
         )
-        self._status_left.pack(side="left", padx=12)
+        self._status_left.pack(side="left", padx=theme.SPACE_3)
         self._status_right = ctk.CTkLabel(
             self._status_bar,
             text="",
-            font=theme.mono_font(11),
+            font=theme.mono_font(theme.FONT_BODY),
             text_color=COLORS["muted_fg"],
         )
-        self._status_right.pack(side="right", padx=12)
+        self._status_right.pack(side="right", padx=theme.SPACE_3)
 
     # ------------------------------------------------------------------
     # File selection
     # ------------------------------------------------------------------
 
     def _add_files(self) -> None:
-        paths = filedialog.askopenfilenames(filetypes=SUPPORTED_FILETYPES)
+        paths = native_dialog.ask_open_files(SUPPORTED_FILETYPES)
         for p in paths:
             self._paths.append(Path(p))
         self._refresh_file_strip()
 
     def _add_folder(self) -> None:
-        folder = filedialog.askdirectory()
+        folder = native_dialog.ask_directory()
         if folder:
             self._paths.append(Path(folder))
         self._refresh_file_strip()
@@ -426,9 +434,9 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
                     "No files selected. Click 'Add File' or 'Add Folder' "
                     "to get started."
                 ),
-                font=theme.font(11),
+                font=theme.font(theme.FONT_BODY),
                 text_color=COLORS["muted_fg"],
-            ).pack(pady=10)
+            ).pack(pady=theme.SPACE_3)
         else:
             for path in self._paths:
                 self._build_file_row(path)
@@ -441,22 +449,23 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
     def _build_file_row(self, path: Path) -> None:
         row = ctk.CTkFrame(self._file_strip, fg_color="transparent")
         row.pack(fill="x", pady=1)
-        icon = ICONS["folder_open"] if path.is_dir() else ICONS["file_text"]
+        icon = "folder_open" if path.is_dir() else "file_text"
         ctk.CTkLabel(
             row,
-            text=f"{icon}  {path}",
-            font=theme.mono_font(11),
+            text=str(path),
+            image=theme.icon_image(icon, size=14, color=COLORS["fg"]),
+            compound="left",
+            font=theme.mono_font(theme.FONT_BODY),
             text_color=COLORS["fg"],
             anchor="w",
         ).pack(side="left", fill="x", expand=True)
         remove_btn = ctk.CTkLabel(
             row,
-            text=ICONS["x"],
-            font=theme.font(11),
-            text_color=COLORS["muted_fg"],
+            text="",
+            image=theme.icon_image("x", size=12, color=COLORS["muted_fg"]),
             cursor="hand2",
         )
-        remove_btn.pack(side="right", padx=6)
+        remove_btn.pack(side="right", padx=theme.SPACE_2)
         remove_btn.bind("<Button-1>", lambda _e, p=path: self._remove_path(p))
 
     # ------------------------------------------------------------------
@@ -468,7 +477,7 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             child.destroy()
         EmptyState(
             self._results_frame,
-            ICONS["bar_chart"],
+            "bar_chart",
             "Add files and click Analyze to see results",
         ).pack(expand=True)
 
@@ -477,7 +486,9 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             child.destroy()
 
         stats_row = ctk.CTkFrame(self._results_frame, fg_color="transparent")
-        stats_row.pack(fill="x", padx=12, pady=(10, 6))
+        stats_row.pack(
+            fill="x", padx=theme.SPACE_3, pady=(theme.SPACE_3, theme.SPACE_2)
+        )
 
         successful = [r for r in results if r.error is None]
         total_tokens = sum(r.token_count for r in successful)
@@ -488,26 +499,28 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         avg_pct = sum(pct_values) / len(pct_values) if pct_values else None
 
         StatPill(stats_row, "Files", formatting.fmt_num(len(results))).pack(
-            side="left", padx=(0, 24)
+            side="left", padx=(0, theme.SPACE_6)
         )
         StatPill(stats_row, "Total tokens", formatting.fmt_num(total_tokens)).pack(
-            side="left", padx=24
+            side="left", padx=theme.SPACE_6
         )
         StatPill(stats_row, "Input cost", formatting.fmt_cost(total_input_cost)).pack(
-            side="left", padx=24
+            side="left", padx=theme.SPACE_6
         )
         StatPill(stats_row, "Avg context", formatting.fmt_context_pct(avg_pct)).pack(
-            side="left", padx=24
+            side="left", padx=theme.SPACE_6
         )
         IconButton(
             stats_row, "Export CSV", icon="file_text", command=self._export_csv
-        ).pack(side="right", padx=(6, 0))
+        ).pack(side="right", padx=(theme.SPACE_2, 0))
         IconButton(
             stats_row, "Export MD", icon="file_text", command=self._export_md
         ).pack(side="right")
 
         table = ResultsTable(self._results_frame)
-        table.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        table.pack(
+            fill="both", expand=True, padx=theme.SPACE_3, pady=(0, theme.SPACE_3)
+        )
         table.set_results(results)
 
     # ------------------------------------------------------------------
@@ -553,7 +566,10 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         self.analyzing = True
         self.cancel_event = threading.Event()
         self._analyze_btn.configure(
-            text=f"{ICONS['x']} Cancel", command=self._cancel_analysis, state="normal"
+            text="Cancel",
+            image=theme.icon_image("x", size=16, color=COLORS["primary_fg"]),
+            command=self._cancel_analysis,
+            state="normal",
         )
 
         model = self._model_dropdown.selected_model()
@@ -568,7 +584,9 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
     def _cancel_analysis(self) -> None:
         if self.cancel_event is not None:
             self.cancel_event.set()
-        self._analyze_btn.configure(text="Cancelling…", state="disabled")
+        self._analyze_btn.configure(
+            text="Cancelling…", image=theme.blank_icon(size=16), state="disabled"
+        )
 
     def _analysis_worker(
         self, paths: list[Path], model: ModelInfo, cancel_event: threading.Event
@@ -607,7 +625,8 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         if not self.winfo_exists():
             return
         self._analyze_btn.configure(
-            text=_ANALYZE_LABEL,
+            text="Analyze",
+            image=theme.icon_image("zap", size=16, color=COLORS["primary_fg"]),
             command=self._run_analysis,
             state="normal" if self._paths else "disabled",
         )
@@ -627,7 +646,8 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         total_input_cost = sum(r.estimated_input_cost for r in successful)
         prefix = "Cancelled — " if cancelled else "Done — "
         self._status_left.configure(
-            text=f"{prefix}{len(results)} file(s) analysed with {model.display_name}"
+            text=f"{prefix}{len(results)} file(s) analysed with {model.display_name}",
+            image=theme.blank_icon(size=14),
         )
         tokens_str = formatting.fmt_num(total_tokens)
         cost_str = formatting.fmt_cost(total_input_cost)
@@ -643,7 +663,9 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             return
         self._reset_busy_state()
         self._status_left.configure(
-            text=f"{ICONS['x_circle']} Analysis failed: {message}"
+            text=f"Analysis failed: {message}",
+            image=theme.icon_image("x_circle", size=14, color=COLORS["muted_fg"]),
+            compound="left",
         )
         self._status_right.configure(text="")
         self._status_bar.pack(side="bottom", fill="x")

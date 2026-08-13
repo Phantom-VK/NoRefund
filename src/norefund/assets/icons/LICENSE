@@ -1,0 +1,29 @@
+The PNG icons in this directory are rasterized from the Lucide icon set
+(https://lucide.dev, https://github.com/lucide-icons/lucide) with no changes
+to their geometry. They were rendered at 128x128 from the upstream 24x24 SVG
+sources, with `currentColor` replaced by white so the application can tint
+them to any theme color at load time via their alpha channel.
+
+Lucide is distributed under the ISC License, reproduced in full below.
+
+Some Lucide icons are derived from the Feather project and are additionally
+covered by the MIT License (Copyright (c) 2013-present Cole Bemis). Of the
+icons in this directory, the following are Feather-derived: check,
+chevron-down, download, external-link, hash, moon, plus, x.
+
+--------------------------------------------------------------------------
+ISC License
+
+Copyright (c) 2026 Lucide Icons and Contributors
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.

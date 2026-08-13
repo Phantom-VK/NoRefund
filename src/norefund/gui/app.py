@@ -25,8 +25,8 @@ class App(*_BaseWindow):
         ctk.set_default_color_theme("blue")
 
         self.title("NoRefund — Token & Cost Analyzer")
-        self.geometry("1360x800")
-        self.minsize(1040, 640)
+        self.geometry("1440x900")
+        self.minsize(1180, 760)
 
         MainView(self).pack(fill="both", expand=True)
 

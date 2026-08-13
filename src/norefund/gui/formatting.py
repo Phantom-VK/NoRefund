@@ -78,6 +78,16 @@ def context_color(pct: float | None) -> tuple[str, str]:
     return COLORS["destructive"]
 
 
+def elide_middle(text: str, max_chars: int) -> str:
+    """Truncate long text in the middle, keeping the tail (usually a
+    filename) visible since that's the part that identifies the resource."""
+    if len(text) <= max_chars or max_chars <= 1:
+        return text
+    tail_len = max(1, max_chars // 3)
+    head_len = max_chars - tail_len - 1
+    return f"{text[:head_len]}…{text[-tail_len:]}"
+
+
 def tint(accent_hex: str, bg_hex: str, alpha: float) -> str:
     """Alpha-blend accent_hex over bg_hex, returning a flat hex color."""
     a = _hex_to_rgb(accent_hex)

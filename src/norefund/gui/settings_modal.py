@@ -8,7 +8,7 @@ import customtkinter as ctk
 
 from norefund.core import secrets
 from norefund.core.settings import Settings
-from norefund.gui import formatting, theme
+from norefund.gui import formatting, motion, theme
 from norefund.gui.theme import COLORS
 
 _CURRENCIES = ["USD", "EUR", "GBP", "INR"]
@@ -26,7 +26,7 @@ class SettingsModal(ctk.CTkToplevel):
         self._on_save = on_save
 
         self.title("Settings")
-        self.geometry("420x540")
+        self.geometry("480x620")
         self.resizable(False, False)
         self.configure(fg_color=COLORS["card"])
         self.transient(parent.winfo_toplevel())
@@ -49,37 +49,39 @@ class SettingsModal(ctk.CTkToplevel):
 
     def _build_ui(self) -> None:
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=20, pady=(16, 4))
+        header.pack(fill="x", padx=theme.SPACE_5, pady=(theme.SPACE_4, theme.SPACE_1))
         ctk.CTkLabel(
             header,
             text="Settings",
-            font=theme.font(15, "bold"),
+            font=theme.font(theme.FONT_TITLE, "bold"),
             text_color=COLORS["fg"],
         ).pack(side="left")
-        ctk.CTkLabel(
+        close_btn = ctk.CTkLabel(
             header,
-            text="✕",
-            font=theme.font(13),
-            text_color=COLORS["muted_fg"],
+            text="",
+            image=theme.icon_image("x", size=14, color=COLORS["muted_fg"]),
             cursor="hand2",
-        ).pack(side="right")
-        header.winfo_children()[-1].bind("<Button-1>", lambda _e: self._cancel())
+        )
+        close_btn.pack(side="right")
+        close_btn.bind("<Button-1>", lambda _e: self._cancel())
 
         body = ctk.CTkFrame(self, fg_color="transparent")
-        body.pack(fill="both", expand=True, padx=20, pady=8)
+        body.pack(fill="both", expand=True, padx=theme.SPACE_5, pady=theme.SPACE_2)
 
         ctk.CTkLabel(
             body,
             text="Default currency",
-            font=theme.font(11, "bold"),
+            font=theme.font(theme.FONT_BODY, "bold"),
             text_color=COLORS["muted_fg"],
             anchor="w",
-        ).pack(fill="x", pady=(8, 6))
+        ).pack(fill="x", pady=(theme.SPACE_2, theme.SPACE_2))
         self._currency_var = ctk.StringVar(value=self._settings.currency)
         ctk.CTkOptionMenu(
             body,
             values=_CURRENCIES,
             variable=self._currency_var,
+            height=theme.CONTROL_MD,
+            font=theme.font(theme.FONT_LABEL),
             fg_color=COLORS["input_bg"],
             button_color=COLORS["muted"],
         ).pack(fill="x")
@@ -87,17 +89,18 @@ class SettingsModal(ctk.CTkToplevel):
         ctk.CTkLabel(
             body,
             text="Default output tokens estimate",
-            font=theme.font(11, "bold"),
+            font=theme.font(theme.FONT_BODY, "bold"),
             text_color=COLORS["muted_fg"],
             anchor="w",
-        ).pack(fill="x", pady=(16, 6))
+        ).pack(fill="x", pady=(theme.SPACE_4, theme.SPACE_2))
         self._output_tokens_var = ctk.StringVar(
             value=str(self._settings.default_output_tokens)
         )
         ctk.CTkEntry(
             body,
             textvariable=self._output_tokens_var,
-            font=theme.mono_font(12),
+            height=theme.CONTROL_MD,
+            font=theme.mono_font(theme.FONT_LABEL),
             fg_color=COLORS["input_bg"],
             border_width=0,
         ).pack(fill="x")
@@ -105,10 +108,10 @@ class SettingsModal(ctk.CTkToplevel):
         ctk.CTkLabel(
             body,
             text="API tokens & secrets",
-            font=theme.font(11, "bold"),
+            font=theme.font(theme.FONT_BODY, "bold"),
             text_color=COLORS["muted_fg"],
             anchor="w",
-        ).pack(fill="x", pady=(20, 2))
+        ).pack(fill="x", pady=(theme.SPACE_5, theme.SPACE_1))
 
         self._keyring_ok = secrets.keyring_available()
         has_token = self._keyring_ok and secrets.get_hf_token() is not None
@@ -126,12 +129,12 @@ class SettingsModal(ctk.CTkToplevel):
         ctk.CTkLabel(
             body,
             text=note_text,
-            font=theme.font(10),
+            font=theme.font(theme.FONT_SMALL),
             text_color=COLORS["muted_fg"],
             anchor="w",
             justify="left",
-            wraplength=360,
-        ).pack(fill="x", pady=(0, 6))
+            wraplength=420,
+        ).pack(fill="x", pady=(0, theme.SPACE_2))
 
         token_row = ctk.CTkFrame(body, fg_color="transparent")
         token_row.pack(fill="x")
@@ -145,7 +148,8 @@ class SettingsModal(ctk.CTkToplevel):
                 if has_token
                 else "hf_xxx (optional)"
             ),
-            font=theme.mono_font(12),
+            height=theme.CONTROL_MD,
+            font=theme.mono_font(theme.FONT_LABEL),
             fg_color=COLORS["input_bg"],
             border_width=0,
             state="normal" if self._keyring_ok else "disabled",
@@ -154,18 +158,19 @@ class SettingsModal(ctk.CTkToplevel):
         self._clear_token_btn = ctk.CTkButton(
             token_row,
             text="Clear",
-            width=56,
-            font=theme.font(11),
+            width=64,
+            height=theme.CONTROL_MD,
+            font=theme.font(theme.FONT_BODY),
             fg_color=COLORS["muted"],
             text_color=COLORS["fg"],
             hover_color=COLORS["border"],
             state="normal" if has_token else "disabled",
             command=self._clear_hf_token,
         )
-        self._clear_token_btn.pack(side="left", padx=(8, 0))
+        self._clear_token_btn.pack(side="left", padx=(theme.SPACE_2, 0))
 
         toggle_row = ctk.CTkFrame(body, fg_color="transparent")
-        toggle_row.pack(fill="x", pady=(20, 0))
+        toggle_row.pack(fill="x", pady=(theme.SPACE_5, 0))
         self._chunk_warnings_var = ctk.BooleanVar(
             value=self._settings.show_chunk_warnings
         )
@@ -174,14 +179,14 @@ class SettingsModal(ctk.CTkToplevel):
         ctk.CTkLabel(
             text_col,
             text="Show chunk warnings",
-            font=theme.font(12),
+            font=theme.font(theme.FONT_LABEL),
             text_color=COLORS["fg"],
             anchor="w",
         ).pack(fill="x")
         ctk.CTkLabel(
             text_col,
             text="Alert when files exceed the context window",
-            font=theme.font(10),
+            font=theme.font(theme.FONT_SMALL),
             text_color=COLORS["muted_fg"],
             anchor="w",
         ).pack(fill="x")
@@ -193,25 +198,38 @@ class SettingsModal(ctk.CTkToplevel):
         ).pack(side="right")
 
         footer = ctk.CTkFrame(self, fg_color="transparent")
-        footer.pack(fill="x", padx=20, pady=(8, 16), side="bottom")
-        ctk.CTkButton(
+        footer.pack(
+            fill="x",
+            padx=theme.SPACE_5,
+            pady=(theme.SPACE_2, theme.SPACE_4),
+            side="bottom",
+        )
+        save_btn = ctk.CTkButton(
             footer,
             text="Save",
-            font=theme.font(12, "bold"),
+            height=theme.CONTROL_MD,
+            corner_radius=theme.RADIUS_CARD,
+            font=theme.font(theme.FONT_LABEL, "bold"),
             fg_color=COLORS["primary"],
             text_color=COLORS["primary_fg"],
             hover_color=COLORS["primary_hover"],
             command=self._save,
-        ).pack(side="right")
-        ctk.CTkButton(
+        )
+        save_btn.pack(side="right")
+        motion.press_feedback(save_btn)
+        cancel_btn = ctk.CTkButton(
             footer,
             text="Cancel",
-            font=theme.font(12),
+            height=theme.CONTROL_MD,
+            corner_radius=theme.RADIUS_CARD,
+            font=theme.font(theme.FONT_LABEL),
             fg_color=COLORS["muted"],
             text_color=COLORS["fg"],
             hover_color=COLORS["border"],
             command=self._cancel,
-        ).pack(side="right", padx=(0, 8))
+        )
+        cancel_btn.pack(side="right", padx=(0, theme.SPACE_2))
+        motion.press_feedback(cancel_btn)
 
     # ------------------------------------------------------------------
 

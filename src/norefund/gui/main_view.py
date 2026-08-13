@@ -9,8 +9,8 @@ import customtkinter as ctk
 
 from norefund.core.models_registry import list_models
 from norefund.core.settings import SettingsStore
-from norefund.gui import theme
-from norefund.gui.theme import COLORS, ICONS
+from norefund.gui import motion, theme
+from norefund.gui.theme import COLORS
 from norefund.gui.widgets import (
     ModelDropdownButton,
     NoticeBanner,
@@ -125,36 +125,36 @@ class MainView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
 
     def _build_sidebar(self) -> None:
         sidebar = ctk.CTkFrame(
-            self, width=208, fg_color=COLORS["sidebar"], corner_radius=0
+            self, width=236, fg_color=COLORS["sidebar"], corner_radius=0
         )
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
 
         logo_row = ctk.CTkFrame(sidebar, fg_color="transparent")
-        logo_row.pack(fill="x", padx=16, pady=(20, 16))
+        logo_row.pack(fill="x", padx=theme.SPACE_4, pady=(theme.SPACE_5, theme.SPACE_4))
         ctk.CTkLabel(
             logo_row,
             text="$",
             width=28,
             height=28,
-            corner_radius=6,
+            corner_radius=theme.RADIUS_CARD,
             fg_color=COLORS["primary"],
             text_color=COLORS["primary_fg"],
-            font=theme.font(14, "bold"),
+            font=theme.font(theme.FONT_TITLE, "bold"),
         ).pack(side="left")
         title_col = ctk.CTkFrame(logo_row, fg_color="transparent")
-        title_col.pack(side="left", padx=(10, 0))
+        title_col.pack(side="left", padx=(theme.SPACE_3, 0))
         ctk.CTkLabel(
             title_col,
             text="NoRefund",
-            font=theme.font(14, "bold"),
+            font=theme.font(theme.FONT_TITLE, "bold"),
             text_color=COLORS["sidebar_fg"],
             anchor="w",
         ).pack(fill="x")
         ctk.CTkLabel(
             title_col,
             text="TOKEN & COST ANALYZER",
-            font=theme.font(9),
+            font=theme.font(theme.FONT_MICRO),
             text_color=COLORS["muted_fg"],
             anchor="w",
         ).pack(fill="x")
@@ -178,36 +178,39 @@ class MainView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         )
 
         footer = ctk.CTkFrame(sidebar, fg_color="transparent")
-        footer.pack(side="bottom", fill="x", padx=12, pady=12)
-        warn = ctk.CTkFrame(footer, fg_color=COLORS["muted"], corner_radius=6)
+        footer.pack(side="bottom", fill="x", padx=theme.SPACE_3, pady=theme.SPACE_3)
+        warn = ctk.CTkFrame(
+            footer, fg_color=COLORS["muted"], corner_radius=theme.RADIUS_CARD
+        )
         warn.pack(fill="x")
         ctk.CTkLabel(
             warn,
-            text=(
-                f"{ICONS['check']}  Local analysis. "
-                "Your files never leave this machine."
-            ),
-            font=theme.font(10),
+            text="Local analysis. Your files never leave this machine.",
+            image=theme.icon_image("check", size=14, color=COLORS["muted_fg"]),
+            compound="left",
+            font=theme.font(theme.FONT_SMALL),
             text_color=COLORS["muted_fg"],
-            wraplength=170,
+            wraplength=196,
             justify="left",
-        ).pack(padx=8, pady=8, fill="x")
+        ).pack(padx=theme.SPACE_2, pady=theme.SPACE_2, fill="x")
         ctk.CTkLabel(
             footer,
             text=f"v{_APP_VERSION} · open-source",
-            font=theme.font(9),
+            font=theme.font(theme.FONT_MICRO),
             text_color=COLORS["muted_fg"],
-        ).pack(pady=(8, 0))
+        ).pack(pady=(theme.SPACE_2, 0))
 
     def _nav_section(
         self, parent, label: str, items: list[tuple[str, str, str]]
     ) -> None:
-        section_label(parent, label).pack(fill="x", padx=16, pady=(12, 4))
+        section_label(parent, label).pack(
+            fill="x", padx=theme.SPACE_4, pady=(theme.SPACE_3, theme.SPACE_1)
+        )
         for view_id, text, icon in items:
             item = SidebarItem(
                 parent, text, icon, command=lambda v=view_id: self.show_view(v)
             )
-            item.pack(fill="x", padx=10, pady=1)
+            item.pack(fill="x", padx=theme.SPACE_2, pady=1)
             self._nav_items[view_id] = item
 
     # ------------------------------------------------------------------
@@ -216,60 +219,73 @@ class MainView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
 
     def _build_header(self, parent) -> None:
         header = ctk.CTkFrame(
-            parent, height=44, fg_color=COLORS["card"], corner_radius=0
+            parent, height=52, fg_color=COLORS["card"], corner_radius=0
         )
         header.pack(side="top", fill="x")
         header.pack_propagate(False)
 
         left = ctk.CTkFrame(header, fg_color="transparent")
-        left.pack(side="left", padx=16)
+        left.pack(side="left", padx=theme.SPACE_4)
         self._header_title = ctk.CTkLabel(
             left,
             text=_TITLES[self.VIEW_CALCULATOR],
-            font=theme.font(14, "bold"),
+            font=theme.font(theme.FONT_TITLE, "bold"),
             text_color=COLORS["fg"],
         )
         self._header_title.pack(side="left")
         self._header_badge = ctk.CTkLabel(
             left,
             text="",
-            font=theme.font(10),
+            font=theme.font(theme.FONT_SMALL),
             fg_color=COLORS["muted"],
             text_color=COLORS["muted_fg"],
             corner_radius=8,
         )
 
         right = ctk.CTkFrame(header, fg_color="transparent")
-        right.pack(side="right", padx=12)
+        right.pack(side="right", padx=theme.SPACE_3)
+        initial_icon = "moon" if ctk.get_appearance_mode() == "Dark" else "sun"
         self._theme_btn = ctk.CTkButton(
             right,
             text="",
-            width=32,
-            height=32,
-            corner_radius=6,
+            # CTkButton only creates its internal image-label widget when
+            # constructed with an image; a later configure(image=...) on a
+            # button built with image=None is a silent no-op (it calls
+            # _update_image(), which bails out early if _image_label is
+            # still None) -- so this needs a real image from the start,
+            # not just whatever _sync_theme_icon() sets afterwards.
+            image=theme.icon_image(initial_icon, size=16, color=COLORS["fg"]),
+            width=theme.CONTROL_MD,
+            height=theme.CONTROL_MD,
+            corner_radius=theme.RADIUS_CARD,
             fg_color="transparent",
             hover_color=COLORS["muted"],
-            text_color=COLORS["fg"],
             command=self._toggle_theme,
         )
-        self._theme_btn.pack(side="left", padx=4)
-        ctk.CTkButton(
+        self._theme_btn.pack(side="left", padx=theme.SPACE_1)
+        motion.press_feedback(self._theme_btn)
+        settings_btn = ctk.CTkButton(
             right,
-            text=ICONS["settings"],
-            width=32,
-            height=32,
-            corner_radius=6,
+            text="",
+            image=theme.icon_image("settings", size=16, color=COLORS["fg"]),
+            width=theme.CONTROL_MD,
+            height=theme.CONTROL_MD,
+            corner_radius=theme.RADIUS_CARD,
             fg_color="transparent",
             hover_color=COLORS["muted"],
-            text_color=COLORS["fg"],
             command=self._open_settings,
-        ).pack(side="left", padx=4)
+        )
+        settings_btn.pack(side="left", padx=theme.SPACE_1)
+        motion.press_feedback(settings_btn)
 
         self._sync_theme_icon()
 
     def _sync_theme_icon(self) -> None:
         is_dark = ctk.get_appearance_mode() == "Dark"
-        self._theme_btn.configure(text=ICONS["moon"] if is_dark else ICONS["sun"])
+        icon_name = "moon" if is_dark else "sun"
+        self._theme_btn.configure(
+            image=theme.icon_image(icon_name, size=16, color=COLORS["fg"])
+        )
 
     def _toggle_theme(self) -> None:
         new_mode = "Light" if ctk.get_appearance_mode() == "Dark" else "Dark"
@@ -296,7 +312,9 @@ class MainView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             self._header_badge.configure(
                 text=f"{count} file{'s' if count != 1 else ''}"
             )
-            self._header_badge.pack(side="left", padx=(10, 0), ipadx=6, ipady=2)
+            self._header_badge.pack(
+                side="left", padx=(theme.SPACE_3, 0), ipadx=6, ipady=2
+            )
         else:
             self._header_badge.pack_forget()
 
