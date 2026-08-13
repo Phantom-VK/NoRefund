@@ -4,10 +4,16 @@
 ; dist/NoRefund/NoRefund.exe):
 ;   iscc packaging/windows/installer.iss
 ;
+; MyAppVersion defaults to the value below for a manual/local build, but can
+; be overridden without editing this file (e.g. from CI, driven by a git
+; tag): iscc /DMyAppVersion=1.2.3 packaging/windows/installer.iss
+;
 ; Output: packaging/windows/dist/NoRefund-Setup-<version>.exe
 
 #define MyAppName "NoRefund"
-#define MyAppVersion "0.1.0"
+#ifndef MyAppVersion
+  #define MyAppVersion "0.1.0"
+#endif
 #define MyAppPublisher "PhantomVK"
 #define MyAppExeName "NoRefund.exe"
 #define MyDistDir "..\..\dist\NoRefund"
