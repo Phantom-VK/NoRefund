@@ -18,6 +18,12 @@ from norefund.gui.registry_view import RegistryView  # noqa: E402
 
 from .conftest import _pump, _pump_until  # noqa: E402
 
+# LoadingOverlay.hide() fades its text color out over ~150ms (motion.py's
+# fade_text_color) before calling place_forget(), so the label is still
+# placed for a moment after `_loading` flips False -- pump past the fade
+# before asserting it's gone.
+_FADE_SETTLE_MS = 250
+
 
 @dataclass
 class _FakeShell:
@@ -45,6 +51,7 @@ def test_loading_text_shows_first_then_atomic_reveal(root):
     assert view._loading_overlay._label.place_info() != {}
 
     _pump_until(root, lambda: not view._loading)
+    _pump(root, _FADE_SETTLE_MS)
 
     assert view._loading_overlay._label.place_info() == {}
     assert len(view._cards) == len(shell.models)

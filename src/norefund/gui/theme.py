@@ -1,4 +1,4 @@
-"""Static design tokens for the GUI: colors, fonts, icons, filetypes.
+"""Static design tokens for the GUI: colors, type/spacing/control scales, icons.
 
 Color values are ported from the NoRefund Desktop UI Design reference
 (`NoRefund Desktop UI Design/src/styles/theme.css`). Each entry is a
@@ -10,9 +10,14 @@ Color values are ported from the NoRefund Desktop UI Design reference
 
 from __future__ import annotations
 
+import tkinter as tk
 import tkinter.font as tkfont
 
+import customtkinter as ctk
+from PIL import Image
+
 from norefund.core.parsing import SUPPORTED_EXTENSIONS
+from norefund.core.paths import bundled_resource
 
 COLORS: dict[str, tuple[str, str]] = {
     "bg": ("#f5f6f8", "#111318"),
@@ -51,32 +56,6 @@ PROVIDER_COLORS: dict[str, str] = {
 }
 _DEFAULT_PROVIDER_COLOR = "#8b949e"
 
-ICONS: dict[str, str] = {
-    "calculator": "\U0001f5a9",
-    "folder_open": "\U0001f4c2",
-    "layers": "\U0001f5c2",
-    "plus": "+",
-    "folder_plus": "\U0001f4c1",
-    "x": "✕",
-    "zap": "⚡",
-    "check": "✓",
-    "check_circle": "✓",
-    "x_circle": "✗",
-    "sun": "☀",
-    "moon": "☾",
-    "settings": "⚙",
-    "warning": "⚠",
-    "bar_chart": "\U0001f4ca",
-    "chevron_right": "›",
-    "chevron_down": "▾",
-    "hash": "#",
-    "external_link": "↗",
-    "file_text": "\U0001f4c4",
-    "refresh": "↻",
-    "download": "⤓",
-    "hard_drive": "\U0001f4be",
-}
-
 SUPPORTED_FILETYPES: list[tuple[str, str]] = [
     (
         "Supported documents",
@@ -84,6 +63,50 @@ SUPPORTED_FILETYPES: list[tuple[str, str]] = [
     ),
     ("All files", "*.*"),
 ]
+
+# ----------------------------------------------------------------------
+# Type scale — 7 named steps, collapsing the 9 ad-hoc sizes the app used
+# to have. Hierarchy comes from weight + size together (Apple's typography
+# guidance), so this stays a small step scale rather than growing further.
+# ----------------------------------------------------------------------
+
+FONT_MICRO = 11
+FONT_SMALL = 12
+FONT_BODY = 13
+FONT_LABEL = 14
+FONT_TITLE = 15
+FONT_HEADING = 20
+FONT_DISPLAY = 26
+
+# ----------------------------------------------------------------------
+# Spacing — single 4px grid. Card padding standardizes on CARD_PAD_X/Y
+# instead of the three different pad values views used to pick.
+# ----------------------------------------------------------------------
+
+SPACE_1 = 4
+SPACE_2 = 8
+SPACE_3 = 12
+SPACE_4 = 16
+SPACE_5 = 20
+SPACE_6 = 24
+SPACE_7 = 32
+CARD_PAD_X = 20
+CARD_PAD_Y = 16
+PAGE_GUTTER = 24
+
+# ----------------------------------------------------------------------
+# Controls — three height tiers replacing the six-value 26-36px band.
+# ----------------------------------------------------------------------
+
+CONTROL_SM = 30
+CONTROL_MD = 36
+CONTROL_LG = 42
+
+# ----------------------------------------------------------------------
+# Radius — tokenized but unchanged in value; card look stays as-is.
+# ----------------------------------------------------------------------
+
+RADIUS_CARD = 6
 
 _UI_FAMILY_CANDIDATES = ("Inter", "Segoe UI", "Helvetica", "Arial")
 _MONO_FAMILY_CANDIDATES = ("JetBrains Mono", "Consolas", "Menlo", "monospace")
@@ -114,12 +137,12 @@ def _mono_family_name() -> str:
     return _mono_family
 
 
-def font(size: int = 13, weight: str = "normal") -> tuple[str, int, str]:
-    """UI text font tuple, e.g. for CTkLabel(font=font(14, "bold"))."""
+def font(size: int = FONT_BODY, weight: str = "normal") -> tuple[str, int, str]:
+    """UI text font tuple, e.g. for CTkLabel(font=font(FONT_LABEL, "bold"))."""
     return (_ui_family_name(), size, weight)
 
 
-def mono_font(size: int = 13, weight: str = "normal") -> tuple[str, int, str]:
+def mono_font(size: int = FONT_BODY, weight: str = "normal") -> tuple[str, int, str]:
     """Monospace font tuple for numbers, paths, and log output."""
     return (_mono_family_name(), size, weight)
 
@@ -133,3 +156,95 @@ def resolve(token: str, dark: bool) -> str:
 
 def provider_color(provider: str) -> str:
     return PROVIDER_COLORS.get(provider, _DEFAULT_PROVIDER_COLOR)
+
+
+_PROVIDER_SLUGS: dict[str, str] = {
+    "OpenAI": "openai",
+    "Anthropic": "anthropic",
+    "Google": "google",
+    "DeepSeek": "deepseek",
+    "Meta": "meta",
+    "Mistral": "mistral",
+}
+
+
+def provider_icon(provider: str, size: int = 16) -> ctk.CTkImage | None:
+    """The provider's brand mark (assets/icons/providers/<slug>.png), tinted
+    to its accent color. None if `provider` has no bundled mark, so callers
+    can fall back to a plain status dot."""
+    slug = _PROVIDER_SLUGS.get(provider)
+    if slug is None:
+        return None
+    hex_color = provider_color(provider)
+    return icon_image(f"providers/{slug}", size=size, color=(hex_color, hex_color))
+
+
+# ----------------------------------------------------------------------
+# Icons — monochrome PNGs (src/norefund/assets/icons), alpha-tinted at
+# load time to any COLORS token so one source file covers every theme
+# color in both light and dark mode. Replaces the old mixed emoji/glyph
+# ICONS dict; icon *names* below are the source-of-truth vocabulary used
+# across the GUI (each must have a matching assets/icons/<name>.png).
+# ----------------------------------------------------------------------
+
+_icon_source_cache: dict[str, Image.Image] = {}
+_icon_image_cache: dict[tuple[int, str, int, tuple[str, str]], ctk.CTkImage] = {}
+
+
+def _icon_source(name: str) -> Image.Image:
+    source = _icon_source_cache.get(name)
+    if source is None:
+        path = bundled_resource(f"assets/icons/{name}.png")
+        source = Image.open(path).convert("RGBA")
+        _icon_source_cache[name] = source
+    return source
+
+
+def _tint(name: str, hex_color: str) -> Image.Image:
+    source = _icon_source(name)
+    r, g, b = (int(hex_color[i : i + 2], 16) for i in (1, 3, 5))
+    solid = Image.new("RGBA", source.size, (r, g, b, 255))
+    solid.putalpha(source.getchannel("A"))
+    return solid
+
+
+def icon_image(
+    name: str, size: int = 16, color: tuple[str, str] = COLORS["fg"]
+) -> ctk.CTkImage:
+    """A CTkImage for icon `name`, tinted to `color` (light_hex, dark_hex).
+
+    Cached per (Tk interpreter, name, size, color) — callers can call this
+    freely on every build/reconfigure without re-reading or re-tinting the
+    source PNG. Keying on the current default root's id (not just the icon
+    params) matters because a CTkImage's underlying PhotoImage is bound to
+    the Tk interpreter that created it: reusing one across interpreters
+    (e.g. a fresh `ctk.CTk()` per test) raises "image ... doesn't exist"
+    once the original interpreter is destroyed.
+    """
+    root_id = id(tk._default_root)
+    key = (root_id, name, size, color)
+    cached = _icon_image_cache.get(key)
+    if cached is not None:
+        return cached
+    image = ctk.CTkImage(
+        light_image=_tint(name, color[0]),
+        dark_image=_tint(name, color[1]),
+        size=(size, size),
+    )
+    _icon_image_cache[key] = image
+    return image
+
+
+_icon_source_cache["__blank__"] = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
+
+
+def blank_icon(size: int = 16) -> ctk.CTkImage:
+    """A fully transparent CTkImage, for *clearing* a widget's icon.
+
+    `widget.configure(image=None)` is a no-op on CTkButton/CTkLabel once an
+    image has been set: `_update_image()` only overwrites the underlying Tk
+    image when the new value is a CTkImage (or another non-None image), so
+    the previous icon stays on screen. Configuring with a real (blank)
+    CTkImage instead actually replaces it.
+    """
+    return icon_image("__blank__", size=size, color=("#000000", "#000000"))

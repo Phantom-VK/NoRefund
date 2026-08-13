@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
-from tkinter import filedialog
 
 import customtkinter as ctk
 
@@ -16,9 +15,9 @@ from norefund.core.compare import (
 )
 from norefund.core.export import comparison_to_csv, comparison_to_markdown
 from norefund.core.parsing import SUPPORTED_EXTENSIONS
-from norefund.gui import formatting, theme
+from norefund.gui import formatting, native_dialog, theme
 from norefund.gui.dnd import enable_file_drop
-from norefund.gui.theme import COLORS, ICONS, SUPPORTED_FILETYPES
+from norefund.gui.theme import COLORS, SUPPORTED_FILETYPES
 from norefund.gui.widgets import (
     ContextBar,
     EmptyState,
@@ -26,9 +25,12 @@ from norefund.gui.widgets import (
     ModelCheckList,
     StatPill,
     ThreadSafeSchedulerMixin,
+    bind_mousewheel,
     card,
     export_via_dialog,
 )
+
+_ROW_CONTEXT_BAR_HEIGHT = theme.SPACE_1 + 2  # 6px, denser than the default 8px bar
 
 
 class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
@@ -49,63 +51,68 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
     def _build_layout(self) -> None:
         body = ctk.CTkFrame(self, fg_color=COLORS["bg"])
         body.pack(fill="both", expand=True)
-        body.columnconfigure(0, weight=0, minsize=320)
+        body.columnconfigure(0, weight=0, minsize=360)
         body.columnconfigure(1, weight=1)
         body.rowconfigure(0, weight=1)
 
-        left = ctk.CTkScrollableFrame(body, fg_color=COLORS["bg"], width=320)
-        left.grid(row=0, column=0, sticky="ns", padx=(16, 8), pady=16)
+        left = ctk.CTkScrollableFrame(body, fg_color=COLORS["bg"], width=360)
+        left.grid(
+            row=0, column=0, sticky="ns", padx=(theme.SPACE_4, theme.SPACE_2),
+            pady=theme.SPACE_4,
+        )
+        bind_mousewheel(left)
         self._build_input_card(left)
         self._build_models_card(left)
 
         right = ctk.CTkFrame(body, fg_color=COLORS["bg"])
-        right.grid(row=0, column=1, sticky="nsew", padx=(8, 16), pady=16)
+        right.grid(
+            row=0, column=1, sticky="nsew", padx=(theme.SPACE_2, theme.SPACE_4),
+            pady=theme.SPACE_4,
+        )
         self._build_results_area(right)
 
     def _build_input_card(self, parent) -> None:
         card_frame = card(parent)
-        card_frame.pack(fill="x", pady=(0, 12))
+        card_frame.pack(fill="x", pady=(0, theme.SPACE_3))
         inner = ctk.CTkFrame(card_frame, fg_color="transparent")
-        inner.pack(fill="x", padx=14, pady=14)
+        inner.pack(fill="x", padx=theme.CARD_PAD_X, pady=theme.CARD_PAD_Y)
 
         ctk.CTkLabel(
-            inner, text="Input", font=theme.font(11, "bold"), text_color=COLORS["fg"]
-        ).pack(anchor="w", pady=(0, 8))
+            inner,
+            text="Input",
+            font=theme.font(theme.FONT_BODY, "bold"),
+            text_color=COLORS["fg"],
+        ).pack(anchor="w", pady=(0, theme.SPACE_2))
 
         self._text_box = ctk.CTkTextbox(
-            inner, height=140, fg_color=COLORS["input_bg"], font=theme.font(12)
+            inner,
+            height=150,
+            fg_color=COLORS["input_bg"],
+            font=theme.font(theme.FONT_LABEL),
         )
-        self._text_box.pack(fill="x", pady=(0, 8))
+        self._text_box.pack(fill="x", pady=(0, theme.SPACE_2))
         enable_file_drop(inner, self._on_files_dropped, suffixes=SUPPORTED_EXTENSIONS)
 
         picker_row = ctk.CTkFrame(inner, fg_color="transparent")
-        picker_row.pack(fill="x", pady=(0, 8))
+        picker_row.pack(fill="x", pady=(0, theme.SPACE_2))
         IconButton(
             picker_row, "Pick File", icon="file_text", command=self._pick_file
-        ).pack(side="left", padx=(0, 6))
+        ).pack(side="left", padx=(0, theme.SPACE_2))
         IconButton(
             picker_row, "Pick Folder", icon="folder_open", command=self._pick_folder
         ).pack(side="left")
 
-        self._paths_label = ctk.CTkLabel(
-            inner,
-            text="",
-            font=theme.font(10),
-            text_color=COLORS["muted_fg"],
-            anchor="w",
-            wraplength=280,
-            justify="left",
-        )
-        self._paths_label.pack(fill="x")
+        self._paths_container = ctk.CTkFrame(inner, fg_color="transparent")
+        self._paths_container.pack(fill="x")
 
         out_row = ctk.CTkFrame(inner, fg_color="transparent")
-        out_row.pack(fill="x", pady=(10, 0))
+        out_row.pack(fill="x", pady=(theme.SPACE_3, 0))
         ctk.CTkLabel(
             out_row,
             text="Est. output tokens:",
-            font=theme.font(11),
+            font=theme.font(theme.FONT_BODY),
             text_color=COLORS["muted_fg"],
-        ).pack(side="left", padx=(0, 6))
+        ).pack(side="left", padx=(0, theme.SPACE_2))
         self._output_var = ctk.StringVar(
             value=str(self.shell.settings.default_output_tokens)
         )
@@ -113,7 +120,7 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             out_row,
             textvariable=self._output_var,
             width=90,
-            font=theme.mono_font(11),
+            font=theme.mono_font(theme.FONT_BODY),
             fg_color=COLORS["input_bg"],
             border_width=0,
         )
@@ -123,38 +130,42 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         self._run_btn = IconButton(
             inner, "Compare", icon="zap", variant="primary", command=self._run_compare
         )
-        self._run_btn.pack(fill="x", pady=(10, 0))
+        self._run_btn.pack(fill="x", pady=(theme.SPACE_3, 0))
 
     def _build_models_card(self, parent) -> None:
         card_frame = card(parent)
-        card_frame.pack(fill="x", pady=(0, 12))
+        card_frame.pack(fill="x", pady=(0, theme.SPACE_3))
         inner = ctk.CTkFrame(card_frame, fg_color="transparent")
-        inner.pack(fill="both", padx=14, pady=14)
+        inner.pack(fill="both", padx=theme.CARD_PAD_X, pady=theme.CARD_PAD_Y)
 
         header = ctk.CTkFrame(inner, fg_color="transparent")
-        header.pack(fill="x", pady=(0, 8))
+        header.pack(fill="x", pady=(0, theme.SPACE_2))
         ctk.CTkLabel(
-            header, text="Models", font=theme.font(11, "bold"), text_color=COLORS["fg"]
+            header,
+            text="Models",
+            font=theme.font(theme.FONT_BODY, "bold"),
+            text_color=COLORS["fg"],
         ).pack(side="left")
 
-        self._check_list = ModelCheckList(inner, self.shell.models, height=220)
+        self._check_list = ModelCheckList(inner, self.shell.models, height=260)
         self._check_list.pack(fill="both", expand=True)
 
     def _build_results_area(self, parent) -> None:
         self._stats_row = ctk.CTkFrame(parent, fg_color="transparent")
-        self._stats_row.pack(fill="x", pady=(0, 8))
+        self._stats_row.pack(fill="x", pady=(0, theme.SPACE_2))
 
         toolbar = ctk.CTkFrame(parent, fg_color="transparent")
-        toolbar.pack(fill="x", pady=(0, 8))
+        toolbar.pack(fill="x", pady=(0, theme.SPACE_2))
         IconButton(
             toolbar, "Export CSV", icon="file_text", command=self._export_csv
-        ).pack(side="left", padx=(0, 6))
+        ).pack(side="left", padx=(0, theme.SPACE_2))
         IconButton(
             toolbar, "Export MD", icon="file_text", command=self._export_md
         ).pack(side="left")
 
         self._results_scroll = ctk.CTkScrollableFrame(parent, fg_color=COLORS["bg"])
         self._results_scroll.pack(fill="both", expand=True)
+        bind_mousewheel(self._results_scroll)
         self._show_empty_state()
 
     # ------------------------------------------------------------------
@@ -162,20 +173,37 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
     # ------------------------------------------------------------------
 
     def _pick_file(self) -> None:
-        paths = filedialog.askopenfilenames(filetypes=SUPPORTED_FILETYPES)
+        paths = native_dialog.ask_open_files(SUPPORTED_FILETYPES)
         if paths:
-            self._paths = [Path(p) for p in paths]
-            self._paths_label.configure(text="\n".join(str(p) for p in self._paths))
+            self._set_selected_paths([Path(p) for p in paths])
 
     def _pick_folder(self) -> None:
-        folder = filedialog.askdirectory()
+        folder = native_dialog.ask_directory()
         if folder:
-            self._paths = [Path(folder)]
-            self._paths_label.configure(text=str(folder))
+            self._set_selected_paths([Path(folder)])
 
     def _on_files_dropped(self, paths: list[Path]) -> None:
+        self._set_selected_paths(paths)
+
+    def _set_selected_paths(self, paths: list[Path]) -> None:
         self._paths = paths
-        self._paths_label.configure(text="\n".join(str(p) for p in paths))
+        for child in self._paths_container.winfo_children():
+            child.destroy()
+        for path in paths:
+            row = ctk.CTkFrame(self._paths_container, fg_color="transparent")
+            row.pack(fill="x", pady=(0, theme.SPACE_1))
+            ctk.CTkLabel(
+                row,
+                text="",
+                image=theme.icon_image("check", size=14, color=COLORS["primary"]),
+            ).pack(side="left", padx=(0, theme.SPACE_2))
+            ctk.CTkLabel(
+                row,
+                text=path.name,
+                font=theme.font(theme.FONT_BODY, "bold"),
+                text_color=COLORS["fg"],
+                anchor="w",
+            ).pack(side="left", fill="x", expand=True)
 
     # ------------------------------------------------------------------
     # Run / cancel
@@ -194,7 +222,10 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         self._running = True
         self.cancel_event = threading.Event()
         self._run_btn.configure(
-            text=f"{ICONS['x']} Cancel", command=self._cancel_compare, state="normal"
+            text="Cancel",
+            image=theme.icon_image("x", size=16, color=COLORS["primary_fg"]),
+            command=self._cancel_compare,
+            state="normal",
         )
         output_tokens = formatting.parse_int(self._output_var.get())
         paths = list(self._paths)
@@ -209,7 +240,9 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
     def _cancel_compare(self) -> None:
         if self.cancel_event is not None:
             self.cancel_event.set()
-        self._run_btn.configure(text="Cancelling…", state="disabled")
+        self._run_btn.configure(
+            text="Cancelling…", image=theme.blank_icon(size=16), state="disabled"
+        )
 
     def _compare_worker(
         self, text, paths, models, output_tokens, cancel_event
@@ -245,7 +278,10 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         if not self.winfo_exists():
             return
         self._run_btn.configure(
-            text=f"{ICONS['zap']} Compare", command=self._run_compare, state="normal"
+            text="Compare",
+            image=theme.icon_image("zap", size=16, color=COLORS["primary_fg"]),
+            command=self._run_compare,
+            state="normal",
         )
 
     # ------------------------------------------------------------------
@@ -278,7 +314,7 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         text = message or (
             "Enter text or pick a file, choose models, and click Compare"
         )
-        icon = ICONS["x_circle"] if message else ICONS["bar_chart"]
+        icon = "x_circle" if message else "bar_chart"
         EmptyState(self._results_scroll, icon, text).pack(expand=True, pady=40)
 
     def _render_results(self, report: CompareReport) -> None:
@@ -289,13 +325,13 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
 
         successful = [r for r in report.results if r.error is None]
         StatPill(self._stats_row, "Source", report.source_label).pack(
-            side="left", padx=(0, 24)
+            side="left", padx=(0, theme.SPACE_6)
         )
         if successful:
             cheapest = min(successful, key=lambda r: r.total_cost)
             StatPill(
                 self._stats_row, "Cheapest", cheapest.model.display_name
-            ).pack(side="left", padx=24)
+            ).pack(side="left", padx=theme.SPACE_6)
 
         sorted_results = sorted(
             report.results, key=lambda r: (r.error is not None, r.total_cost)
@@ -306,14 +342,14 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             self._build_result_row(result, is_cheapest=result.model.id == cheapest_id)
 
     def _build_result_row(self, result: ModelComparison, is_cheapest: bool) -> None:
-        card = ctk.CTkFrame(
+        row_card = ctk.CTkFrame(
             self._results_scroll,
             fg_color=COLORS["primary"] if is_cheapest else COLORS["card"],
-            corner_radius=6,
+            corner_radius=theme.RADIUS_CARD,
         )
-        card.pack(fill="x", pady=4)
-        inner = ctk.CTkFrame(card, fg_color="transparent")
-        inner.pack(fill="x", padx=14, pady=10)
+        row_card.pack(fill="x", pady=theme.SPACE_1)
+        inner = ctk.CTkFrame(row_card, fg_color="transparent")
+        inner.pack(fill="x", padx=theme.SPACE_4, pady=theme.SPACE_3)
 
         fg = COLORS["primary_fg"] if is_cheapest else COLORS["fg"]
         muted = COLORS["primary_fg"] if is_cheapest else COLORS["muted_fg"]
@@ -323,63 +359,67 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         ctk.CTkLabel(
             top_row,
             text=result.model.display_name,
-            font=theme.font(13, "bold"),
+            font=theme.font(theme.FONT_TITLE, "bold"),
             text_color=fg,
             anchor="w",
         ).pack(side="left")
         if is_cheapest:
             ctk.CTkLabel(
                 top_row,
-                text=f"{ICONS['check']} cheapest",
-                font=theme.font(10, "bold"),
+                text="cheapest",
+                image=theme.icon_image("check", size=12, color=fg),
+                compound="left",
+                font=theme.font(theme.FONT_SMALL, "bold"),
                 text_color=fg,
             ).pack(side="right")
 
         if result.error is not None:
             ctk.CTkLabel(
                 inner,
-                text=f"{ICONS['x_circle']} {result.error}",
-                font=theme.font(11),
+                text=result.error,
+                image=theme.icon_image(
+                    "x_circle", size=14, color=COLORS["destructive"]
+                ),
+                compound="left",
+                font=theme.font(theme.FONT_BODY),
                 text_color=COLORS["destructive"],
                 anchor="w",
-                wraplength=500,
+                wraplength=800,
                 justify="left",
-            ).pack(fill="x", pady=(4, 0))
+            ).pack(fill="x", pady=(theme.SPACE_1, 0))
             return
 
         stats = ctk.CTkFrame(inner, fg_color="transparent")
-        stats.pack(fill="x", pady=(6, 0))
+        stats.pack(fill="x", pady=(theme.SPACE_2, 0))
         tokens_str = formatting.fmt_num(result.token_count)
         if result.tokenizer_is_approximate:
             tokens_str += " (approx.)"
         ctk.CTkLabel(
             stats,
             text=f"Tokens: {tokens_str}",
-            font=theme.mono_font(11),
+            font=theme.mono_font(theme.FONT_BODY),
             text_color=muted,
-        ).pack(side="left", padx=(0, 16))
+        ).pack(side="left", padx=(0, theme.SPACE_4))
 
         bar_cell = ctk.CTkFrame(stats, fg_color="transparent")
-        bar_cell.pack(side="left", padx=(0, 16))
-        bar = ContextBar(bar_cell, height=5, width=100)
+        bar_cell.pack(side="left", padx=(0, theme.SPACE_4))
+        bar = ContextBar(bar_cell, height=_ROW_CONTEXT_BAR_HEIGHT, width=100)
         bar.pack()
         bar.set_value(result.context_usage_pct)
         ctk.CTkLabel(
             stats,
             text=formatting.fmt_context_pct(result.context_usage_pct),
-            font=theme.mono_font(11),
+            font=theme.mono_font(theme.FONT_BODY),
             text_color=muted,
-        ).pack(side="left", padx=(0, 16))
+        ).pack(side="left", padx=(0, theme.SPACE_4))
 
-        fits_icon = (
-            ICONS["check_circle"] if result.fits_in_context else ICONS["x_circle"]
-        )
+        fits_icon = "check_circle" if result.fits_in_context else "x_circle"
         ctk.CTkLabel(
-            stats, text=fits_icon, font=theme.font(11), text_color=muted
-        ).pack(side="left", padx=(0, 16))
+            stats, text="", image=theme.icon_image(fits_icon, size=14, color=muted)
+        ).pack(side="left", padx=(0, theme.SPACE_4))
 
         cost_row = ctk.CTkFrame(inner, fg_color="transparent")
-        cost_row.pack(fill="x", pady=(4, 0))
+        cost_row.pack(fill="x", pady=(theme.SPACE_1, 0))
         ctk.CTkLabel(
             cost_row,
             text=(
@@ -387,7 +427,7 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
                 f"Output {formatting.fmt_cost(result.output_cost)}  ·  "
                 f"Total {formatting.fmt_cost(result.total_cost)}"
             ),
-            font=theme.mono_font(12, "bold"),
+            font=theme.mono_font(theme.FONT_LABEL, "bold"),
             text_color=fg,
             anchor="w",
         ).pack(side="left")

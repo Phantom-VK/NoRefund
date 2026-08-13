@@ -15,6 +15,7 @@ import pytest
 ctk = pytest.importorskip("customtkinter")
 
 import norefund.gui.compare_view as compare_view_module  # noqa: E402
+import norefund.gui.native_dialog as native_dialog_module  # noqa: E402
 from norefund.core.compare import CompareReport, ModelComparison  # noqa: E402
 from norefund.core.export import comparison_to_csv, comparison_to_markdown  # noqa: E402
 from norefund.core.models_registry import ModelInfo  # noqa: E402
@@ -160,9 +161,7 @@ def test_export_csv_and_md_write_expected_content(root, monkeypatch, tmp_path):
 
     csv_path = tmp_path / "out.csv"
     monkeypatch.setattr(
-        compare_view_module.filedialog,
-        "asksaveasfilename",
-        lambda **kwargs: str(csv_path),
+        native_dialog_module, "ask_save_file", lambda **kwargs: str(csv_path)
     )
     view._export_csv()
     with csv_path.open(encoding="utf-8", newline="") as f:
@@ -170,9 +169,7 @@ def test_export_csv_and_md_write_expected_content(root, monkeypatch, tmp_path):
 
     md_path = tmp_path / "out.md"
     monkeypatch.setattr(
-        compare_view_module.filedialog,
-        "asksaveasfilename",
-        lambda **kwargs: str(md_path),
+        native_dialog_module, "ask_save_file", lambda **kwargs: str(md_path)
     )
     view._export_md()
     assert md_path.read_text(encoding="utf-8") == comparison_to_markdown(view._report)

@@ -6,8 +6,14 @@ import customtkinter as ctk
 
 from norefund.core import costing
 from norefund.gui import formatting, theme
-from norefund.gui.theme import COLORS, ICONS
-from norefund.gui.widgets import ContextBar, ModelDropdownButton, card, section_label
+from norefund.gui.theme import COLORS
+from norefund.gui.widgets import (
+    ContextBar,
+    ModelDropdownButton,
+    bind_mousewheel,
+    card,
+    section_label,
+)
 
 
 class CalculatorView(ctk.CTkFrame):
@@ -16,15 +22,18 @@ class CalculatorView(ctk.CTkFrame):
         self.shell = shell
 
         scroll = ctk.CTkScrollableFrame(self, fg_color=COLORS["bg"])
-        scroll.pack(fill="both", expand=True, padx=24, pady=20)
+        scroll.pack(
+            fill="both", expand=True, padx=theme.PAGE_GUTTER, pady=theme.SPACE_5
+        )
+        bind_mousewheel(scroll)
 
         ctk.CTkLabel(
             scroll,
             text="Manually estimate token cost for any LLM before making an API call.",
-            font=theme.font(12),
+            font=theme.font(theme.FONT_LABEL),
             text_color=COLORS["muted_fg"],
             anchor="w",
-        ).pack(fill="x", pady=(0, 16))
+        ).pack(fill="x", pady=(0, theme.SPACE_4))
 
         self._build_config_card(scroll)
         self._build_context_card(scroll)
@@ -36,43 +45,44 @@ class CalculatorView(ctk.CTkFrame):
 
     def _build_config_card(self, parent) -> None:
         card_frame = card(parent)
-        card_frame.pack(fill="x", pady=(0, 16))
+        card_frame.pack(fill="x", pady=(0, theme.SPACE_4))
         inner = ctk.CTkFrame(card_frame, fg_color="transparent")
-        inner.pack(fill="x", padx=20, pady=20)
+        inner.pack(fill="x", padx=theme.CARD_PAD_X, pady=theme.CARD_PAD_Y)
 
         ctk.CTkLabel(
             inner,
             text="Model",
-            font=theme.font(11, "bold"),
+            font=theme.font(theme.FONT_BODY, "bold"),
             text_color=COLORS["muted_fg"],
             anchor="w",
-        ).pack(fill="x", pady=(0, 6))
+        ).pack(fill="x", pady=(0, theme.SPACE_2))
         self._model_dropdown = ModelDropdownButton(
             inner,
             self.shell.models,
             self.shell.models[0],
             on_select=self._on_model_change,
         )
-        self._model_dropdown.pack(fill="x", pady=(0, 16))
+        self._model_dropdown.pack(fill="x", pady=(0, theme.SPACE_4))
 
         grid = ctk.CTkFrame(inner, fg_color="transparent")
         grid.pack(fill="x")
         grid.columnconfigure((0, 1), weight=1)
 
         in_col = ctk.CTkFrame(grid, fg_color="transparent")
-        in_col.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+        in_col.grid(row=0, column=0, sticky="ew", padx=(0, theme.SPACE_2))
         ctk.CTkLabel(
             in_col,
             text="Input tokens",
-            font=theme.font(11, "bold"),
+            font=theme.font(theme.FONT_BODY, "bold"),
             text_color=COLORS["muted_fg"],
             anchor="w",
-        ).pack(fill="x", pady=(0, 6))
+        ).pack(fill="x", pady=(0, theme.SPACE_2))
         self._input_var = ctk.StringVar(value="0")
         input_entry = ctk.CTkEntry(
             in_col,
             textvariable=self._input_var,
-            font=theme.mono_font(13),
+            height=theme.CONTROL_MD,
+            font=theme.mono_font(theme.FONT_TITLE),
             fg_color=COLORS["input_bg"],
             border_width=0,
         )
@@ -80,21 +90,22 @@ class CalculatorView(ctk.CTkFrame):
         input_entry.bind("<KeyRelease>", lambda _e: self._recalculate())
 
         out_col = ctk.CTkFrame(grid, fg_color="transparent")
-        out_col.grid(row=0, column=1, sticky="ew", padx=(8, 0))
+        out_col.grid(row=0, column=1, sticky="ew", padx=(theme.SPACE_2, 0))
         ctk.CTkLabel(
             out_col,
             text="Est. output tokens",
-            font=theme.font(11, "bold"),
+            font=theme.font(theme.FONT_BODY, "bold"),
             text_color=COLORS["muted_fg"],
             anchor="w",
-        ).pack(fill="x", pady=(0, 6))
+        ).pack(fill="x", pady=(0, theme.SPACE_2))
         self._output_var = ctk.StringVar(
             value=str(self.shell.settings.default_output_tokens)
         )
         output_entry = ctk.CTkEntry(
             out_col,
             textvariable=self._output_var,
-            font=theme.mono_font(13),
+            height=theme.CONTROL_MD,
+            font=theme.mono_font(theme.FONT_TITLE),
             fg_color=COLORS["input_bg"],
             border_width=0,
         )
@@ -103,53 +114,53 @@ class CalculatorView(ctk.CTkFrame):
 
     def _build_context_card(self, parent) -> None:
         card_frame = card(parent)
-        card_frame.pack(fill="x", pady=(0, 16))
+        card_frame.pack(fill="x", pady=(0, theme.SPACE_4))
         inner = ctk.CTkFrame(card_frame, fg_color="transparent")
-        inner.pack(fill="x", padx=20, pady=20)
+        inner.pack(fill="x", padx=theme.CARD_PAD_X, pady=theme.CARD_PAD_Y)
 
         header_row = ctk.CTkFrame(inner, fg_color="transparent")
-        header_row.pack(fill="x", pady=(0, 8))
+        header_row.pack(fill="x", pady=(0, theme.SPACE_2))
         ctk.CTkLabel(
             header_row,
             text="Context window usage",
-            font=theme.font(12, "bold"),
+            font=theme.font(theme.FONT_LABEL, "bold"),
             text_color=COLORS["fg"],
             anchor="w",
         ).pack(side="left")
         self._pct_label = ctk.CTkLabel(
-            header_row, text="—", font=theme.mono_font(12, "bold")
+            header_row, text="—", font=theme.mono_font(theme.FONT_LABEL, "bold")
         )
         self._pct_label.pack(side="right")
 
         self._context_bar = ContextBar(inner)
-        self._context_bar.pack(fill="x", pady=(0, 8))
+        self._context_bar.pack(fill="x", pady=(0, theme.SPACE_2))
 
         self._stat_label = ctk.CTkLabel(
             inner,
             text="",
-            font=theme.mono_font(11),
+            font=theme.mono_font(theme.FONT_BODY),
             text_color=COLORS["muted_fg"],
             anchor="w",
         )
-        self._stat_label.pack(fill="x", pady=(0, 8))
+        self._stat_label.pack(fill="x", pady=(0, theme.SPACE_2))
 
         self._status_row = ctk.CTkFrame(inner, fg_color="transparent")
         self._status_row.pack(fill="x")
-        self._status_icon = ctk.CTkLabel(self._status_row, text="", font=theme.font(12))
-        self._status_icon.pack(side="left", padx=(0, 6))
+        self._status_icon = ctk.CTkLabel(self._status_row, text="")
+        self._status_icon.pack(side="left", padx=(0, theme.SPACE_2))
         self._status_text = ctk.CTkLabel(
             self._status_row,
             text="",
-            font=theme.font(12),
+            font=theme.font(theme.FONT_LABEL),
             anchor="w",
         )
         self._status_text.pack(side="left")
 
     def _build_cost_card(self, parent) -> None:
         card_frame = card(parent)
-        card_frame.pack(fill="x", pady=(0, 16))
+        card_frame.pack(fill="x", pady=(0, theme.SPACE_4))
         inner = ctk.CTkFrame(card_frame, fg_color="transparent")
-        inner.pack(fill="both", padx=20, pady=20)
+        inner.pack(fill="both", padx=theme.CARD_PAD_X, pady=theme.CARD_PAD_Y)
 
         grid = ctk.CTkFrame(inner, fg_color="transparent")
         grid.pack(fill="x")
@@ -166,18 +177,20 @@ class CalculatorView(ctk.CTkFrame):
         )
 
         ctk.CTkFrame(inner, fg_color=COLORS["border"], height=1).pack(
-            fill="x", pady=(16, 8)
+            fill="x", pady=(theme.SPACE_4, theme.SPACE_2)
         )
         ctk.CTkLabel(
             inner,
             text=(
-                f"{ICONS['warning']}  Prices are estimates based on locally stored "
+                " Prices are estimates based on locally stored "
                 "pricing data and may not reflect current provider rates."
             ),
-            font=theme.font(10),
+            image=theme.icon_image("warning", size=14, color=COLORS["primary"]),
+            compound="left",
+            font=theme.font(theme.FONT_SMALL),
             text_color=COLORS["muted_fg"],
             anchor="w",
-            wraplength=560,
+            wraplength=800,
             justify="left",
         ).pack(fill="x")
 
@@ -188,14 +201,19 @@ class CalculatorView(ctk.CTkFrame):
             border_width=1 if border else 0,
             border_color=COLORS["border"],
         )
-        col_frame.grid(row=0, column=col, sticky="nsew", padx=(16 if border else 0, 0))
+        col_frame.grid(
+            row=0,
+            column=col,
+            sticky="nsew",
+            padx=(theme.SPACE_4 if border else 0, 0),
+        )
         pad = ctk.CTkFrame(col_frame, fg_color="transparent")
-        pad.pack(padx=(12, 0) if border else 0, fill="x")
+        pad.pack(padx=(theme.SPACE_3, 0) if border else 0, fill="x")
         section_label(pad, label).pack(fill="x")
         value_label = ctk.CTkLabel(
             pad,
             text="$0.00",
-            font=theme.mono_font(20, "bold"),
+            font=theme.mono_font(theme.FONT_DISPLAY, "bold"),
             text_color=COLORS["primary"],
             anchor="w",
         )
@@ -203,7 +221,7 @@ class CalculatorView(ctk.CTkFrame):
         rate_label = ctk.CTkLabel(
             pad,
             text="",
-            font=theme.font(10),
+            font=theme.font(theme.FONT_SMALL),
             text_color=COLORS["muted_fg"],
             anchor="w",
         )
@@ -244,7 +262,7 @@ class CalculatorView(ctk.CTkFrame):
 
         if fits:
             self._status_icon.configure(
-                text=ICONS["check_circle"], text_color=COLORS["primary"]
+                image=theme.icon_image("check_circle", size=16, color=COLORS["primary"])
             )
             self._status_text.configure(
                 text="Fits in one context window", text_color=COLORS["muted_fg"]
@@ -256,7 +274,9 @@ class CalculatorView(ctk.CTkFrame):
                 if self.shell.settings.show_chunk_warnings
                 else COLORS["muted_fg"]
             )
-            self._status_icon.configure(text=ICONS["x_circle"], text_color=icon_color)
+            self._status_icon.configure(
+                image=theme.icon_image("x_circle", size=16, color=icon_color)
+            )
             exceed_str = formatting.fmt_num(exceed_by)
             self._status_text.configure(
                 text=f"Exceeds by {exceed_str} tokens — chunking required",

@@ -20,7 +20,7 @@ from norefund.core.resources import (
     download_tokenizer,
 )
 from norefund.gui import formatting, theme
-from norefund.gui.theme import COLORS, ICONS
+from norefund.gui.theme import COLORS
 from norefund.gui.widgets import (
     IconButton,
     LoadingOverlay,
@@ -30,6 +30,8 @@ from norefund.gui.widgets import (
     section_label,
     status_dot,
 )
+
+_PATH_MAX_CHARS = 64
 
 
 def _open_folder(path: Path) -> None:
@@ -48,60 +50,67 @@ class _TokenizerRow(ctk.CTkFrame):
     def __init__(
         self, parent, resource: TokenizerResource, view: ResourcesView
     ) -> None:
-        super().__init__(parent, fg_color=COLORS["card"], corner_radius=6)
+        super().__init__(
+            parent, fg_color=COLORS["card"], corner_radius=theme.RADIUS_CARD
+        )
         self._resource = resource
         self._view = view
 
         inner = ctk.CTkFrame(self, fg_color="transparent")
-        inner.pack(fill="x", padx=14, pady=10)
+        inner.pack(fill="x", padx=theme.SPACE_4, pady=theme.SPACE_3)
         inner.columnconfigure(1, weight=1)
 
         self._status_dot = status_dot(inner)
-        self._status_dot.grid(row=0, column=0, rowspan=2, padx=(0, 10), sticky="n")
+        self._status_dot.grid(
+            row=0, column=0, rowspan=2, padx=(0, theme.SPACE_3), sticky="n"
+        )
 
         title_row = ctk.CTkFrame(inner, fg_color="transparent")
         title_row.grid(row=0, column=1, sticky="ew")
         ctk.CTkLabel(
             title_row,
             text=resource.name,
-            font=theme.font(13, "bold"),
+            font=theme.font(theme.FONT_TITLE, "bold"),
             text_color=COLORS["fg"],
             anchor="w",
         ).pack(side="left")
         ctk.CTkLabel(
             title_row,
             text=resource.backend,
-            font=theme.font(9, "bold"),
+            font=theme.font(theme.FONT_MICRO, "bold"),
             fg_color=COLORS["muted"],
             text_color=COLORS["muted_fg"],
             corner_radius=8,
-            padx=6,
-        ).pack(side="left", padx=(8, 0))
+            padx=theme.SPACE_2,
+        ).pack(side="left", padx=(theme.SPACE_2, 0))
 
         n_models = len(resource.model_ids)
         sub_text = f"used by {n_models} model{'s' if n_models != 1 else ''}"
         self._sub_label = ctk.CTkLabel(
             inner,
             text=sub_text,
-            font=theme.font(10),
+            font=theme.font(theme.FONT_SMALL),
             text_color=COLORS["muted_fg"],
             anchor="w",
         )
-        self._sub_label.grid(row=1, column=1, sticky="ew", pady=(2, 0))
+        self._sub_label.grid(row=1, column=1, sticky="ew", pady=(theme.SPACE_1, 0))
 
         self._path_label = ctk.CTkLabel(
             inner,
             text="",
-            font=theme.mono_font(9),
+            font=theme.mono_font(theme.FONT_MICRO),
             text_color=COLORS["muted_fg"],
             anchor="w",
         )
-        self._path_label.grid(row=2, column=1, sticky="ew", pady=(2, 0))
+        self._path_label.grid(row=2, column=1, sticky="ew", pady=(theme.SPACE_1, 0))
 
         self._size_label = ctk.CTkLabel(
-            inner, text="", font=theme.mono_font(11), text_color=COLORS["muted_fg"]
+            inner,
+            text="",
+            font=theme.mono_font(theme.FONT_BODY),
+            text_color=COLORS["muted_fg"],
         )
-        self._size_label.grid(row=0, column=2, padx=(10, 10))
+        self._size_label.grid(row=0, column=2, padx=(theme.SPACE_3, theme.SPACE_3))
 
         self._action_area = ctk.CTkFrame(inner, fg_color="transparent")
         self._action_area.grid(row=0, column=3, rowspan=2)
@@ -109,10 +118,10 @@ class _TokenizerRow(ctk.CTkFrame):
         self._error_label = ctk.CTkLabel(
             inner,
             text="",
-            font=theme.font(10),
+            font=theme.font(theme.FONT_SMALL),
             text_color=COLORS["destructive"],
             anchor="w",
-            wraplength=420,
+            wraplength=480,
             justify="left",
         )
 
@@ -127,7 +136,9 @@ class _TokenizerRow(ctk.CTkFrame):
         )
         self._size_label.configure(text=formatting.fmt_bytes(resource.size_bytes))
         if resource.cache_path is not None:
-            self._path_label.configure(text=str(resource.cache_path))
+            self._path_label.configure(
+                text=formatting.elide_middle(str(resource.cache_path), _PATH_MAX_CHARS)
+            )
         else:
             self._path_label.configure(text="not downloaded")
 
@@ -135,10 +146,20 @@ class _TokenizerRow(ctk.CTkFrame):
         if resource.notes:
             text = resource.notes
             if show_link:
-                text += f"  {ICONS['external_link']} open page"
-            self._error_label.configure(text=text)
+                text += "  open page"
+            self._error_label.configure(
+                text=text,
+                image=(
+                    theme.icon_image(
+                        "external_link", size=12, color=COLORS["destructive"]
+                    )
+                    if show_link
+                    else theme.blank_icon(size=12)
+                ),
+                compound="right",
+            )
             self._error_label.grid(
-                row=3, column=1, columnspan=3, sticky="ew", pady=(4, 0)
+                row=3, column=1, columnspan=3, sticky="ew", pady=(theme.SPACE_1, 0)
             )
             if show_link:
                 self._error_label.configure(cursor="hand2")
@@ -168,8 +189,13 @@ class _TokenizerRow(ctk.CTkFrame):
             return
 
         if self._view.is_downloading(self._resource.key):
-            self._progress = ctk.CTkProgressBar(self._action_area, width=120)
-            self._progress.pack(side="left", padx=(0, 8))
+            self._progress = ctk.CTkProgressBar(
+                self._action_area,
+                width=120,
+                progress_color=COLORS["primary"],
+                fg_color=COLORS["muted"],
+            )
+            self._progress.pack(side="left", padx=(0, theme.SPACE_2))
             self._progress.set(0)
             IconButton(
                 self._action_area,
@@ -207,9 +233,11 @@ class _TokenizerRow(ctk.CTkFrame):
 
 class _DirRow(ctk.CTkFrame):
     def __init__(self, parent, managed_dir: ManagedDir) -> None:
-        super().__init__(parent, fg_color=COLORS["card"], corner_radius=6)
+        super().__init__(
+            parent, fg_color=COLORS["card"], corner_radius=theme.RADIUS_CARD
+        )
         inner = ctk.CTkFrame(self, fg_color="transparent")
-        inner.pack(fill="x", padx=14, pady=10)
+        inner.pack(fill="x", padx=theme.SPACE_4, pady=theme.SPACE_3)
         inner.columnconfigure(0, weight=1)
 
         left = ctk.CTkFrame(inner, fg_color="transparent")
@@ -217,17 +245,17 @@ class _DirRow(ctk.CTkFrame):
         ctk.CTkLabel(
             left,
             text=managed_dir.label,
-            font=theme.font(12, "bold"),
+            font=theme.font(theme.FONT_LABEL, "bold"),
             text_color=COLORS["fg"],
             anchor="w",
         ).pack(fill="x")
         ctk.CTkLabel(
             left,
-            text=str(managed_dir.path),
-            font=theme.mono_font(9),
+            text=formatting.elide_middle(str(managed_dir.path), _PATH_MAX_CHARS),
+            font=theme.mono_font(theme.FONT_MICRO),
             text_color=COLORS["muted_fg"],
             anchor="w",
-        ).pack(fill="x", pady=(2, 0))
+        ).pack(fill="x", pady=(theme.SPACE_1, 0))
 
         ctk.CTkLabel(
             inner,
@@ -236,9 +264,9 @@ class _DirRow(ctk.CTkFrame):
                 f"  ·  {managed_dir.file_count} file"
                 f"{'s' if managed_dir.file_count != 1 else ''}"
             ),
-            font=theme.mono_font(11),
+            font=theme.mono_font(theme.FONT_BODY),
             text_color=COLORS["muted_fg"],
-        ).grid(row=0, column=1, padx=10)
+        ).grid(row=0, column=1, padx=theme.SPACE_3)
 
         IconButton(
             inner,
@@ -270,29 +298,31 @@ class ResourcesView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
 
     def _build_header(self) -> None:
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=24, pady=(20, 12))
+        header.pack(
+            fill="x", padx=theme.PAGE_GUTTER, pady=(theme.SPACE_5, theme.SPACE_3)
+        )
 
         left = ctk.CTkFrame(header, fg_color="transparent")
         left.pack(side="left", fill="x", expand=True)
         ctk.CTkLabel(
             left,
             text="Resources",
-            font=theme.font(16, "bold"),
+            font=theme.font(theme.FONT_HEADING, "bold"),
             text_color=COLORS["fg"],
             anchor="w",
         ).pack(fill="x")
         ctk.CTkLabel(
             left,
             text="Tokenizers downloaded to this machine, and where they live on disk.",
-            font=theme.font(11),
+            font=theme.font(theme.FONT_BODY),
             text_color=COLORS["muted_fg"],
             anchor="w",
-        ).pack(fill="x", pady=(2, 0))
+        ).pack(fill="x", pady=(theme.SPACE_1, 0))
 
         stats_row = ctk.CTkFrame(header, fg_color="transparent")
-        stats_row.pack(side="left", padx=32)
+        stats_row.pack(side="left", padx=theme.SPACE_7)
         self._downloaded_pill = StatPill(stats_row, "Downloaded", "—")
-        self._downloaded_pill.pack(side="left", padx=(0, 24))
+        self._downloaded_pill.pack(side="left", padx=(0, theme.SPACE_6))
         self._size_pill = StatPill(stats_row, "Disk used", "—")
         self._size_pill.pack(side="left")
 
@@ -307,11 +337,13 @@ class ResourcesView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             variant="primary",
             command=self._download_all,
         )
-        self._download_all_btn.pack(side="right", padx=(0, 6))
+        self._download_all_btn.pack(side="right", padx=(0, theme.SPACE_2))
 
     def _build_scroll(self) -> None:
         self._scroll = ctk.CTkScrollableFrame(self, fg_color=COLORS["bg"])
-        self._scroll.pack(fill="both", expand=True, padx=24, pady=(0, 20))
+        self._scroll.pack(
+            fill="both", expand=True, padx=theme.PAGE_GUTTER, pady=(0, theme.SPACE_5)
+        )
         bind_mousewheel(self._scroll)
         self._loading_overlay = LoadingOverlay(self._scroll, "Scanning…")
 
@@ -348,17 +380,19 @@ class ResourcesView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         self._downloaded_pill.set_text(f"{cached} of {len(report.tokenizers)}")
         self._size_pill.set_text(formatting.fmt_bytes(report.total_tokenizer_bytes))
 
-        section_label(self._scroll, "Tokenizers", size=10).pack(
-            fill="x", pady=(0, 6)
+        section_label(self._scroll, "Tokenizers").pack(
+            fill="x", pady=(0, theme.SPACE_2)
         )
         for resource in report.tokenizers:
             row = _TokenizerRow(self._scroll, resource, self)
-            row.pack(fill="x", pady=4)
+            row.pack(fill="x", pady=theme.SPACE_1)
             self._rows[resource.key] = row
 
-        section_label(self._scroll, "Storage", size=10).pack(fill="x", pady=(16, 6))
+        section_label(self._scroll, "Storage").pack(
+            fill="x", pady=(theme.SPACE_4, theme.SPACE_2)
+        )
         for managed_dir in report.dirs:
-            _DirRow(self._scroll, managed_dir).pack(fill="x", pady=4)
+            _DirRow(self._scroll, managed_dir).pack(fill="x", pady=theme.SPACE_1)
 
     # ------------------------------------------------------------------
     # Downloads

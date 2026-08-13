@@ -7,12 +7,13 @@ import webbrowser
 import customtkinter as ctk
 
 from norefund.core.models_registry import ModelInfo
-from norefund.gui import formatting, theme
-from norefund.gui.theme import COLORS, ICONS
+from norefund.gui import formatting, motion, theme
+from norefund.gui.theme import COLORS
 from norefund.gui.widgets import LoadingOverlay, ProviderBadge, bind_mousewheel
 from norefund.gui.widgets import card as card_factory
 
-_MIN_CARD_WIDTH = 300
+_MIN_CARD_WIDTH = 340
+_PILL_HEIGHT = theme.CONTROL_SM
 
 
 class RegistryView(ctk.CTkFrame):
@@ -34,14 +35,16 @@ class RegistryView(ctk.CTkFrame):
 
     def _build_header(self) -> None:
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=24, pady=(20, 12))
+        header.pack(
+            fill="x", padx=theme.PAGE_GUTTER, pady=(theme.SPACE_5, theme.SPACE_3)
+        )
 
         left = ctk.CTkFrame(header, fg_color="transparent")
         left.pack(side="left", fill="x", expand=True)
         ctk.CTkLabel(
             left,
             text="Model Registry",
-            font=theme.font(16, "bold"),
+            font=theme.font(theme.FONT_HEADING, "bold"),
             text_color=COLORS["fg"],
             anchor="w",
         ).pack(fill="x")
@@ -53,10 +56,10 @@ class RegistryView(ctk.CTkFrame):
         ctk.CTkLabel(
             left,
             text=subtitle,
-            font=theme.font(11),
+            font=theme.font(theme.FONT_BODY),
             text_color=COLORS["muted_fg"],
             anchor="w",
-        ).pack(fill="x", pady=(2, 0))
+        ).pack(fill="x", pady=(theme.SPACE_1, 0))
 
         pills_row = ctk.CTkFrame(header, fg_color="transparent")
         pills_row.pack(side="right")
@@ -64,16 +67,17 @@ class RegistryView(ctk.CTkFrame):
             pill = ctk.CTkButton(
                 pills_row,
                 text=label,
-                font=theme.font(11),
-                corner_radius=14,
-                height=26,
+                font=theme.font(theme.FONT_BODY),
+                corner_radius=_PILL_HEIGHT // 2,
+                height=_PILL_HEIGHT,
                 width=1,
                 fg_color=COLORS["muted"],
                 text_color=COLORS["muted_fg"],
                 hover_color=COLORS["border"],
                 command=lambda p=label: self._apply_filter(p),
             )
-            pill.pack(side="left", padx=3)
+            pill.pack(side="left", padx=theme.SPACE_1)
+            motion.press_feedback(pill)
             self._pills[label] = pill
         self._sync_pill_styles()
 
@@ -93,7 +97,9 @@ class RegistryView(ctk.CTkFrame):
 
     def _build_grid(self) -> None:
         self._scroll = ctk.CTkScrollableFrame(self, fg_color=COLORS["bg"])
-        self._scroll.pack(fill="both", expand=True, padx=24, pady=(0, 20))
+        self._scroll.pack(
+            fill="both", expand=True, padx=theme.PAGE_GUTTER, pady=(0, theme.SPACE_5)
+        )
         self._scroll.bind("<Configure>", lambda _e: self._relayout())
         self._loading_overlay = LoadingOverlay(self._scroll, "Loading models…")
 
@@ -157,13 +163,13 @@ class RegistryView(ctk.CTkFrame):
         header = ctk.CTkFrame(model_card, fg_color=header_tint, corner_radius=0)
         header.pack(fill="x")
         header_inner = ctk.CTkFrame(header, fg_color="transparent")
-        header_inner.pack(fill="x", padx=14, pady=10)
+        header_inner.pack(fill="x", padx=theme.SPACE_4, pady=theme.SPACE_3)
         top_row = ctk.CTkFrame(header_inner, fg_color="transparent")
         top_row.pack(fill="x")
         ctk.CTkLabel(
             top_row,
             text=model.display_name,
-            font=theme.font(13, "bold"),
+            font=theme.font(theme.FONT_TITLE, "bold"),
             text_color=COLORS["fg"],
             anchor="w",
         ).pack(side="left")
@@ -171,27 +177,27 @@ class RegistryView(ctk.CTkFrame):
         ctk.CTkLabel(
             header_inner,
             text=model.id,
-            font=theme.mono_font(10),
+            font=theme.mono_font(theme.FONT_SMALL),
             text_color=COLORS["muted_fg"],
             anchor="w",
-        ).pack(fill="x", pady=(2, 0))
+        ).pack(fill="x", pady=(theme.SPACE_1, 0))
 
         body = ctk.CTkFrame(model_card, fg_color="transparent")
-        body.pack(fill="x", padx=14, pady=12)
+        body.pack(fill="x", padx=theme.SPACE_4, pady=theme.SPACE_3)
         ctk.CTkLabel(
             body,
             text="Context window",
-            font=theme.font(10),
+            font=theme.font(theme.FONT_SMALL),
             text_color=COLORS["muted_fg"],
             anchor="w",
         ).pack(fill="x")
         ctk.CTkLabel(
             body,
             text=formatting.fmt_context_window(model.context_window),
-            font=theme.mono_font(13, "bold"),
+            font=theme.mono_font(theme.FONT_TITLE, "bold"),
             text_color=COLORS["fg"],
             anchor="w",
-        ).pack(fill="x", pady=(0, 10))
+        ).pack(fill="x", pady=(0, theme.SPACE_3))
 
         pricing = ctk.CTkFrame(body, fg_color="transparent")
         pricing.pack(fill="x")
@@ -202,19 +208,25 @@ class RegistryView(ctk.CTkFrame):
         footer = ctk.CTkFrame(model_card, fg_color="transparent", border_width=0)
         ctk.CTkFrame(footer, fg_color=COLORS["border"], height=1).pack(fill="x")
         footer_inner = ctk.CTkFrame(footer, fg_color="transparent")
-        footer_inner.pack(fill="x", padx=14, pady=8)
+        footer_inner.pack(fill="x", padx=theme.SPACE_4, pady=theme.SPACE_2)
         ctk.CTkLabel(
             footer_inner,
-            text=f"{ICONS['hash']} {model.tokenizer_name}",
-            font=theme.mono_font(10),
+            text=model.tokenizer_name,
+            image=theme.icon_image("hash", size=12, color=COLORS["muted_fg"]),
+            compound="left",
+            font=theme.mono_font(theme.FONT_SMALL),
             text_color=COLORS["muted_fg"],
             anchor="w",
         ).pack(side="left")
         if model.docs_url:
             docs_btn = ctk.CTkLabel(
                 footer_inner,
-                text=f"Docs {ICONS['external_link']}",
-                font=theme.font(10),
+                text="Docs",
+                image=theme.icon_image(
+                    "external_link", size=12, color=COLORS["primary"]
+                ),
+                compound="right",
+                font=theme.font(theme.FONT_SMALL),
                 text_color=COLORS["primary"],
                 cursor="hand2",
             )
@@ -227,26 +239,28 @@ class RegistryView(ctk.CTkFrame):
         return model_card
 
     def _price_cell(self, parent, col: int, label: str, price: float) -> None:
-        cell = ctk.CTkFrame(parent, fg_color=COLORS["muted"], corner_radius=4)
+        cell = ctk.CTkFrame(
+            parent, fg_color=COLORS["muted"], corner_radius=theme.RADIUS_CARD
+        )
         cell.grid(
             row=0,
             column=col,
             sticky="ew",
-            padx=(0 if col == 0 else 6, 0 if col == 1 else 6),
+            padx=(0 if col == 0 else theme.SPACE_2, 0 if col == 1 else theme.SPACE_2),
         )
         inner = ctk.CTkFrame(cell, fg_color="transparent")
-        inner.pack(padx=8, pady=6, fill="x")
+        inner.pack(padx=theme.SPACE_2, pady=theme.SPACE_2, fill="x")
         ctk.CTkLabel(
             inner,
             text=label,
-            font=theme.font(9),
+            font=theme.font(theme.FONT_MICRO),
             text_color=COLORS["muted_fg"],
             anchor="w",
         ).pack(fill="x")
         ctk.CTkLabel(
             inner,
             text=f"${price:,.2f}",
-            font=theme.mono_font(12, "bold"),
+            font=theme.mono_font(theme.FONT_LABEL, "bold"),
             text_color=COLORS["fg"],
             anchor="w",
         ).pack(fill="x")
@@ -282,6 +296,12 @@ class RegistryView(ctk.CTkFrame):
 
         for index, card in enumerate(self._visible_cards()):
             row, col = divmod(index, col_count)
-            card.grid(row=row, column=col, sticky="nsew", padx=6, pady=6)
+            card.grid(
+                row=row,
+                column=col,
+                sticky="nsew",
+                padx=theme.SPACE_2,
+                pady=theme.SPACE_2,
+            )
 
         self._refresh_scrollregion()

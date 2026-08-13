@@ -21,6 +21,15 @@ SRC = PROJECT_ROOT / "src" / "norefund"
 datas = [
     (str(SRC / "config" / "default_models.yaml"), "norefund/config"),
 ]
+datas += [
+    (str(icon_path), "norefund/assets/icons")
+    for icon_path in (SRC / "assets" / "icons").iterdir()
+    if icon_path.is_file()
+]
+datas += [
+    (str(icon_path), "norefund/assets/icons/providers")
+    for icon_path in (SRC / "assets" / "icons" / "providers").iterdir()
+]
 datas += collect_data_files("customtkinter")
 
 hiddenimports = [
