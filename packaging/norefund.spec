@@ -33,6 +33,11 @@ datas += [
 datas += collect_data_files("customtkinter")
 
 hiddenimports = [
+    # PIL.ImageTk resolves this at runtime via a try/except import to find
+    # the right _tkinter shared library; PyInstaller's static analysis can't
+    # see that either, so every CTkImage-bearing widget (i.e. every icon)
+    # fails with "No module named 'PIL._tkinter_finder'" without this.
+    "PIL._tkinter_finder",
     # tiktoken discovers its encoding plugins via pkgutil/namespace-package
     # scanning at import time, which static analysis can't see. Without
     # this, the frozen build fails the first time it loads any encoding.
