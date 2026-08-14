@@ -113,6 +113,12 @@ def test_probe_hf_flags_gated_repos():
     assert "gated" in result.notes.lower()
 
 
+def test_probe_hf_flags_gemma_as_gated():
+    result = resources.probe_hf("google/gemma-2-9b-it")
+    assert result.notes is not None
+    assert "gated" in result.notes.lower()
+
+
 def test_probe_hf_passes_stored_token(tmp_path, monkeypatch):
     fixture = tmp_path / "tokenizer.json"
     fixture.write_bytes(b"1234567890")

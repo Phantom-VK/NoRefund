@@ -20,6 +20,8 @@ SRC = PROJECT_ROOT / "src" / "norefund"
 
 datas = [
     (str(SRC / "config" / "default_models.yaml"), "norefund/config"),
+    (str(SRC / "config" / "model_architectures.yaml"), "norefund/config"),
+    (str(SRC / "config" / "hardware.yaml"), "norefund/config"),
 ]
 datas += [
     (str(icon_path), "norefund/assets/icons")
