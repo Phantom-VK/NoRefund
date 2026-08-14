@@ -32,6 +32,7 @@ _TITLES = {
     "registry": "Model Registry",
     "resources": "Resources",
     "compare": "Compare Models",
+    "fit_check": "Self-Host Fit Check",
 }
 
 
@@ -41,6 +42,7 @@ class MainView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
     VIEW_REGISTRY = "registry"
     VIEW_RESOURCES = "resources"
     VIEW_COMPARE = "compare"
+    VIEW_FIT_CHECK = "fit_check"
 
     def __init__(self, parent) -> None:
         super().__init__(parent, fg_color=COLORS["bg"])
@@ -54,6 +56,7 @@ class MainView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         self._view_cache: dict[str, ctk.CTkFrame] = {}
         self._current_view: str | None = None
         self._file_count = 0
+        self.last_analysis_tokens: int | None = None
 
         self._build_sidebar()
         right = ctk.CTkFrame(self, fg_color=COLORS["bg"], corner_radius=0)
@@ -108,6 +111,7 @@ class MainView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             self.VIEW_COMPARE,
             self.VIEW_REGISTRY,
             self.VIEW_RESOURCES,
+            self.VIEW_FIT_CHECK,
         ]
         for i, view_id in enumerate(view_order, start=1):
             root.bind(f"<Control-Key-{i}>", lambda _e, v=view_id: self.show_view(v))
@@ -166,6 +170,7 @@ class MainView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
                 (self.VIEW_CALCULATOR, "Token Calculator", "calculator"),
                 (self.VIEW_PARSER, "File Parser", "folder_open"),
                 (self.VIEW_COMPARE, "Compare Models", "bar_chart"),
+                (self.VIEW_FIT_CHECK, "Fit Check", "hash"),
             ],
         )
         self._nav_section(
@@ -306,6 +311,9 @@ class MainView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
     # View switching
     # ------------------------------------------------------------------
 
+    def update_last_analysis_tokens(self, count: int) -> None:
+        self.last_analysis_tokens = count
+
     def update_header_count(self, count: int) -> None:
         self._file_count = count
         if self._current_view == self.VIEW_PARSER and count > 0:
@@ -330,7 +338,11 @@ class MainView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             view = self._make_view(view_id)
             view.place(in_=self._content, x=0, y=0, relwidth=1, relheight=1)
             self._view_cache[view_id] = view
-        self._view_cache[view_id].tkraise()
+        active_view = self._view_cache[view_id]
+        active_view.tkraise()
+        on_show = getattr(active_view, "on_show", None)
+        if on_show is not None:
+            on_show()
 
         self._current_view = view_id
         self._header_title.configure(text=_TITLES[view_id])
@@ -357,4 +369,8 @@ class MainView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             from norefund.gui.compare_view import CompareView
 
             return CompareView(self._content, self)
+        if view_id == self.VIEW_FIT_CHECK:
+            from norefund.gui.fit_check_view import FitCheckView
+
+            return FitCheckView(self._content, self)
         raise ValueError(f"Unknown view: {view_id}")

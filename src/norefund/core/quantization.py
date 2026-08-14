@@ -46,6 +46,7 @@ _DISPLAY_NAMES: dict[str, str] = {
     "q5_k_m": "Q5_K_M",
     "q4_k_m": "Q4_K_M",
     "int4": "INT4",
+    "q4_0": "Q4_0",
 }
 
 

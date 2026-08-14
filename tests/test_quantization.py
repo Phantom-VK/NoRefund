@@ -68,3 +68,16 @@ def test_quantization_display_name_unknown_returns_none():
 
 def test_kv_cache_dtype_display_name():
     assert kv_cache_dtype_display_name("fp8") == "FP8 (1 bytes)"
+
+
+def test_kv_cache_dtype_display_name_every_listed_dtype_resolves():
+    # Guards against a dtype existing in _BYTES_PER_KV_ELEMENT (and thus
+    # list_kv_cache_dtypes()) without a matching _DISPLAY_NAMES entry --
+    # q4_0 was missing this way and raised KeyError.
+    for dtype in list_kv_cache_dtypes():
+        assert kv_cache_dtype_display_name(dtype) is not None
+
+
+def test_quantization_display_name_every_listed_level_resolves():
+    for level in list_quantization_levels():
+        assert quantization_display_name(level) is not None

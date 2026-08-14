@@ -644,6 +644,8 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         successful = [r for r in results if r.error is None]
         total_tokens = sum(r.token_count for r in successful)
         total_input_cost = sum(r.estimated_input_cost for r in successful)
+        if total_tokens > 0:
+            self.shell.update_last_analysis_tokens(total_tokens)
         prefix = "Cancelled — " if cancelled else "Done — "
         self._status_left.configure(
             text=f"{prefix}{len(results)} file(s) analysed with {model.display_name}",
