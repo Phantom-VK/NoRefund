@@ -26,6 +26,10 @@ COLORS: dict[str, tuple[str, str]] = {
     "card_fg": ("#0f1117", "#e6edf3"),
     "popover": ("#ffffff", "#242830"),
     "popover_fg": ("#0f1117", "#e6edf3"),
+    # Deliberately distinct from "muted" -- muted's dark value (#242830) is
+    # byte-identical to popover's dark background, so it was invisible as a
+    # row-hover color on dark popovers. This is a step lighter.
+    "popover_hover": ("#e8eaed", "#343b47"),
     "primary": ("#00b894", "#00d4aa"),
     "primary_hover": ("#009f7f", "#00b894"),
     "primary_fg": ("#ffffff", "#0d1117"),

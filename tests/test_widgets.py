@@ -11,6 +11,7 @@ import pytest
 
 ctk = pytest.importorskip("customtkinter")
 
+from norefund.gui.theme import COLORS  # noqa: E402
 from norefund.gui.widgets import DropdownButton, DropdownItem  # noqa: E402
 
 from .conftest import _pump  # noqa: E402
@@ -89,6 +90,59 @@ def test_toggle_twice_closes_without_picking(root):
 
     assert not popover.winfo_exists()
     assert button._popover is None
+
+
+def test_hover_and_selected_row_colors(root):
+    # CTkFrame.bind() redirects to its internal ._canvas -- real mouse
+    # Enter/Leave lands there too, since the canvas fills the frame.
+    button = DropdownButton(root, _ITEMS, "a", on_select=lambda _v: None)
+    button.pack()
+    _pump(root, 20)
+    button._toggle()
+    _pump(root, 20)
+    popover = button._popover
+
+    selected_row = popover.rows["a"]
+    other_row = popover.rows["b"]
+    assert tuple(selected_row.cget("fg_color")) == COLORS["sidebar_accent"]
+    assert other_row.cget("fg_color") == "transparent"
+
+    other_row._canvas.event_generate("<Enter>")
+    _pump(root, 20)
+    assert tuple(other_row.cget("fg_color")) == COLORS["popover_hover"]
+
+    other_row._canvas.event_generate("<Leave>")
+    _pump(root, 20)
+    assert other_row.cget("fg_color") == "transparent"
+
+    # Hovering the selected row itself must not lose its selected tint.
+    selected_row._canvas.event_generate("<Enter>")
+    _pump(root, 20)
+    assert tuple(selected_row.cget("fg_color")) == COLORS["popover_hover"]
+    selected_row._canvas.event_generate("<Leave>")
+    _pump(root, 20)
+    assert tuple(selected_row.cget("fg_color")) == COLORS["sidebar_accent"]
+
+    popover.destroy()
+
+
+def test_popover_follows_window_on_resize(root):
+    button = DropdownButton(root, _ITEMS, "a", on_select=lambda _v: None)
+    button.pack()
+    root.geometry("500x400+0+0")
+    _pump(root, 20)
+
+    button._toggle()
+    _pump(root, 20)
+    popover = button._popover
+    before = popover.geometry()
+
+    root.geometry("900x700+50+50")
+    _pump(root, 20)
+    after = popover.geometry()
+
+    assert after != before
+    popover.destroy()
 
 
 def test_close_all_closes_every_open_popover(root):

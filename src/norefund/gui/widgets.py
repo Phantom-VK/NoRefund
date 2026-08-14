@@ -284,6 +284,32 @@ class ModelDropdownButton(ctk.CTkFrame):
             button.close_popover()
 
 
+def _popover_geometry(anchor, row_count: int, row_height: int) -> str:
+    anchor.update_idletasks()
+    x = anchor.winfo_rootx()
+    y = anchor.winfo_rooty() + anchor.winfo_height() + 2
+    width = max(anchor.winfo_width(), 220)
+    height = min(row_height * row_count, 320)
+    return f"{width}x{height}+{x}+{y}"
+
+
+def _bind_anchor_tracking(popover, anchor, row_count: int, row_height: int):
+    """Keep `popover` glued to `anchor` while the root window moves or
+    resizes (e.g. maximizing) instead of leaving it stranded at the
+    position it had when opened. Returns (root, bind_id) for destroy()
+    to unbind -- otherwise every popover ever opened would leave its
+    closure bound to the root forever."""
+    root = anchor.winfo_toplevel()
+
+    def _reposition(_event=None) -> None:
+        if not popover.winfo_exists() or not anchor.winfo_exists():
+            return
+        popover.geometry(_popover_geometry(anchor, row_count, row_height))
+
+    bind_id = root.bind("<Configure>", _reposition, add="+")
+    return root, bind_id
+
+
 class ModelDropdownPopover(ctk.CTkToplevel):
     """Borderless, non-modal popover listing every model with a colored dot."""
 
@@ -303,11 +329,10 @@ class ModelDropdownPopover(ctk.CTkToplevel):
         self.configure(fg_color=COLORS["popover"])
         self.attributes("-topmost", True)
 
-        anchor.update_idletasks()
-        x = anchor.winfo_rootx()
-        y = anchor.winfo_rooty() + anchor.winfo_height() + 2
-        width = max(anchor.winfo_width(), 220)
-        self.geometry(f"{width}x{min(self._ROW_HEIGHT * len(models), 320)}+{x}+{y}")
+        self.geometry(_popover_geometry(anchor, len(models), self._ROW_HEIGHT))
+        self._track_root, self._track_bind_id = _bind_anchor_tracking(
+            self, anchor, len(models), self._ROW_HEIGHT
+        )
 
         scroll = ctk.CTkScrollableFrame(self, fg_color=COLORS["popover"])
         scroll.pack(fill="both", expand=True, padx=1, pady=1)
@@ -380,6 +405,10 @@ class ModelDropdownPopover(ctk.CTkToplevel):
             self.destroy()
 
     def destroy(self) -> None:
+        try:
+            self._track_root.unbind("<Configure>", self._track_bind_id)
+        except TclError:
+            pass
         if self._anchor._popover is self:
             self._anchor._clear_popover()
         super().destroy()
@@ -523,16 +552,20 @@ class DropdownPopover(ctk.CTkToplevel):
         self.configure(fg_color=COLORS["popover"])
         self.attributes("-topmost", True)
 
-        anchor.update_idletasks()
-        x = anchor.winfo_rootx()
-        y = anchor.winfo_rooty() + anchor.winfo_height() + 2
-        width = max(anchor.winfo_width(), 220)
-        self.geometry(f"{width}x{min(self._ROW_HEIGHT * len(items), 320)}+{x}+{y}")
+        self.geometry(_popover_geometry(anchor, len(items), self._ROW_HEIGHT))
+        self._track_root, self._track_bind_id = _bind_anchor_tracking(
+            self, anchor, len(items), self._ROW_HEIGHT
+        )
 
         scroll = ctk.CTkScrollableFrame(self, fg_color=COLORS["popover"])
         scroll.pack(fill="both", expand=True, padx=1, pady=1)
         bind_mousewheel(scroll)
 
+        # Rows keyed by value -- CTkFrame draws its rounded background via
+        # internal implementation-detail children, so external code (tests)
+        # can't reliably rediscover a specific row via winfo_children()
+        # tree-walking; this is the one reliable handle onto it.
+        self.rows: dict[str, ctk.CTkFrame] = {}
         for item in items:
             self._build_row(scroll, item, is_selected=item.value == selected_value)
 
@@ -548,6 +581,7 @@ class DropdownPopover(ctk.CTkToplevel):
 
         row = ctk.CTkFrame(scroll, fg_color=resting_color, cursor="hand2")
         row.pack(fill="x", pady=1)
+        self.rows[item.value] = row
         widgets = [row]
 
         if item.icon is not None:
@@ -577,7 +611,8 @@ class DropdownPopover(ctk.CTkToplevel):
         for widget in widgets:
             widget.bind("<Button-1>", lambda _e, v=item.value: self._pick(v))
             widget.bind(
-                "<Enter>", lambda _e, r=row: r.configure(fg_color=COLORS["muted"])
+                "<Enter>",
+                lambda _e, r=row: r.configure(fg_color=COLORS["popover_hover"]),
             )
             widget.bind(
                 "<Leave>", lambda _e, r=row, rc=resting_color: r.configure(fg_color=rc)
@@ -621,6 +656,10 @@ class DropdownPopover(ctk.CTkToplevel):
             self.destroy()
 
     def destroy(self) -> None:
+        try:
+            self._track_root.unbind("<Configure>", self._track_bind_id)
+        except TclError:
+            pass
         if self._anchor._popover is self:
             self._anchor._clear_popover()
         super().destroy()
