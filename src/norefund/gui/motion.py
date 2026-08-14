@@ -42,30 +42,49 @@ def press_feedback(button, *, alpha: float = 0.15) -> None:
     instead, since there's no solid fg_color to darken. A short floor
     keeps fast clicks visually registering even when press and release
     land in the same event-loop tick.
+
+    For a toggle/selection button (e.g. a filter pill), `command` runs as
+    part of the same ButtonRelease-1 event, before this handler, and may
+    recolor the button to reflect its new resting state (selected vs not).
+    The scheduled restore only reverts fg_color if nothing has touched it
+    since the press-darken was applied -- otherwise it would clobber the
+    command's recolor a moment after it happens.
     """
-    original_fg = button.cget("fg_color")
-    hover = button.cget("hover_color")
-    reference = original_fg if original_fg not in (None, "transparent") else hover
-    if reference in (None, "transparent"):
-        return
-    ref_light, ref_dark = _as_pair(reference)
-    pressed = (
-        formatting.tint("#000000", ref_light, alpha),
-        formatting.tint("#000000", ref_dark, alpha),
-    )
-    state = {"pressed_at": 0.0}
+    state = {"pressed_at": 0.0, "original_fg": None, "pressed_fg": None}
 
     def _on_press(_event=None) -> None:
+        original_fg = button.cget("fg_color")
+        hover = button.cget("hover_color")
+        reference = original_fg if original_fg not in (None, "transparent") else hover
+        if reference in (None, "transparent"):
+            state["original_fg"] = None
+            return
+        ref_light, ref_dark = _as_pair(reference)
+        pressed = (
+            formatting.tint("#000000", ref_light, alpha),
+            formatting.tint("#000000", ref_dark, alpha),
+        )
         state["pressed_at"] = time.monotonic()
+        state["original_fg"] = original_fg
+        state["pressed_fg"] = pressed
         _safe_configure(button, fg_color=pressed)
 
     def _on_release(_event=None) -> None:
+        original_fg = state["original_fg"]
+        if original_fg is None:
+            return
         elapsed_ms = (time.monotonic() - state["pressed_at"]) * 1000
         remaining = max(0, _PRESS_FLOOR_MS - int(elapsed_ms))
+
+        def _restore() -> None:
+            if not button.winfo_exists():
+                return
+            current = _as_pair(button.cget("fg_color"))
+            if current == _as_pair(state["pressed_fg"]):
+                _safe_configure(button, fg_color=original_fg)
+
         try:
-            button.after(
-                remaining, lambda: _safe_configure(button, fg_color=original_fg)
-            )
+            button.after(remaining, _restore)
         except (TclError, RuntimeError):
             pass
 

@@ -450,7 +450,7 @@ class DropdownPopover(ctk.CTkToplevel):
         label = tk.Label(
             row,
             text=item.label,
-            font=theme.font(theme.FONT_LABEL),
+            font=theme.font(theme.FONT_BODY),
             fg=text_hex,
             bg=resting_hex,
             bd=0,
