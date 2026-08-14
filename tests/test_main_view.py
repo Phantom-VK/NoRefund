@@ -73,7 +73,7 @@ def _build_main_view(
     return view
 
 
-def test_show_view_builds_all_five_views_without_raising(root, monkeypatch):
+def test_show_view_builds_all_six_views_without_raising(root, monkeypatch):
     view = _build_main_view(root, monkeypatch)
     for view_id in (
         MainView.VIEW_CALCULATOR,
@@ -81,6 +81,7 @@ def test_show_view_builds_all_five_views_without_raising(root, monkeypatch):
         MainView.VIEW_REGISTRY,
         MainView.VIEW_RESOURCES,
         MainView.VIEW_COMPARE,
+        MainView.VIEW_FIT_CHECK,
     ):
         view.show_view(view_id)
         _pump(root, 30)
@@ -147,6 +148,7 @@ def test_ctrl_shortcuts_route_to_correct_view(root, monkeypatch):
         ("3", MainView.VIEW_COMPARE),
         ("4", MainView.VIEW_REGISTRY),
         ("5", MainView.VIEW_RESOURCES),
+        ("6", MainView.VIEW_FIT_CHECK),
     ]
     for key, view_id in expected:
         root.event_generate(f"<Control-Key-{key}>")

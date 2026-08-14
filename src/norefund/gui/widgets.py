@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import tkinter as tk
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from tkinter import TclError
 from typing import ClassVar
@@ -198,27 +200,93 @@ class SidebarItem(ctk.CTkButton):
         )
 
 
-class ModelDropdownButton(ctk.CTkFrame):
-    """Trigger button showing a colored provider dot + model label + chevron.
+@dataclass(frozen=True)
+class DropdownItem:
+    """One selectable row: a stable `value`, its display `label`, and an
+    optional leading icon."""
 
-    Opens a non-modal ModelDropdownPopover on click (no grab_set — avoids the
-    grab-race bug class the old Settings modal used to hit).
+    value: str
+    label: str
+    icon: ctk.CTkImage | None = None
+
+
+def _popover_geometry(anchor, row_count: int, row_height: int) -> str:
+    anchor.update_idletasks()
+    x = anchor.winfo_rootx()
+    y = anchor.winfo_rooty() + anchor.winfo_height() + 2
+    width = max(anchor.winfo_width(), 220)
+    height = min(row_height * row_count, 320)
+    return f"{width}x{height}+{x}+{y}"
+
+
+_root_tracking_installed: set[int] = set()
+
+
+def _ensure_root_tracking(root) -> None:
+    """Install (once per root window, ever) a watcher that keeps every open
+    DropdownPopover glued to its trigger field while the window moves or
+    resizes (e.g. maximizing) -- otherwise a popover left open during a
+    resize is stranded at its old screen position.
+
+    Installed once and shared across every popover, like bind_mousewheel()
+    / DropdownPopover._ensure_click_watch(): binding+unbinding a fresh
+    <Configure> handler on every single open/close would mean accumulating
+    one live Tcl-level handler per dropdown interaction ever made in the
+    session (and each open constructs/destroys the popover before the
+    matching unbind can run in the fast toggle-twice-to-close case).
+    """
+    root_id = id(root)
+    if root_id in _root_tracking_installed:
+        return
+    _root_tracking_installed.add(root_id)
+    root.bind(
+        "<Destroy>", lambda _e: _root_tracking_installed.discard(root_id), add="+"
+    )
+
+    def _reposition_open_popovers(event=None) -> None:
+        # Tk's bindtags put the toplevel's pathname in every descendant's
+        # bindtags, so a plain root.bind("<Configure>", ...) (not bind_all)
+        # fires for every descendant's Configure too, not just the root
+        # window's own resize/move -- filter to the real thing.
+        if event is not None and event.widget is not root:
+            return
+        for button in list(DropdownButton._open):
+            popover = button._popover
+            if popover is None or not popover.winfo_exists():
+                continue
+            if not button.winfo_exists():
+                continue
+            popover.geometry(
+                _popover_geometry(button, popover._row_count, popover._ROW_HEIGHT)
+            )
+
+    root.bind("<Configure>", _reposition_open_popovers, add="+")
+
+
+class DropdownButton(ctk.CTkFrame):
+    """The one dropdown component used everywhere a value is picked from a
+    list: trigger button (optional icon + label + chevron) that opens a
+    non-modal, width-matched, scrollable popover on click, with hover and
+    selected-row highlighting.
+
+    Generic over `DropdownItem.value` (a plain string) -- `ModelDropdownButton`
+    below is a thin ModelInfo-specific wrapper around this same popover.
 
     Tracks every instance with an open popover in a class-level registry so
     callers that switch screens (e.g. MainView.show_view) can force-close
-    any dropdown left open on the screen being navigated away from — the
+    any dropdown left open on the screen being navigated away from -- the
     popover is a separate CTkToplevel, so raising a different view frame on
     top of it does nothing to make it go away on its own.
     """
 
-    _open: ClassVar[set[ModelDropdownButton]] = set()
+    _open: ClassVar[set[DropdownButton]] = set()
 
     def __init__(
         self,
         parent,
-        models: list[ModelInfo],
-        selected: ModelInfo,
-        on_select: Callable[[ModelInfo], None],
+        items: list[DropdownItem],
+        selected_value: str,
+        on_select: Callable[[str], None],
         **kwargs,
     ) -> None:
         super().__init__(
@@ -228,49 +296,69 @@ class ModelDropdownButton(ctk.CTkFrame):
             cursor="hand2",
             **kwargs,
         )
-        self._models = models
-        self._selected = selected
+        self._items = items
+        self._selected_value = selected_value
         self._on_select = on_select
-        self._popover: ModelDropdownPopover | None = None
+        self._popover: DropdownPopover | None = None
 
-        self._dot = provider_mark(self, selected.provider)
-        self._dot.pack(side="left", padx=(10, theme.SPACE_2), pady=theme.SPACE_2)
-        self._label = ctk.CTkLabel(
-            self,
-            text=formatting.model_label(selected),
-            font=theme.font(theme.FONT_LABEL),
-            anchor="w",
+        self._icon_label = ctk.CTkLabel(self, text="")
+        self._text_label = ctk.CTkLabel(
+            self, text="", font=theme.font(theme.FONT_LABEL), anchor="w"
         )
-        self._label.pack(side="left", fill="x", expand=True, pady=theme.SPACE_2)
+        self._text_label.pack(
+            side="left", fill="x", expand=True, padx=(10, theme.SPACE_2),
+            pady=theme.SPACE_2,
+        )
         self._chevron = ctk.CTkLabel(
             self,
             text="",
             image=theme.icon_image("chevron_down", size=12, color=COLORS["muted_fg"]),
         )
         self._chevron.pack(side="right", padx=(theme.SPACE_2, 10), pady=theme.SPACE_2)
+        self._sync_display()
 
-        for widget in (self, self._dot, self._label, self._chevron):
+        for widget in (self, self._icon_label, self._text_label, self._chevron):
             widget.bind("<Button-1>", self._toggle)
 
-    def selected_model(self) -> ModelInfo:
-        return self._selected
+    def _item_for(self, value: str) -> DropdownItem | None:
+        return next((item for item in self._items if item.value == value), None)
+
+    def _sync_display(self) -> None:
+        item = self._item_for(self._selected_value)
+        self._text_label.configure(text=item.label if item is not None else "")
+        if item is not None and item.icon is not None:
+            self._icon_label.configure(image=item.icon)
+            self._icon_label.pack(
+                side="left", padx=(10, theme.SPACE_2), pady=theme.SPACE_2,
+                before=self._text_label,
+            )
+        else:
+            self._icon_label.pack_forget()
+
+    def selected_value(self) -> str:
+        return self._selected_value
+
+    def select(self, value: str) -> None:
+        """Change the selection without firing `on_select` (external sync)."""
+        self._selected_value = value
+        self._sync_display()
 
     def _toggle(self, _event=None) -> None:
         if self._popover is not None and self._popover.winfo_exists():
             self._popover.destroy()
             return
-        self._popover = ModelDropdownPopover(self, self._models, self._select)
-        ModelDropdownButton._open.add(self)
+        self._popover = DropdownPopover(
+            self, self._items, self._selected_value, self._pick
+        )
+        DropdownButton._open.add(self)
 
-    def _select(self, model: ModelInfo) -> None:
-        self._selected = model
-        set_provider_mark(self._dot, model.provider)
-        self._label.configure(text=formatting.model_label(model))
-        self._on_select(model)
+    def _pick(self, value: str) -> None:
+        self.select(value)
+        self._on_select(value)
 
     def _clear_popover(self) -> None:
         self._popover = None
-        ModelDropdownButton._open.discard(self)
+        DropdownButton._open.discard(self)
 
     def close_popover(self) -> None:
         if self._popover is not None and self._popover.winfo_exists():
@@ -278,58 +366,131 @@ class ModelDropdownButton(ctk.CTkFrame):
 
     @classmethod
     def close_all(cls) -> None:
-        """Close every open dropdown popover, regardless of which screen opened it."""
+        """Close every open popover, regardless of which screen opened it."""
         for button in list(cls._open):
             button.close_popover()
 
 
-class ModelDropdownPopover(ctk.CTkToplevel):
-    """Borderless, non-modal popover listing every model with a colored dot."""
+class DropdownPopover(ctk.CTkToplevel):
+    """Borderless, non-modal, scrollable popover for `DropdownButton`.
+
+    Width matches the trigger (never narrower than 220px); the currently
+    selected row is tinted and check-marked at rest, and every row
+    highlights on hover.
+
+    Rows are built with plain tkinter.Frame/Label, not CTkFrame/CTkLabel:
+    CTkFrame draws its rounded background via an internal Canvas +
+    DrawEngine, which measured ~5-10ms per widget -- for a 28-row list
+    (rebuilt from scratch on every open, since a value can change any time
+    the popover is closed) that's ~300ms of visible lag opening a single
+    dropdown. Plain tkinter rows carry no rounding/scaling/appearance-mode
+    machinery and cut that to ~50ms; the resting color is resolved to a
+    flat hex up front instead, since plain tk widgets don't auto-track
+    light/dark mode the way COLORS tuples do.
+    """
 
     _ROW_HEIGHT = theme.CONTROL_LG
     _click_watch_installed: ClassVar[bool] = False
 
     def __init__(
         self,
-        anchor: ModelDropdownButton,
-        models: list[ModelInfo],
-        on_select: Callable[[ModelInfo], None],
+        anchor: DropdownButton,
+        items: list[DropdownItem],
+        selected_value: str,
+        on_pick: Callable[[str], None],
     ) -> None:
         super().__init__(anchor)
         self._anchor = anchor
-        self._on_select = on_select
+        self._on_pick = on_pick
+        self._row_count = len(items)
+        self._icon_photos: list = []  # keep CTkImage-derived PhotoImages alive
         self.overrideredirect(True)
         self.configure(fg_color=COLORS["popover"])
         self.attributes("-topmost", True)
 
-        anchor.update_idletasks()
-        x = anchor.winfo_rootx()
-        y = anchor.winfo_rooty() + anchor.winfo_height() + 2
-        width = max(anchor.winfo_width(), 220)
-        self.geometry(f"{width}x{min(self._ROW_HEIGHT * len(models), 320)}+{x}+{y}")
+        self.geometry(_popover_geometry(anchor, self._row_count, self._ROW_HEIGHT))
+        _ensure_root_tracking(anchor.winfo_toplevel())
 
         scroll = ctk.CTkScrollableFrame(self, fg_color=COLORS["popover"])
         scroll.pack(fill="both", expand=True, padx=1, pady=1)
         bind_mousewheel(scroll)
 
-        for model in models:
-            row = ctk.CTkFrame(scroll, fg_color="transparent", cursor="hand2")
-            row.pack(fill="x", pady=1)
-            dot = provider_mark(row, model.provider)
-            dot.pack(side="left", padx=(8, theme.SPACE_2), pady=theme.SPACE_2)
-            label = ctk.CTkLabel(
-                row,
-                text=formatting.model_label(model),
-                font=theme.font(theme.FONT_LABEL),
-                anchor="w",
+        is_dark = ctk.get_appearance_mode() == "Dark"
+        # Rows keyed by value, for tests and any future keyboard-nav code --
+        # plain tkinter.Frame rows are directly discoverable via
+        # winfo_children() (unlike CTkFrame's internal-canvas indirection),
+        # but a stable dict is still clearer than tree-walking by index.
+        self.rows: dict[str, tk.Frame] = {}
+        for item in items:
+            self._build_row(
+                scroll, item, is_selected=item.value == selected_value, is_dark=is_dark
             )
-            label.pack(side="left", fill="x", expand=True, pady=theme.SPACE_2)
-            for widget in (row, dot, label):
-                widget.bind("<Button-1>", lambda _e, m=model: self._pick(m))
 
         self.bind("<Escape>", lambda _e: self.destroy())
         self.after(10, self._grab_focus)
-        ModelDropdownPopover._ensure_click_watch(self)
+        DropdownPopover._ensure_click_watch(self)
+
+    def _build_row(
+        self, scroll, item: DropdownItem, *, is_selected: bool, is_dark: bool
+    ) -> None:
+        resting_hex = theme.resolve(
+            "sidebar_accent" if is_selected else "popover", is_dark
+        )
+        text_hex = theme.resolve(
+            "sidebar_accent_fg" if is_selected else "popover_fg", is_dark
+        )
+        hover_hex = theme.resolve("popover_hover", is_dark)
+
+        row = tk.Frame(
+            scroll, bg=resting_hex, bd=0, highlightthickness=0, cursor="hand2"
+        )
+        row.pack(fill="x", pady=1)
+        self.rows[item.value] = row
+        widgets = [row]
+
+        if item.icon is not None:
+            mode = "dark" if is_dark else "light"
+            widget_scaling = ctk.ScalingTracker.get_widget_scaling(scroll)
+            photo = item.icon.create_scaled_photo_image(widget_scaling, mode)
+            self._icon_photos.append(photo)
+            icon_label = tk.Label(row, image=photo, bg=resting_hex, bd=0)
+            icon_label.pack(side="left", padx=(8, theme.SPACE_2), pady=theme.SPACE_2)
+            widgets.append(icon_label)
+
+        label = tk.Label(
+            row,
+            text=item.label,
+            font=theme.font(theme.FONT_BODY),
+            fg=text_hex,
+            bg=resting_hex,
+            bd=0,
+            anchor="w",
+        )
+        label.pack(
+            side="left", fill="x", expand=True, padx=(0, theme.SPACE_2),
+            pady=theme.SPACE_2,
+        )
+        widgets.append(label)
+
+        if is_selected:
+            check_icon = theme.icon_image("check", size=14, color=COLORS["primary"])
+            widget_scaling = ctk.ScalingTracker.get_widget_scaling(scroll)
+            check_photo = check_icon.create_scaled_photo_image(
+                widget_scaling, "dark" if is_dark else "light"
+            )
+            self._icon_photos.append(check_photo)
+            check = tk.Label(row, image=check_photo, bg=resting_hex, bd=0)
+            check.pack(side="right", padx=(theme.SPACE_2, 8))
+            widgets.append(check)
+
+        def _set_bg(color: str) -> None:
+            for widget in widgets:
+                widget.configure(bg=color)
+
+        for widget in widgets:
+            widget.bind("<Button-1>", lambda _e, v=item.value: self._pick(v))
+            widget.bind("<Enter>", lambda _e, c=hover_hex: _set_bg(c))
+            widget.bind("<Leave>", lambda _e, c=resting_hex: _set_bg(c))
 
     def _grab_focus(self) -> None:
         if self.winfo_exists():
@@ -337,16 +498,6 @@ class ModelDropdownPopover(ctk.CTkToplevel):
 
     @classmethod
     def _ensure_click_watch(cls, widget) -> None:
-        """Install (once, app-wide) a click-outside-closes watcher.
-
-        Popovers are borderless overrideredirect(True) Toplevels, which many
-        window managers never hand real focus to -- so the previous approach
-        of closing on <FocusOut> was unreliable (it could simply never fire).
-        A global <Button-1> watch that checks the click's actual target
-        against the open popover's widget tree works regardless of the WM's
-        focus-routing behavior. Installed once, like bind_mousewheel(), since
-        unbind_all() can't remove a single handler once added.
-        """
         if cls._click_watch_installed:
             return
         cls._click_watch_installed = True
@@ -355,7 +506,7 @@ class ModelDropdownPopover(ctk.CTkToplevel):
             target = event.widget
             if isinstance(target, str):
                 return
-            for button in list(ModelDropdownButton._open):
+            for button in list(DropdownButton._open):
                 popover = button._popover
                 if popover is None or not popover.winfo_exists():
                     continue
@@ -373,8 +524,8 @@ class ModelDropdownPopover(ctk.CTkToplevel):
             widget = getattr(widget, "master", None)
         return False
 
-    def _pick(self, model: ModelInfo) -> None:
-        self._on_select(model)
+    def _pick(self, value: str) -> None:
+        self._on_pick(value)
         if self.winfo_exists():
             self.destroy()
 
@@ -382,6 +533,40 @@ class ModelDropdownPopover(ctk.CTkToplevel):
         if self._anchor._popover is self:
             self._anchor._clear_popover()
         super().destroy()
+
+
+class ModelDropdownButton(DropdownButton):
+    """ModelInfo-specific convenience wrapper around DropdownButton: turns
+    a model list into DropdownItems (provider icon + priced label) so
+    Calculator/Parser/Compare keep working with ModelInfo objects instead
+    of raw ids. Shares DropdownButton's `_open` registry (not redeclared
+    here), so DropdownButton.close_all() closes these popovers too."""
+
+    def __init__(
+        self,
+        parent,
+        models: list[ModelInfo],
+        selected: ModelInfo,
+        on_select: Callable[[ModelInfo], None],
+        **kwargs,
+    ) -> None:
+        self._models_by_id = {m.id: m for m in models}
+        items = [
+            DropdownItem(
+                value=m.id,
+                label=formatting.model_label(m),
+                icon=theme.provider_icon_or_dot(m.provider, size=14),
+            )
+            for m in models
+        ]
+        self._raw_on_select = on_select
+        super().__init__(parent, items, selected.id, self._handle_select, **kwargs)
+
+    def _handle_select(self, value: str) -> None:
+        self._raw_on_select(self._models_by_id[value])
+
+    def selected_model(self) -> ModelInfo:
+        return self._models_by_id[self.selected_value()]
 
 
 class NoticeBanner(ctk.CTkFrame):
@@ -604,17 +789,6 @@ def provider_mark(parent, provider: str, *, size: int = 14, **kwargs) -> ctk.CTk
     if icon is not None:
         return ctk.CTkLabel(parent, text="", image=icon, **kwargs)
     return status_dot(parent, color=theme.provider_color(provider), **kwargs)
-
-
-def set_provider_mark(label: ctk.CTkLabel, provider: str, *, size: int = 14) -> None:
-    """Update a provider_mark() label in place after the selection changes."""
-    icon = theme.provider_icon(provider, size=size)
-    if icon is not None:
-        label.configure(image=icon, fg_color="transparent")
-    else:
-        label.configure(
-            image=theme.blank_icon(size=size), fg_color=theme.provider_color(provider)
-        )
 
 
 def section_label(
