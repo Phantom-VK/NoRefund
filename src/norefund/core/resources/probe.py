@@ -17,7 +17,7 @@ from norefund.core.resources.types import TokenizerResource
 
 _LOG = logging.getLogger(__name__)
 
-_GATED_HF_PREFIXES = ("meta-llama/",)
+_GATED_HF_PREFIXES = ("meta-llama/", "google/gemma-")
 
 
 def canonical_tiktoken_encoding(tokenizer_name: str) -> str:
