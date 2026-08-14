@@ -19,11 +19,26 @@ from norefund.core.quantization import (
 from norefund.core.selfhost import FitResult, evaluate_fit
 from norefund.gui import formatting, theme
 from norefund.gui.theme import COLORS
-from norefund.gui.widgets import ContextBar, StatPill, bind_mousewheel, card
+from norefund.gui.widgets import (
+    ContextBar,
+    DropdownButton,
+    DropdownItem,
+    StatPill,
+    bind_mousewheel,
+    card,
+    section_label,
+)
 
 _DEFAULT_CONTEXT = "8192"
 _DEFAULT_QUANTIZATION = "q4_k_m"
 _DEFAULT_KV_CACHE_DTYPE = "fp16"
+
+
+def _vendor_icon(vendor: str) -> ctk.CTkImage | None:
+    """A small brand-color icon for a model's vendor, if one is bundled --
+    optional per DropdownItem, so vendors like Qwen (no bundled mark) just
+    show a plain label row."""
+    return theme.provider_icon(vendor, size=14)
 
 
 class FitCheckView(ctk.CTkFrame):
@@ -34,186 +49,56 @@ class FitCheckView(ctk.CTkFrame):
 
         self._architectures = list_architectures()
         self._hardware = list_hardware()
-        self._arch_by_label: dict[str, ModelArchitecture] = {
-            a.display_name: a for a in self._architectures
+        self._arch_by_id: dict[str, ModelArchitecture] = {
+            a.id: a for a in self._architectures
         }
-        self._hw_by_label: dict[str, HardwareTarget] = {
-            h.display_name: h for h in self._hardware
-        }
-        self._quant_by_label: dict[str, str] = {
-            quantization_display_name(level): level
+        self._hw_by_id: dict[str, HardwareTarget] = {h.id: h for h in self._hardware}
+
+        self._model_items = [
+            DropdownItem(value=a.id, label=a.display_name, icon=_vendor_icon(a.vendor))
+            for a in self._architectures
+        ]
+        self._hw_items = [
+            DropdownItem(value=h.id, label=h.display_name) for h in self._hardware
+        ]
+        self._quant_items = [
+            DropdownItem(value=level, label=quantization_display_name(level))
             for level in list_quantization_levels()
-        }
-        self._kv_by_label: dict[str, str] = {
-            kv_cache_dtype_display_name(dtype): dtype
+        ]
+        self._kv_items = [
+            DropdownItem(value=dtype, label=kv_cache_dtype_display_name(dtype))
             for dtype in list_kv_cache_dtypes()
-        }
+        ]
 
         self._build_layout()
         self._recalculate()
 
-    def _option_menu(self, parent, values: list[str], variable: ctk.StringVar):
-        return ctk.CTkOptionMenu(
-            parent,
-            values=values,
-            variable=variable,
-            height=theme.CONTROL_MD,
-            font=theme.font(theme.FONT_LABEL),
-            fg_color=COLORS["input_bg"],
-            text_color=COLORS["fg"],
-            button_color=COLORS["muted"],
-            button_hover_color=COLORS["border"],
-            dropdown_fg_color=COLORS["popover"],
-            dropdown_text_color=COLORS["popover_fg"],
-            dropdown_hover_color=COLORS["muted"],
-            command=lambda _v: self._recalculate(),
-        )
-
     # ------------------------------------------------------------------
-    # Layout
+    # Layout -- single pane: results on top, configuration at the bottom.
     # ------------------------------------------------------------------
 
     def _build_layout(self) -> None:
-        body = ctk.CTkFrame(self, fg_color=COLORS["bg"])
-        body.pack(fill="both", expand=True)
-        body.columnconfigure(0, weight=0, minsize=360)
-        body.columnconfigure(1, weight=1)
-        body.rowconfigure(0, weight=1)
-
-        left = ctk.CTkScrollableFrame(body, fg_color=COLORS["bg"], width=360)
-        left.grid(
-            row=0, column=0, sticky="ns", padx=(theme.SPACE_4, theme.SPACE_2),
-            pady=theme.SPACE_4,
+        scroll = ctk.CTkScrollableFrame(self, fg_color=COLORS["bg"])
+        scroll.pack(
+            fill="both", expand=True, padx=theme.PAGE_GUTTER, pady=theme.SPACE_5
         )
-        bind_mousewheel(left)
-        self._build_model_card(left)
-        self._build_precision_card(left)
-        self._build_context_card(left)
-        self._build_hardware_card(left)
+        bind_mousewheel(scroll)
 
-        right = ctk.CTkScrollableFrame(body, fg_color=COLORS["bg"])
-        right.grid(
-            row=0, column=1, sticky="nsew", padx=(theme.SPACE_2, theme.SPACE_4),
-            pady=theme.SPACE_4,
-        )
-        bind_mousewheel(right)
-        self._build_results_area(right)
+        self._build_verdict(scroll)
+        self._build_utilization_card(scroll)
+        self._build_breakdown_card(scroll)
+        self._build_concurrency_card(scroll)
+        self._build_config_card(scroll)
+        self._warnings_frame = ctk.CTkFrame(scroll, fg_color="transparent")
+        self._warnings_frame.pack(fill="x")
 
-    def _build_model_card(self, parent) -> None:
-        card_frame = card(parent)
-        card_frame.pack(fill="x", pady=(0, theme.SPACE_3))
-        inner = ctk.CTkFrame(card_frame, fg_color="transparent")
-        inner.pack(fill="x", padx=theme.CARD_PAD_X, pady=theme.CARD_PAD_Y)
-
-        ctk.CTkLabel(
-            inner,
-            text="Model",
-            font=theme.font(theme.FONT_BODY, "bold"),
-            text_color=COLORS["fg"],
-        ).pack(anchor="w", pady=(0, theme.SPACE_2))
-
-        self._model_var = ctk.StringVar(value=self._architectures[0].display_name)
-        self._option_menu(
-            inner, list(self._arch_by_label.keys()), self._model_var
-        ).pack(fill="x")
-
-    def _build_precision_card(self, parent) -> None:
-        card_frame = card(parent)
-        card_frame.pack(fill="x", pady=(0, theme.SPACE_3))
-        inner = ctk.CTkFrame(card_frame, fg_color="transparent")
-        inner.pack(fill="x", padx=theme.CARD_PAD_X, pady=theme.CARD_PAD_Y)
-
-        ctk.CTkLabel(
-            inner,
-            text="Precision",
-            font=theme.font(theme.FONT_BODY, "bold"),
-            text_color=COLORS["fg"],
-        ).pack(anchor="w", pady=(0, theme.SPACE_2))
-
-        quant_labels = list(self._quant_by_label.keys())
-        default_quant_label = next(
-            (lbl for lbl, key in self._quant_by_label.items()
-             if key == _DEFAULT_QUANTIZATION),
-            quant_labels[0],
-        )
-        ctk.CTkLabel(
-            inner,
-            text="Weight quantization",
-            font=theme.font(theme.FONT_SMALL),
-            text_color=COLORS["muted_fg"],
-            anchor="w",
-        ).pack(fill="x")
-        self._quant_var = ctk.StringVar(value=default_quant_label)
-        self._option_menu(inner, quant_labels, self._quant_var).pack(
-            fill="x", pady=(0, theme.SPACE_3)
-        )
-
-        kv_labels = list(self._kv_by_label.keys())
-        default_kv_label = next(
-            (lbl for lbl, key in self._kv_by_label.items()
-             if key == _DEFAULT_KV_CACHE_DTYPE),
-            kv_labels[0],
-        )
-        ctk.CTkLabel(
-            inner,
-            text="KV cache precision",
-            font=theme.font(theme.FONT_SMALL),
-            text_color=COLORS["muted_fg"],
-            anchor="w",
-        ).pack(fill="x")
-        self._kv_var = ctk.StringVar(value=default_kv_label)
-        self._option_menu(inner, kv_labels, self._kv_var).pack(fill="x")
-
-    def _build_context_card(self, parent) -> None:
-        card_frame = card(parent)
-        card_frame.pack(fill="x", pady=(0, theme.SPACE_3))
-        inner = ctk.CTkFrame(card_frame, fg_color="transparent")
-        inner.pack(fill="x", padx=theme.CARD_PAD_X, pady=theme.CARD_PAD_Y)
-
-        ctk.CTkLabel(
-            inner,
-            text="Context needed",
-            font=theme.font(theme.FONT_BODY, "bold"),
-            text_color=COLORS["fg"],
-        ).pack(anchor="w", pady=(0, theme.SPACE_2))
-
-        self._context_var = ctk.StringVar(value=_DEFAULT_CONTEXT)
-        entry = ctk.CTkEntry(
-            inner,
-            textvariable=self._context_var,
-            height=theme.CONTROL_MD,
-            font=theme.mono_font(theme.FONT_TITLE),
-            fg_color=COLORS["input_bg"],
-            border_width=0,
-        )
-        entry.pack(fill="x")
-        entry.bind("<KeyRelease>", self._on_context_edited)
-
-    def _build_hardware_card(self, parent) -> None:
-        card_frame = card(parent)
-        card_frame.pack(fill="x", pady=(0, theme.SPACE_3))
-        inner = ctk.CTkFrame(card_frame, fg_color="transparent")
-        inner.pack(fill="x", padx=theme.CARD_PAD_X, pady=theme.CARD_PAD_Y)
-
-        ctk.CTkLabel(
-            inner,
-            text="Hardware",
-            font=theme.font(theme.FONT_BODY, "bold"),
-            text_color=COLORS["fg"],
-        ).pack(anchor="w", pady=(0, theme.SPACE_2))
-
-        self._hw_var = ctk.StringVar(value=self._hardware[0].display_name)
-        self._option_menu(
-            inner, list(self._hw_by_label.keys()), self._hw_var
-        ).pack(fill="x")
-
-    def _build_results_area(self, parent) -> None:
-        self._verdict_row = ctk.CTkFrame(parent, fg_color="transparent")
-        self._verdict_row.pack(fill="x", pady=(0, theme.SPACE_1))
-        self._verdict_icon = ctk.CTkLabel(self._verdict_row, text="")
+    def _build_verdict(self, parent) -> None:
+        verdict_row = ctk.CTkFrame(parent, fg_color="transparent")
+        verdict_row.pack(fill="x", pady=(0, theme.SPACE_1))
+        self._verdict_icon = ctk.CTkLabel(verdict_row, text="")
         self._verdict_icon.pack(side="left", padx=(0, theme.SPACE_2))
         self._verdict_text = ctk.CTkLabel(
-            self._verdict_row,
+            verdict_row,
             text="",
             font=theme.font(theme.FONT_HEADING, "bold"),
             anchor="w",
@@ -232,6 +117,7 @@ class FitCheckView(ctk.CTkFrame):
             justify="left",
         )
 
+    def _build_utilization_card(self, parent) -> None:
         util_card = card(parent)
         util_card.pack(fill="x", pady=(theme.SPACE_2, theme.SPACE_3))
         util_inner = ctk.CTkFrame(util_card, fg_color="transparent")
@@ -252,37 +138,127 @@ class FitCheckView(ctk.CTkFrame):
         self._util_bar = ContextBar(util_inner)
         self._util_bar.pack(fill="x")
 
+    def _build_breakdown_card(self, parent) -> None:
         breakdown_card = card(parent)
         breakdown_card.pack(fill="x", pady=(0, theme.SPACE_3))
-        self._breakdown_grid = ctk.CTkFrame(breakdown_card, fg_color="transparent")
-        self._breakdown_grid.pack(
-            fill="x", padx=theme.CARD_PAD_X, pady=theme.CARD_PAD_Y
-        )
-        self._breakdown_grid.columnconfigure((0, 1, 2), weight=1)
-        self._weights_pill = StatPill(self._breakdown_grid, "Weights")
+        grid = ctk.CTkFrame(breakdown_card, fg_color="transparent")
+        grid.pack(fill="x", padx=theme.CARD_PAD_X, pady=theme.CARD_PAD_Y)
+        grid.columnconfigure((0, 1, 2), weight=1)
+        self._weights_pill = StatPill(grid, "Weights")
         self._weights_pill.grid(row=0, column=0, sticky="w", pady=(0, theme.SPACE_3))
-        self._kv_pill = StatPill(self._breakdown_grid, "KV cache")
+        self._kv_pill = StatPill(grid, "KV cache")
         self._kv_pill.grid(row=0, column=1, sticky="w", pady=(0, theme.SPACE_3))
-        self._activation_pill = StatPill(self._breakdown_grid, "Activations")
+        self._activation_pill = StatPill(grid, "Activations")
         self._activation_pill.grid(row=0, column=2, sticky="w", pady=(0, theme.SPACE_3))
-        self._overhead_pill = StatPill(self._breakdown_grid, "Framework overhead")
+        self._overhead_pill = StatPill(grid, "Framework overhead")
         self._overhead_pill.grid(row=1, column=0, sticky="w")
-        self._total_pill = StatPill(self._breakdown_grid, "Total needed")
+        self._total_pill = StatPill(grid, "Total needed")
         self._total_pill.grid(row=1, column=1, sticky="w")
-        self._headroom_pill = StatPill(self._breakdown_grid, "Headroom")
+        self._headroom_pill = StatPill(grid, "Headroom")
         self._headroom_pill.grid(row=1, column=2, sticky="w")
 
+    def _build_concurrency_card(self, parent) -> None:
         concurrency_card = card(parent)
-        concurrency_card.pack(fill="x", pady=(0, theme.SPACE_3))
-        concurrency_inner = ctk.CTkFrame(concurrency_card, fg_color="transparent")
-        concurrency_inner.pack(fill="x", padx=theme.CARD_PAD_X, pady=theme.CARD_PAD_Y)
-        self._concurrency_pill = StatPill(
-            concurrency_inner, "Max concurrent requests"
-        )
+        concurrency_card.pack(fill="x", pady=(0, theme.SPACE_4))
+        inner = ctk.CTkFrame(concurrency_card, fg_color="transparent")
+        inner.pack(fill="x", padx=theme.CARD_PAD_X, pady=theme.CARD_PAD_Y)
+        self._concurrency_pill = StatPill(inner, "Max concurrent requests")
         self._concurrency_pill.pack(anchor="w")
 
-        self._warnings_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        self._warnings_frame.pack(fill="x")
+    def _build_config_card(self, parent) -> None:
+        config_card = card(parent)
+        config_card.pack(fill="x", pady=(0, theme.SPACE_3))
+        inner = ctk.CTkFrame(config_card, fg_color="transparent")
+        inner.pack(fill="x", padx=theme.CARD_PAD_X, pady=theme.CARD_PAD_Y)
+
+        section_label(inner, "Configuration").pack(anchor="w", pady=(0, theme.SPACE_3))
+
+        ctk.CTkLabel(
+            inner,
+            text="Model",
+            font=theme.font(theme.FONT_BODY, "bold"),
+            text_color=COLORS["muted_fg"],
+            anchor="w",
+        ).pack(fill="x", pady=(0, theme.SPACE_2))
+        self._model_dropdown = DropdownButton(
+            inner, self._model_items, self._architectures[0].id,
+            on_select=lambda _v: self._recalculate(),
+        )
+        self._model_dropdown.pack(fill="x", pady=(0, theme.SPACE_4))
+
+        precision_grid = ctk.CTkFrame(inner, fg_color="transparent")
+        precision_grid.pack(fill="x", pady=(0, theme.SPACE_4))
+        precision_grid.columnconfigure((0, 1), weight=1)
+
+        quant_col = ctk.CTkFrame(precision_grid, fg_color="transparent")
+        quant_col.grid(row=0, column=0, sticky="ew", padx=(0, theme.SPACE_2))
+        ctk.CTkLabel(
+            quant_col,
+            text="Weight quantization",
+            font=theme.font(theme.FONT_BODY, "bold"),
+            text_color=COLORS["muted_fg"],
+            anchor="w",
+        ).pack(fill="x", pady=(0, theme.SPACE_2))
+        self._quant_dropdown = DropdownButton(
+            quant_col, self._quant_items, _DEFAULT_QUANTIZATION,
+            on_select=lambda _v: self._recalculate(),
+        )
+        self._quant_dropdown.pack(fill="x")
+
+        kv_col = ctk.CTkFrame(precision_grid, fg_color="transparent")
+        kv_col.grid(row=0, column=1, sticky="ew", padx=(theme.SPACE_2, 0))
+        ctk.CTkLabel(
+            kv_col,
+            text="KV cache precision",
+            font=theme.font(theme.FONT_BODY, "bold"),
+            text_color=COLORS["muted_fg"],
+            anchor="w",
+        ).pack(fill="x", pady=(0, theme.SPACE_2))
+        self._kv_dropdown = DropdownButton(
+            kv_col, self._kv_items, _DEFAULT_KV_CACHE_DTYPE,
+            on_select=lambda _v: self._recalculate(),
+        )
+        self._kv_dropdown.pack(fill="x")
+
+        bottom_grid = ctk.CTkFrame(inner, fg_color="transparent")
+        bottom_grid.pack(fill="x")
+        bottom_grid.columnconfigure((0, 1), weight=1)
+
+        context_col = ctk.CTkFrame(bottom_grid, fg_color="transparent")
+        context_col.grid(row=0, column=0, sticky="ew", padx=(0, theme.SPACE_2))
+        ctk.CTkLabel(
+            context_col,
+            text="Context needed",
+            font=theme.font(theme.FONT_BODY, "bold"),
+            text_color=COLORS["muted_fg"],
+            anchor="w",
+        ).pack(fill="x", pady=(0, theme.SPACE_2))
+        self._context_var = ctk.StringVar(value=_DEFAULT_CONTEXT)
+        entry = ctk.CTkEntry(
+            context_col,
+            textvariable=self._context_var,
+            height=theme.CONTROL_MD,
+            font=theme.mono_font(theme.FONT_TITLE),
+            fg_color=COLORS["input_bg"],
+            border_width=0,
+        )
+        entry.pack(fill="x")
+        entry.bind("<KeyRelease>", self._on_context_edited)
+
+        hw_col = ctk.CTkFrame(bottom_grid, fg_color="transparent")
+        hw_col.grid(row=0, column=1, sticky="ew", padx=(theme.SPACE_2, 0))
+        ctk.CTkLabel(
+            hw_col,
+            text="Hardware",
+            font=theme.font(theme.FONT_BODY, "bold"),
+            text_color=COLORS["muted_fg"],
+            anchor="w",
+        ).pack(fill="x", pady=(0, theme.SPACE_2))
+        self._hw_dropdown = DropdownButton(
+            hw_col, self._hw_items, self._hardware[0].id,
+            on_select=lambda _v: self._recalculate(),
+        )
+        self._hw_dropdown.pack(fill="x")
 
     # ------------------------------------------------------------------
     # Auto-fill from the last analysis
@@ -305,10 +281,10 @@ class FitCheckView(ctk.CTkFrame):
     # ------------------------------------------------------------------
 
     def _recalculate(self) -> None:
-        architecture = self._arch_by_label[self._model_var.get()]
-        hardware = self._hw_by_label[self._hw_var.get()]
-        quantization = self._quant_by_label[self._quant_var.get()]
-        kv_cache_dtype = self._kv_by_label[self._kv_var.get()]
+        architecture = self._arch_by_id[self._model_dropdown.selected_value()]
+        hardware = self._hw_by_id[self._hw_dropdown.selected_value()]
+        quantization = self._quant_dropdown.selected_value()
+        kv_cache_dtype = self._kv_dropdown.selected_value()
         context_length = formatting.parse_int(self._context_var.get())
 
         result = evaluate_fit(

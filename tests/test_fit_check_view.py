@@ -46,8 +46,8 @@ def test_undersized_hardware_does_not_fit(root):
     view = FitCheckView(root, _FakeShell())
     view.pack(fill="both", expand=True)
 
-    view._model_var.set("Llama 3.1 405B")
-    view._hw_var.set("NVIDIA RTX 3090 24GB")
+    view._model_dropdown.select("meta:llama-3.1-405b")
+    view._hw_dropdown.select("nvidia:rtx-3090-24gb")
     view._recalculate()
     _pump(root, 30)
 

@@ -12,6 +12,7 @@ from norefund.core.settings import SettingsStore
 from norefund.gui import motion, theme
 from norefund.gui.theme import COLORS
 from norefund.gui.widgets import (
+    DropdownButton,
     ModelDropdownButton,
     NoticeBanner,
     SidebarItem,
@@ -331,6 +332,7 @@ class MainView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         # raising a different cached view frame on top of them doesn't
         # close them on its own -- force it here on every navigation.
         ModelDropdownButton.close_all()
+        DropdownButton.close_all()
         for vid, item in self._nav_items.items():
             item.set_active(vid == view_id)
 
