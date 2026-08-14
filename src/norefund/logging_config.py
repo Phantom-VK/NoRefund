@@ -28,12 +28,11 @@ import json
 import logging
 import os
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from norefund.core.paths import app_log_dir
-
 
 # ---------------------------------------------------------------------------
 # Log directory helpers
@@ -60,11 +59,11 @@ LOG_DIR: Path = app_log_dir()
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # One log file per app run, timestamped in UTC
-_RUN_TS = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+_RUN_TS = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
 RUN_LOG_FILE: Path = LOG_DIR / f"norefund-{_RUN_TS}.log"
 
 
-def list_log_files() -> List[Path]:
+def list_log_files() -> list[Path]:
     """Return all known run log files, sorted by name (oldest → newest)."""
 
     if not LOG_DIR.exists():
@@ -72,7 +71,7 @@ def list_log_files() -> List[Path]:
     return sorted(LOG_DIR.glob("norefund-*.log"))
 
 
-def latest_log_file() -> Optional[Path]:
+def latest_log_file() -> Path | None:
     """Return the most recent run log file, or None if none exist."""
 
     files = list_log_files()
@@ -93,7 +92,7 @@ class LogRecordData:
     func: str
     line: int
     pathname: str
-    ctx: Dict[str, Any]
+    ctx: dict[str, Any]
 
 
 class JsonFormatter(logging.Formatter):
@@ -105,7 +104,7 @@ class JsonFormatter(logging.Formatter):
             ctx = {"value": repr(ctx)}
 
         data = LogRecordData(
-            ts=datetime.fromtimestamp(record.created, tz=timezone.utc)
+            ts=datetime.fromtimestamp(record.created, tz=UTC)
             .isoformat()
             .replace("+00:00", "Z"),
             level=record.levelname,

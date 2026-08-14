@@ -9,7 +9,7 @@ from typing import Protocol
 from norefund.core.models_registry import ModelInfo
 
 _LOG = logging.getLogger(__name__)
-_tokenizer_cache: dict[str, "TokenizerBackend"] = {}
+_tokenizer_cache: dict[str, TokenizerBackend] = {}
 
 
 class TokenizerBackend(Protocol):
