@@ -1,0 +1,212 @@
+# Architecture parameters for self-hostable open-weight models, used by the
+# self-host VRAM fit calculator (core/selfhost.py).
+#
+# Every number here is copied from the model's published HuggingFace
+# config.json (linked via docs_url), not derived or guessed. In particular:
+#
+# - head_dim is NOT always hidden_size / n_attention_heads. Gemma 2 9B is the
+#   counter-example: hidden_size=3584, n_attention_heads=16 gives 224, but
+#   its real head_dim is 256. Always copy head_dim from config.json.
+# - n_kv_heads is the GQA key/value head count, which is smaller than
+#   n_attention_heads for every model here. Using n_attention_heads instead
+#   would overstate KV-cache memory (8x for Llama 3.1 70B).
+# - total_params/active_params differ only for mixture-of-experts models
+#   (Mixtral, DeepSeek V3). See core/selfhost.py for why weight memory uses
+#   total_params, not active_params.
+
+- id: meta:llama-3.1-8b
+  display_name: "Llama 3.1 8B"
+  family: "Llama 3"
+  vendor: "Meta"
+  total_params: 8030000000
+  active_params: 8030000000
+  n_layers: 32
+  n_attention_heads: 32
+  n_kv_heads: 8
+  head_dim: 128
+  hidden_size: 4096
+  max_context_length: 131072
+  attention_type: "gqa"
+  docs_url: "https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct"
+
+- id: meta:llama-3.1-70b
+  display_name: "Llama 3.1 70B"
+  family: "Llama 3"
+  vendor: "Meta"
+  total_params: 70550000000
+  active_params: 70550000000
+  n_layers: 80
+  n_attention_heads: 64
+  n_kv_heads: 8
+  head_dim: 128
+  hidden_size: 8192
+  max_context_length: 131072
+  attention_type: "gqa"
+  docs_url: "https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct"
+
+- id: meta:llama-3.3-70b
+  display_name: "Llama 3.3 70B"
+  family: "Llama 3"
+  vendor: "Meta"
+  total_params: 70550000000
+  active_params: 70550000000
+  n_layers: 80
+  n_attention_heads: 64
+  n_kv_heads: 8
+  head_dim: 128
+  hidden_size: 8192
+  max_context_length: 131072
+  attention_type: "gqa"
+  docs_url: "https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct"
+
+- id: meta:llama-3.1-405b
+  display_name: "Llama 3.1 405B"
+  family: "Llama 3"
+  vendor: "Meta"
+  total_params: 405850000000
+  active_params: 405850000000
+  n_layers: 126
+  n_attention_heads: 128
+  n_kv_heads: 8
+  head_dim: 128
+  hidden_size: 16384
+  max_context_length: 131072
+  attention_type: "gqa"
+  docs_url: "https://huggingface.co/meta-llama/Llama-3.1-405B-Instruct"
+
+- id: qwen:qwen2.5-7b
+  display_name: "Qwen2.5 7B"
+  family: "Qwen 2.5"
+  vendor: "Qwen"
+  total_params: 7620000000
+  active_params: 7620000000
+  n_layers: 28
+  n_attention_heads: 28
+  n_kv_heads: 4
+  head_dim: 128
+  hidden_size: 3584
+  max_context_length: 131072
+  attention_type: "gqa"
+  docs_url: "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct"
+
+- id: qwen:qwen2.5-32b
+  display_name: "Qwen2.5 32B"
+  family: "Qwen 2.5"
+  vendor: "Qwen"
+  total_params: 32760000000
+  active_params: 32760000000
+  n_layers: 64
+  n_attention_heads: 40
+  n_kv_heads: 8
+  head_dim: 128
+  hidden_size: 5120
+  max_context_length: 131072
+  attention_type: "gqa"
+  docs_url: "https://huggingface.co/Qwen/Qwen2.5-32B-Instruct"
+
+- id: qwen:qwen2.5-72b
+  display_name: "Qwen2.5 72B"
+  family: "Qwen 2.5"
+  vendor: "Qwen"
+  total_params: 72710000000
+  active_params: 72710000000
+  n_layers: 80
+  n_attention_heads: 64
+  n_kv_heads: 8
+  head_dim: 128
+  hidden_size: 8192
+  max_context_length: 131072
+  attention_type: "gqa"
+  docs_url: "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct"
+
+- id: mistral:mistral-7b
+  display_name: "Mistral 7B"
+  family: "Mistral"
+  vendor: "Mistral"
+  total_params: 7250000000
+  active_params: 7250000000
+  n_layers: 32
+  n_attention_heads: 32
+  n_kv_heads: 8
+  head_dim: 128
+  hidden_size: 4096
+  max_context_length: 32768
+  attention_type: "gqa"
+  docs_url: "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3"
+
+- id: mistral:mistral-small-24b
+  display_name: "Mistral Small 24B"
+  family: "Mistral"
+  vendor: "Mistral"
+  total_params: 23570000000
+  active_params: 23570000000
+  n_layers: 40
+  n_attention_heads: 32
+  n_kv_heads: 8
+  head_dim: 128
+  hidden_size: 5120
+  max_context_length: 32768
+  attention_type: "gqa"
+  docs_url: "https://huggingface.co/mistralai/Mistral-Small-24B-Instruct-2501"
+
+- id: mistral:mixtral-8x7b
+  display_name: "Mixtral 8x7B"
+  family: "Mistral"
+  vendor: "Mistral"
+  total_params: 46700000000
+  active_params: 12900000000
+  n_layers: 32
+  n_attention_heads: 32
+  n_kv_heads: 8
+  head_dim: 128
+  hidden_size: 4096
+  max_context_length: 32768
+  attention_type: "gqa"
+  docs_url: "https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1"
+
+- id: google:gemma-2-9b
+  display_name: "Gemma 2 9B"
+  family: "Gemma 2"
+  vendor: "Google"
+  total_params: 9240000000
+  active_params: 9240000000
+  n_layers: 42
+  n_attention_heads: 16
+  n_kv_heads: 8
+  head_dim: 256
+  hidden_size: 3584
+  max_context_length: 8192
+  attention_type: "gqa"
+  docs_url: "https://huggingface.co/google/gemma-2-9b-it"
+
+- id: google:gemma-2-27b
+  display_name: "Gemma 2 27B"
+  family: "Gemma 2"
+  vendor: "Google"
+  total_params: 27230000000
+  active_params: 27230000000
+  n_layers: 46
+  n_attention_heads: 32
+  n_kv_heads: 16
+  head_dim: 128
+  hidden_size: 4608
+  max_context_length: 8192
+  attention_type: "gqa"
+  docs_url: "https://huggingface.co/google/gemma-2-27b-it"
+
+- id: deepseek:deepseek-v3
+  display_name: "DeepSeek V3"
+  family: "DeepSeek"
+  vendor: "DeepSeek"
+  total_params: 671000000000
+  active_params: 37000000000
+  n_layers: 61
+  n_attention_heads: 128
+  n_kv_heads: 128
+  head_dim: 128
+  hidden_size: 7168
+  max_context_length: 163840
+  attention_type: "mla"
+  kv_lora_rank: 512
+  qk_rope_head_dim: 64
+  docs_url: "https://huggingface.co/deepseek-ai/DeepSeek-V3"
