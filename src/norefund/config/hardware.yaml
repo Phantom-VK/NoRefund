@@ -1,0 +1,311 @@
+# Hardware targets for the self-host VRAM fit calculator (core/selfhost.py).
+#
+# memory_gib_per_device is GiB (2**30 bytes), matching what nvidia-smi and
+# Apple's System Report actually report -- an "80GB" A100 is 81920 MiB, not
+# 80,000,000,000 bytes. Using GB here would silently under-count by ~7%.
+#
+# usable_memory_fraction is the share of nameplate memory a serving process
+# can actually allocate, after the driver/display reserve and allocator
+# fragmentation. 0.90 for discrete NVIDIA matches vLLM's gpu_memory_utilization
+# default. Apple unified memory is capped by macOS's Metal
+# recommendedMaxWorkingSetSize (~75% of RAM) since the GPU shares memory with
+# the whole OS, not a dedicated pool.
+
+# --- datacenter_gpu (7) ---
+
+- id: nvidia:a100-40gb
+  display_name: "NVIDIA A100 40GB"
+  category: "datacenter_gpu"
+  vendor: "NVIDIA"
+  accelerator: "NVIDIA A100"
+  device_count: 1
+  memory_gib_per_device: 40.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+- id: nvidia:a100-80gb
+  display_name: "NVIDIA A100 80GB"
+  category: "datacenter_gpu"
+  vendor: "NVIDIA"
+  accelerator: "NVIDIA A100"
+  device_count: 1
+  memory_gib_per_device: 80.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+- id: nvidia:h100-80gb
+  display_name: "NVIDIA H100 80GB"
+  category: "datacenter_gpu"
+  vendor: "NVIDIA"
+  accelerator: "NVIDIA H100 SXM5"
+  device_count: 1
+  memory_gib_per_device: 80.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+- id: nvidia:h200-141gb
+  display_name: "NVIDIA H200 141GB"
+  category: "datacenter_gpu"
+  vendor: "NVIDIA"
+  accelerator: "NVIDIA H200"
+  device_count: 1
+  memory_gib_per_device: 141.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+- id: nvidia:l40s-48gb
+  display_name: "NVIDIA L40S 48GB"
+  category: "datacenter_gpu"
+  vendor: "NVIDIA"
+  accelerator: "NVIDIA L40S"
+  device_count: 1
+  memory_gib_per_device: 48.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+- id: nvidia:l4-24gb
+  display_name: "NVIDIA L4 24GB"
+  category: "datacenter_gpu"
+  vendor: "NVIDIA"
+  accelerator: "NVIDIA L4"
+  device_count: 1
+  memory_gib_per_device: 24.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+- id: nvidia:v100-32gb
+  display_name: "NVIDIA V100 32GB"
+  category: "datacenter_gpu"
+  vendor: "NVIDIA"
+  accelerator: "NVIDIA V100"
+  device_count: 1
+  memory_gib_per_device: 32.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+# --- aws (7) ---
+
+- id: aws:p5.48xlarge
+  display_name: "AWS p5.48xlarge"
+  category: "aws"
+  vendor: "AWS"
+  accelerator: "8x NVIDIA H100 SXM5 80GB"
+  device_count: 8
+  memory_gib_per_device: 80.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+  notes: "640 GiB pooled over NVLink/NVSwitch."
+
+- id: aws:p4d.24xlarge
+  display_name: "AWS p4d.24xlarge"
+  category: "aws"
+  vendor: "AWS"
+  accelerator: "8x NVIDIA A100 40GB"
+  device_count: 8
+  memory_gib_per_device: 40.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+  notes: "320 GiB pooled over NVLink."
+
+- id: aws:g6e.xlarge
+  display_name: "AWS g6e.xlarge"
+  category: "aws"
+  vendor: "AWS"
+  accelerator: "NVIDIA L40S"
+  device_count: 1
+  memory_gib_per_device: 48.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+- id: aws:g6.xlarge
+  display_name: "AWS g6.xlarge"
+  category: "aws"
+  vendor: "AWS"
+  accelerator: "NVIDIA L4"
+  device_count: 1
+  memory_gib_per_device: 24.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+- id: aws:g5.xlarge
+  display_name: "AWS g5.xlarge"
+  category: "aws"
+  vendor: "AWS"
+  accelerator: "NVIDIA A10G"
+  device_count: 1
+  memory_gib_per_device: 24.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+- id: aws:g5.12xlarge
+  display_name: "AWS g5.12xlarge"
+  category: "aws"
+  vendor: "AWS"
+  accelerator: "4x NVIDIA A10G"
+  device_count: 4
+  memory_gib_per_device: 24.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+  notes: "96 GiB total, not NVLink-pooled (PCIe only)."
+
+- id: aws:g4dn.xlarge
+  display_name: "AWS g4dn.xlarge"
+  category: "aws"
+  vendor: "AWS"
+  accelerator: "NVIDIA T4"
+  device_count: 1
+  memory_gib_per_device: 16.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+# --- gcp (4) ---
+
+- id: gcp:a2-highgpu-1g
+  display_name: "GCP a2-highgpu-1g"
+  category: "gcp"
+  vendor: "Google Cloud"
+  accelerator: "NVIDIA A100 40GB"
+  device_count: 1
+  memory_gib_per_device: 40.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+- id: gcp:a2-ultragpu-1g
+  display_name: "GCP a2-ultragpu-1g"
+  category: "gcp"
+  vendor: "Google Cloud"
+  accelerator: "NVIDIA A100 80GB"
+  device_count: 1
+  memory_gib_per_device: 80.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+- id: gcp:a3-highgpu-8g
+  display_name: "GCP a3-highgpu-8g"
+  category: "gcp"
+  vendor: "Google Cloud"
+  accelerator: "8x NVIDIA H100 80GB"
+  device_count: 8
+  memory_gib_per_device: 80.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+  notes: "640 GiB pooled over NVLink."
+
+- id: gcp:g2-standard-4
+  display_name: "GCP g2-standard-4"
+  category: "gcp"
+  vendor: "Google Cloud"
+  accelerator: "NVIDIA L4"
+  device_count: 1
+  memory_gib_per_device: 24.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+# --- azure (4) ---
+
+- id: azure:nc24ads-a100-v4
+  display_name: "Azure NC24ads A100 v4"
+  category: "azure"
+  vendor: "Microsoft Azure"
+  accelerator: "NVIDIA A100 80GB"
+  device_count: 1
+  memory_gib_per_device: 80.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+- id: azure:nd96asr-a100-v4
+  display_name: "Azure ND96asr A100 v4"
+  category: "azure"
+  vendor: "Microsoft Azure"
+  accelerator: "8x NVIDIA A100 40GB"
+  device_count: 8
+  memory_gib_per_device: 40.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+  notes: "320 GiB pooled over NVLink/InfiniBand."
+
+- id: azure:nd96isr-h100-v5
+  display_name: "Azure ND96isr H100 v5"
+  category: "azure"
+  vendor: "Microsoft Azure"
+  accelerator: "8x NVIDIA H100 80GB"
+  device_count: 8
+  memory_gib_per_device: 80.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+  notes: "640 GiB pooled over NVLink/InfiniBand."
+
+- id: azure:nv36ads-a10-v5
+  display_name: "Azure NV36ads A10 v5"
+  category: "azure"
+  vendor: "Microsoft Azure"
+  accelerator: "NVIDIA A10"
+  device_count: 1
+  memory_gib_per_device: 24.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+# --- consumer (6) ---
+
+- id: nvidia:rtx-5090-32gb
+  display_name: "NVIDIA RTX 5090 32GB"
+  category: "consumer"
+  vendor: "NVIDIA"
+  accelerator: "NVIDIA RTX 5090"
+  device_count: 1
+  memory_gib_per_device: 32.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+- id: nvidia:rtx-4090-24gb
+  display_name: "NVIDIA RTX 4090 24GB"
+  category: "consumer"
+  vendor: "NVIDIA"
+  accelerator: "NVIDIA RTX 4090"
+  device_count: 1
+  memory_gib_per_device: 24.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+- id: nvidia:rtx-3090-24gb
+  display_name: "NVIDIA RTX 3090 24GB"
+  category: "consumer"
+  vendor: "NVIDIA"
+  accelerator: "NVIDIA RTX 3090"
+  device_count: 1
+  memory_gib_per_device: 24.0
+  memory_kind: "discrete"
+  usable_memory_fraction: 0.90
+
+- id: apple:m4-pro-48gb
+  display_name: "Apple M4 Pro (48 GB)"
+  category: "consumer"
+  vendor: "Apple"
+  accelerator: "Apple M4 Pro"
+  device_count: 1
+  memory_gib_per_device: 48.0
+  memory_kind: "unified"
+  usable_memory_fraction: 0.75
+  notes: "Unified memory shared with macOS; Metal caps GPU allocation near 75%."
+
+- id: apple:m4-max-128gb
+  display_name: "Apple M4 Max (128 GB)"
+  category: "consumer"
+  vendor: "Apple"
+  accelerator: "Apple M4 Max"
+  device_count: 1
+  memory_gib_per_device: 128.0
+  memory_kind: "unified"
+  usable_memory_fraction: 0.75
+  notes: "Unified memory shared with macOS; Metal caps GPU allocation near 75%."
+
+- id: apple:m2-ultra-192gb
+  display_name: "Apple M2 Ultra (192 GB)"
+  category: "consumer"
+  vendor: "Apple"
+  accelerator: "Apple M2 Ultra"
+  device_count: 1
+  memory_gib_per_device: 192.0
+  memory_kind: "unified"
+  usable_memory_fraction: 0.75
+  notes: "Unified memory shared with macOS; Metal caps GPU allocation near 75%."
