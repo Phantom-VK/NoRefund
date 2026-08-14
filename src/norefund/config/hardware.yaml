@@ -94,7 +94,7 @@
   memory_gib_per_device: 80.0
   memory_kind: "discrete"
   usable_memory_fraction: 0.90
-  notes: "640 GiB pooled over NVLink/NVSwitch."
+  notes: "640 GiB aggregate across 8 physically separate GPUs, connected via NVLink/NVSwitch for fast inter-GPU communication -- not a single unified pool."
 
 - id: aws:p4d.24xlarge
   display_name: "AWS p4d.24xlarge"
@@ -105,7 +105,7 @@
   memory_gib_per_device: 40.0
   memory_kind: "discrete"
   usable_memory_fraction: 0.90
-  notes: "320 GiB pooled over NVLink."
+  notes: "320 GiB aggregate across 8 physically separate GPUs, connected via NVLink -- not a single unified pool."
 
 - id: aws:g6e.xlarge
   display_name: "AWS g6e.xlarge"
@@ -146,7 +146,7 @@
   memory_gib_per_device: 24.0
   memory_kind: "discrete"
   usable_memory_fraction: 0.90
-  notes: "96 GiB total, not NVLink-pooled (PCIe only)."
+  notes: "96 GiB aggregate across 4 physically separate GPUs (PCIe only, no NVLink) -- not a single unified pool."
 
 - id: aws:g4dn.xlarge
   display_name: "AWS g4dn.xlarge"
@@ -189,7 +189,7 @@
   memory_gib_per_device: 80.0
   memory_kind: "discrete"
   usable_memory_fraction: 0.90
-  notes: "640 GiB pooled over NVLink."
+  notes: "640 GiB aggregate across 8 physically separate GPUs, connected via NVLink -- not a single unified pool."
 
 - id: gcp:g2-standard-4
   display_name: "GCP g2-standard-4"
@@ -222,7 +222,7 @@
   memory_gib_per_device: 40.0
   memory_kind: "discrete"
   usable_memory_fraction: 0.90
-  notes: "320 GiB pooled over NVLink/InfiniBand."
+  notes: "320 GiB aggregate across 8 physically separate GPUs, connected via NVLink/InfiniBand -- not a single unified pool."
 
 - id: azure:nd96isr-h100-v5
   display_name: "Azure ND96isr H100 v5"
@@ -233,7 +233,7 @@
   memory_gib_per_device: 80.0
   memory_kind: "discrete"
   usable_memory_fraction: 0.90
-  notes: "640 GiB pooled over NVLink/InfiniBand."
+  notes: "640 GiB aggregate across 8 physically separate GPUs, connected via NVLink/InfiniBand -- not a single unified pool."
 
 - id: azure:nv36ads-a10-v5
   display_name: "Azure NV36ads A10 v5"
