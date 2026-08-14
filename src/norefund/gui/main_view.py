@@ -13,7 +13,6 @@ from norefund.gui import motion, theme
 from norefund.gui.theme import COLORS
 from norefund.gui.widgets import (
     DropdownButton,
-    ModelDropdownButton,
     NoticeBanner,
     SidebarItem,
     ThreadSafeSchedulerMixin,
@@ -331,7 +330,8 @@ class MainView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         # Popovers (e.g. the model dropdown) are separate CTkToplevels, so
         # raising a different cached view frame on top of them doesn't
         # close them on its own -- force it here on every navigation.
-        ModelDropdownButton.close_all()
+        # Closes every open dropdown popover app-wide, including
+        # ModelDropdownButton's -- it shares DropdownButton's registry.
         DropdownButton.close_all()
         for vid, item in self._nav_items.items():
             item.set_active(vid == view_id)

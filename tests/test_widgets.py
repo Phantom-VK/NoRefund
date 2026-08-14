@@ -11,7 +11,7 @@ import pytest
 
 ctk = pytest.importorskip("customtkinter")
 
-from norefund.gui.theme import COLORS  # noqa: E402
+from norefund.gui import theme  # noqa: E402
 from norefund.gui.widgets import DropdownButton, DropdownItem  # noqa: E402
 
 from .conftest import _pump  # noqa: E402
@@ -93,8 +93,13 @@ def test_toggle_twice_closes_without_picking(root):
 
 
 def test_hover_and_selected_row_colors(root):
-    # CTkFrame.bind() redirects to its internal ._canvas -- real mouse
-    # Enter/Leave lands there too, since the canvas fills the frame.
+    # Rows are plain tk.Frame (not CTkFrame) for construction speed, so
+    # bindings land directly on the row -- no internal-canvas indirection.
+    is_dark = ctk.get_appearance_mode() == "Dark"
+    resting = theme.resolve("popover", is_dark)
+    selected_resting = theme.resolve("sidebar_accent", is_dark)
+    hover = theme.resolve("popover_hover", is_dark)
+
     button = DropdownButton(root, _ITEMS, "a", on_select=lambda _v: None)
     button.pack()
     _pump(root, 20)
@@ -104,24 +109,24 @@ def test_hover_and_selected_row_colors(root):
 
     selected_row = popover.rows["a"]
     other_row = popover.rows["b"]
-    assert tuple(selected_row.cget("fg_color")) == COLORS["sidebar_accent"]
-    assert other_row.cget("fg_color") == "transparent"
+    assert str(selected_row.cget("bg")) == selected_resting
+    assert str(other_row.cget("bg")) == resting
 
-    other_row._canvas.event_generate("<Enter>")
+    other_row.event_generate("<Enter>")
     _pump(root, 20)
-    assert tuple(other_row.cget("fg_color")) == COLORS["popover_hover"]
+    assert str(other_row.cget("bg")) == hover
 
-    other_row._canvas.event_generate("<Leave>")
+    other_row.event_generate("<Leave>")
     _pump(root, 20)
-    assert other_row.cget("fg_color") == "transparent"
+    assert str(other_row.cget("bg")) == resting
 
     # Hovering the selected row itself must not lose its selected tint.
-    selected_row._canvas.event_generate("<Enter>")
+    selected_row.event_generate("<Enter>")
     _pump(root, 20)
-    assert tuple(selected_row.cget("fg_color")) == COLORS["popover_hover"]
-    selected_row._canvas.event_generate("<Leave>")
+    assert str(selected_row.cget("bg")) == hover
+    selected_row.event_generate("<Leave>")
     _pump(root, 20)
-    assert tuple(selected_row.cget("fg_color")) == COLORS["sidebar_accent"]
+    assert str(selected_row.cget("bg")) == selected_resting
 
     popover.destroy()
 
