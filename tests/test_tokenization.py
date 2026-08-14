@@ -10,6 +10,8 @@ from norefund.core.tokenization import (
     get_tokenizer,
 )
 
+from .conftest import _skip_unless_cached
+
 
 def _reset_tiktoken_registry(monkeypatch):
     """Force tiktoken's process-wide encoding cache empty for this test.
@@ -20,23 +22,6 @@ def _reset_tiktoken_registry(monkeypatch):
     import tiktoken.registry as tiktoken_registry
 
     monkeypatch.setattr(tiktoken_registry, "ENCODINGS", {})
-
-
-def _skip_unless_cached(encoding_name: str) -> None:
-    """Skip (not fail) when the real vocab file isn't cached on this machine.
-
-    These tests exercise TikTokenBackend.count(), which parses real cached
-    vocab bytes -- it can't be satisfied with planted fake bytes the way
-    test_resources.py's probe tests can. Reuses the already-tested cache
-    probe instead of duplicating cache-detection logic.
-    """
-    from norefund.core.resources import probe_tiktoken
-
-    if not probe_tiktoken(encoding_name).is_cached:
-        pytest.skip(
-            f"'{encoding_name}' not cached locally — open Resources in the "
-            "app (or run the CLI hint in TikTokenOfflineError) to cache it"
-        )
 
 
 def test_tiktoken_backend_count_positive():

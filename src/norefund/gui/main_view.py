@@ -185,13 +185,13 @@ class MainView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         warn.pack(fill="x")
         ctk.CTkLabel(
             warn,
-            text="Local analysis. Your files never leave this machine.",
+            text="  Local analysis. Your files never   leave this machine.",
             image=theme.icon_image("check", size=14, color=COLORS["muted_fg"]),
             compound="left",
             font=theme.font(theme.FONT_SMALL),
             text_color=COLORS["muted_fg"],
-            wraplength=196,
-            justify="left",
+            wraplength=190,
+            justify="center",
         ).pack(padx=theme.SPACE_2, pady=theme.SPACE_2, fill="x")
         ctk.CTkLabel(
             footer,

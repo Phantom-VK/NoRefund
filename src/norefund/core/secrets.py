@@ -8,7 +8,6 @@ never written to `settings.json` or anywhere else on disk in plaintext.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import keyring
 import keyring.errors

@@ -6,6 +6,8 @@ import pytest
 
 from norefund.core.service import AnalysisResult, analyze_file, analyze_folder
 
+from .conftest import _skip_unless_cached
+
 
 @pytest.fixture
 def sample_txt(tmp_path: Path) -> Path:
@@ -28,6 +30,7 @@ def test_analyze_file_returns_result(sample_txt: Path):
 
 
 def test_analyze_file_token_count_positive(sample_txt: Path):
+    _skip_unless_cached("o200k_base")
     result = analyze_file(sample_txt, "openai:gpt-4o")
     assert result.token_count > 0
 
@@ -39,17 +42,20 @@ def test_analyze_file_correct_model(sample_txt: Path):
 
 def test_analyze_file_fits_small_doc(sample_txt: Path):
     # A tiny txt file must fit in any model's context window
+    _skip_unless_cached("o200k_base")
     result = analyze_file(sample_txt, "openai:gpt-4o")
     assert result.fits_in_context is True
     assert result.min_chunks_needed == 1
 
 
 def test_analyze_file_context_usage_under_100(sample_txt: Path):
+    _skip_unless_cached("o200k_base")
     result = analyze_file(sample_txt, "openai:gpt-4o")
     assert result.context_usage_pct < 100
 
 
 def test_analyze_file_char_and_word_count(sample_txt: Path):
+    _skip_unless_cached("o200k_base")
     result = analyze_file(sample_txt, "openai:gpt-4o")
     assert result.char_count > 0
     assert result.word_count > 0
