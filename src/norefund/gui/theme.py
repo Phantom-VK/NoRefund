@@ -14,7 +14,7 @@ import tkinter as tk
 import tkinter.font as tkfont
 
 import customtkinter as ctk
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from norefund.core.parsing import SUPPORTED_EXTENSIONS
 from norefund.core.paths import bundled_resource
@@ -181,6 +181,41 @@ def provider_icon(provider: str, size: int = 16) -> ctk.CTkImage | None:
         return None
     hex_color = provider_color(provider)
     return icon_image(f"providers/{slug}", size=size, color=(hex_color, hex_color))
+
+
+_dot_icon_cache: dict[tuple[int, str, int], ctk.CTkImage] = {}
+
+
+def _dot_icon(hex_color: str, size: int) -> ctk.CTkImage:
+    root_id = id(tk._default_root)
+    key = (root_id, hex_color, size)
+    cached = _dot_icon_cache.get(key)
+    if cached is not None:
+        return cached
+    diameter = max(4, size - 4)
+    offset = (size - diameter) // 2
+    dot = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    ImageDraw.Draw(dot).ellipse(
+        (offset, offset, offset + diameter, offset + diameter), fill=hex_color
+    )
+    image = ctk.CTkImage(light_image=dot, dark_image=dot, size=(size, size))
+    _dot_icon_cache[key] = image
+    return image
+
+
+def provider_icon_or_dot(provider: str, size: int = 16) -> ctk.CTkImage:
+    """Like `provider_icon()`, but never returns None: a provider with no
+    bundled brand mark (e.g. Qwen) gets a solid dot in its accent color
+    instead, matching `provider_mark()`'s widget-based fallback elsewhere.
+
+    Use this (not `provider_icon()`) for a list of DropdownItems that mixes
+    providers with and without a bundled logo -- every row then gets a
+    leading icon, so they stay aligned with each other.
+    """
+    icon = provider_icon(provider, size=size)
+    if icon is not None:
+        return icon
+    return _dot_icon(provider_color(provider), size=size)
 
 
 # ----------------------------------------------------------------------

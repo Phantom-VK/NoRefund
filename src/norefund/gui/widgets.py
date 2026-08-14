@@ -239,8 +239,17 @@ def _ensure_root_tracking(root) -> None:
     if root_id in _root_tracking_installed:
         return
     _root_tracking_installed.add(root_id)
+    root.bind(
+        "<Destroy>", lambda _e: _root_tracking_installed.discard(root_id), add="+"
+    )
 
-    def _reposition_open_popovers(_event=None) -> None:
+    def _reposition_open_popovers(event=None) -> None:
+        # Tk's bindtags put the toplevel's pathname in every descendant's
+        # bindtags, so a plain root.bind("<Configure>", ...) (not bind_all)
+        # fires for every descendant's Configure too, not just the root
+        # window's own resize/move -- filter to the real thing.
+        if event is not None and event.widget is not root:
+            return
         for button in list(DropdownButton._open):
             popover = button._popover
             if popover is None or not popover.winfo_exists():
@@ -308,7 +317,7 @@ class DropdownButton(ctk.CTkFrame):
         self._chevron.pack(side="right", padx=(theme.SPACE_2, 10), pady=theme.SPACE_2)
         self._sync_display()
 
-        for widget in (self, self._text_label, self._chevron):
+        for widget in (self, self._icon_label, self._text_label, self._chevron):
             widget.bind("<Button-1>", self._toggle)
 
     def _item_for(self, value: str) -> DropdownItem | None:
@@ -441,7 +450,8 @@ class DropdownPopover(ctk.CTkToplevel):
 
         if item.icon is not None:
             mode = "dark" if is_dark else "light"
-            photo = item.icon.create_scaled_photo_image(1.0, mode)
+            widget_scaling = ctk.ScalingTracker.get_widget_scaling(scroll)
+            photo = item.icon.create_scaled_photo_image(widget_scaling, mode)
             self._icon_photos.append(photo)
             icon_label = tk.Label(row, image=photo, bg=resting_hex, bd=0)
             icon_label.pack(side="left", padx=(8, theme.SPACE_2), pady=theme.SPACE_2)
@@ -464,8 +474,9 @@ class DropdownPopover(ctk.CTkToplevel):
 
         if is_selected:
             check_icon = theme.icon_image("check", size=14, color=COLORS["primary"])
+            widget_scaling = ctk.ScalingTracker.get_widget_scaling(scroll)
             check_photo = check_icon.create_scaled_photo_image(
-                1.0, "dark" if is_dark else "light"
+                widget_scaling, "dark" if is_dark else "light"
             )
             self._icon_photos.append(check_photo)
             check = tk.Label(row, image=check_photo, bg=resting_hex, bd=0)
@@ -544,7 +555,7 @@ class ModelDropdownButton(DropdownButton):
             DropdownItem(
                 value=m.id,
                 label=formatting.model_label(m),
-                icon=theme.provider_icon(m.provider, size=14),
+                icon=theme.provider_icon_or_dot(m.provider, size=14),
             )
             for m in models
         ]

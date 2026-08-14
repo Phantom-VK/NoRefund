@@ -34,11 +34,12 @@ _DEFAULT_QUANTIZATION = "q4_k_m"
 _DEFAULT_KV_CACHE_DTYPE = "fp16"
 
 
-def _vendor_icon(vendor: str) -> ctk.CTkImage | None:
-    """A small brand-color icon for a model's vendor, if one is bundled --
-    optional per DropdownItem, so vendors like Qwen (no bundled mark) just
-    show a plain label row."""
-    return theme.provider_icon(vendor, size=14)
+def _vendor_icon(vendor: str) -> ctk.CTkImage:
+    """A small brand-color icon for a model's vendor. Vendors with no
+    bundled brand mark (e.g. Qwen) get a solid accent-color dot instead --
+    every row needs a leading icon of some kind so the model list stays
+    aligned (a mix of icon/no-icon rows in the same popover looks broken)."""
+    return theme.provider_icon_or_dot(vendor, size=14)
 
 
 class FitCheckView(ctk.CTkFrame):
@@ -119,6 +120,7 @@ class FitCheckView(ctk.CTkFrame):
 
     def _build_utilization_card(self, parent) -> None:
         util_card = card(parent)
+        self._util_card = util_card
         util_card.pack(fill="x", pady=(theme.SPACE_2, theme.SPACE_3))
         util_inner = ctk.CTkFrame(util_card, fg_color="transparent")
         util_inner.pack(fill="x", padx=theme.CARD_PAD_X, pady=theme.CARD_PAD_Y)
@@ -243,6 +245,7 @@ class FitCheckView(ctk.CTkFrame):
             border_width=0,
         )
         entry.pack(fill="x")
+        self._last_autofilled_context = _DEFAULT_CONTEXT
         entry.bind("<KeyRelease>", self._on_context_edited)
 
         hw_col = ctk.CTkFrame(bottom_grid, fg_color="transparent")
@@ -265,7 +268,12 @@ class FitCheckView(ctk.CTkFrame):
     # ------------------------------------------------------------------
 
     def _on_context_edited(self, _event=None) -> None:
-        self._context_edited = True
+        # Gate on the value actually changing, not on any keystroke -- Tab,
+        # arrow keys, or a Ctrl+C copy also fire <KeyRelease> without
+        # editing the field, and would otherwise permanently disable the
+        # on_show() auto-fill for a field the user never actually touched.
+        if self._context_var.get() != self._last_autofilled_context:
+            self._context_edited = True
         self._recalculate()
 
     def on_show(self) -> None:
@@ -273,7 +281,9 @@ class FitCheckView(ctk.CTkFrame):
         if not self._context_edited:
             last = getattr(self.shell, "last_analysis_tokens", None)
             if last:
-                self._context_var.set(str(last))
+                value = str(last)
+                self._context_var.set(value)
+                self._last_autofilled_context = value
         self._recalculate()
 
     # ------------------------------------------------------------------
@@ -305,7 +315,12 @@ class FitCheckView(ctk.CTkFrame):
                 text="Can't estimate", text_color=COLORS["destructive"]
             )
             self._error_label.configure(text=result.error)
-            self._error_label.pack(fill="x", pady=(0, theme.SPACE_3))
+            # Explicit `before=` keeps this pinned right under the verdict row
+            # regardless of pack/forget history -- pack() alone would append
+            # it after every card currently pack()ed (util/breakdown/etc.).
+            self._error_label.pack(
+                fill="x", pady=(0, theme.SPACE_3), before=self._util_card
+            )
             self._util_bar.set_value(None)
             self._util_pct_label.configure(text="—")
             for pill in (
