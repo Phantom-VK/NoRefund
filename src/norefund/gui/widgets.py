@@ -384,8 +384,14 @@ class DropdownButton(ctk.CTkFrame):
             fg_color=COLORS["input_bg"],
             corner_radius=theme.RADIUS_CARD,
             cursor="hand2",
+            # Constant border width so the focus ring below never shifts
+            # layout -- only border_color changes, between an exact match
+            # for fg_color (invisible) and primary (visible ring).
+            border_width=2,
             **kwargs,
         )
+        self._rest_border_color = self.cget("fg_color")
+        self.configure(border_color=self._rest_border_color)
         self._items = items
         self._selected_value = selected_value
         self._on_select = on_select
@@ -409,6 +415,20 @@ class DropdownButton(ctk.CTkFrame):
 
         for widget in (self, self._icon_label, self._text_label, self._chevron):
             widget.bind("<Button-1>", self._toggle)
+
+        # .bind() redirects to self._canvas (see CTkFrame.bind() source),
+        # so that's the widget that actually needs takefocus and is the
+        # one Tab-traversal and focus_set() will land keyboard focus on.
+        self._canvas.configure(takefocus=1)
+        self.bind("<Return>", self._toggle)
+        self.bind("<space>", self._toggle)
+        self.bind(
+            "<FocusIn>", lambda _e: self.configure(border_color=COLORS["primary"])
+        )
+        self.bind(
+            "<FocusOut>",
+            lambda _e: self.configure(border_color=self._rest_border_color),
+        )
 
     def _item_for(self, value: str) -> DropdownItem | None:
         return next((item for item in self._items if item.value == value), None)
@@ -501,17 +521,25 @@ class DropdownPopover(ctk.CTkToplevel):
         bind_mousewheel(scroll)
 
         is_dark = ctk.get_appearance_mode() == "Dark"
-        # Rows keyed by value, for tests and any future keyboard-nav code --
-        # plain tkinter.Frame rows are directly discoverable via
-        # winfo_children() (unlike CTkFrame's internal-canvas indirection),
-        # but a stable dict is still clearer than tree-walking by index.
+        # Rows keyed by value -- plain tkinter.Frame rows are directly
+        # discoverable via winfo_children() (unlike CTkFrame's
+        # internal-canvas indirection), but a stable dict is still clearer
+        # than tree-walking by index. Also used for <Up>/<Down> keyboard
+        # navigation between rows.
         self.rows: dict[str, tk.Frame] = {}
+        self._row_widgets: dict[str, list[tk.Widget]] = {}
+        self._row_resting: dict[str, str] = {}
+        self._row_hover: dict[str, str] = {}
+        self._highlighted: str | None = None
         for item in items:
             self._build_row(
                 scroll, item, is_selected=item.value == selected_value, is_dark=is_dark
             )
 
         self.bind("<Escape>", lambda _e: self.destroy())
+        self.bind("<Up>", lambda _e: self._move_highlight(-1))
+        self.bind("<Down>", lambda _e: self._move_highlight(1))
+        self.bind("<Return>", lambda _e: self._activate_highlighted())
         self.after(10, self._grab_focus)
         DropdownPopover._ensure_click_watch(self)
 
@@ -531,6 +559,10 @@ class DropdownPopover(ctk.CTkToplevel):
         )
         row.pack(fill="x", pady=1)
         self.rows[item.value] = row
+        self._row_resting[item.value] = resting_hex
+        self._row_hover[item.value] = hover_hex
+        if is_selected:
+            self._highlighted = item.value
         widgets = [row]
 
         widget_scaling = ctk.ScalingTracker.get_widget_scaling(scroll)
@@ -572,14 +604,60 @@ class DropdownPopover(ctk.CTkToplevel):
             check.pack(side="right", padx=(theme.SPACE_2, 8))
             widgets.append(check)
 
-        def _set_bg(color: str) -> None:
-            for widget in widgets:
-                widget.configure(bg=color)
-
+        self._row_widgets[item.value] = widgets
         for widget in widgets:
             widget.bind("<Button-1>", lambda _e, v=item.value: self._pick(v))
-            widget.bind("<Enter>", lambda _e, c=hover_hex: _set_bg(c))
-            widget.bind("<Leave>", lambda _e, c=resting_hex: _set_bg(c))
+            widget.bind(
+                "<Enter>", lambda _e, v=item.value: self._set_row_bg(v, hover=True)
+            )
+            widget.bind(
+                "<Leave>", lambda _e, v=item.value: self._set_row_bg(v, hover=False)
+            )
+
+    def _set_row_bg(self, value: str, *, hover: bool) -> None:
+        color = self._row_hover[value] if hover else self._row_resting[value]
+        for widget in self._row_widgets[value]:
+            widget.configure(bg=color)
+
+    def _move_highlight(self, delta: int) -> None:
+        values = list(self.rows)
+        if not values:
+            return
+        if self._highlighted in values:
+            new_index = (values.index(self._highlighted) + delta) % len(values)
+        else:
+            new_index = 0 if delta > 0 else len(values) - 1
+        new_value = values[new_index]
+
+        old_value = self._highlighted
+        self._highlighted = new_value
+        if old_value is not None and old_value != new_value:
+            self._set_row_bg(old_value, hover=False)
+        self._set_row_bg(new_value, hover=True)
+        self._scroll_into_view(new_value)
+
+    def _scroll_into_view(self, value: str) -> None:
+        row = self.rows[value]
+        canvas = row.master._parent_canvas  # row's parent is the CTkScrollableFrame
+        canvas.update_idletasks()
+        bbox = canvas.bbox("all")
+        if not bbox:
+            return
+        total_height = bbox[3] - bbox[1]
+        if total_height <= 0:
+            return
+        row_top = row.winfo_y()
+        row_bottom = row_top + row.winfo_height()
+        view_top = canvas.canvasy(0)
+        view_bottom = view_top + canvas.winfo_height()
+        if row_top < view_top:
+            canvas.yview_moveto(row_top / total_height)
+        elif row_bottom > view_bottom:
+            canvas.yview_moveto((row_bottom - canvas.winfo_height()) / total_height)
+
+    def _activate_highlighted(self) -> None:
+        if self._highlighted is not None:
+            self._pick(self._highlighted)
 
     def _grab_focus(self) -> None:
         if self.winfo_exists():
@@ -621,6 +699,14 @@ class DropdownPopover(ctk.CTkToplevel):
     def destroy(self) -> None:
         if self._anchor._popover is self:
             self._anchor._clear_popover()
+        # Return keyboard focus to the trigger so Tab/Return continue to
+        # work right after closing, whether closed by picking a row,
+        # Escape, or a click outside.
+        try:
+            if self._anchor.winfo_exists():
+                self._anchor._canvas.focus_set()
+        except (TclError, RuntimeError):
+            pass
         super().destroy()
 
 
