@@ -13,6 +13,7 @@ import pytest
 
 ctk = pytest.importorskip("customtkinter")
 
+import norefund.gui.native_dialog as native_dialog_module  # noqa: E402
 from norefund.gui.fit_check_view import FitCheckView  # noqa: E402
 
 from .conftest import _pump  # noqa: E402
@@ -81,3 +82,25 @@ def test_on_show_does_not_clobber_manual_context_edit(root):
     _pump(root, 30)
 
     assert view._context_var.get() == "12345"
+
+
+def test_export_pdf_and_html_write_expected_content(root, monkeypatch, tmp_path):
+    view = FitCheckView(root, _FakeShell())
+    view.pack(fill="both", expand=True)
+    _pump(root, 30)
+
+    pdf_path = tmp_path / "out.pdf"
+    monkeypatch.setattr(
+        native_dialog_module, "ask_save_file", lambda **kwargs: str(pdf_path)
+    )
+    view._export_pdf()
+    assert pdf_path.read_bytes().startswith(b"%PDF")
+
+    html_path = tmp_path / "out.html"
+    monkeypatch.setattr(
+        native_dialog_module, "ask_save_file", lambda **kwargs: str(html_path)
+    )
+    view._export_html()
+    html = html_path.read_text(encoding="utf-8")
+    assert html.startswith("<!doctype html>")
+    assert "Fit Check" in html

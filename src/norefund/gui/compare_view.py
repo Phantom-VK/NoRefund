@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+from datetime import datetime
 from pathlib import Path
 
 import customtkinter as ctk
@@ -20,6 +21,9 @@ from norefund.core.portfolio import (
     cheapest_that_fits,
     project_costs,
 )
+from norefund.core.report.html import render_html
+from norefund.core.report.model import ReportModel
+from norefund.core.report.pdf import render_pdf
 from norefund.gui import formatting, motion, native_dialog, theme
 from norefund.gui.dnd import enable_file_drop
 from norefund.gui.theme import COLORS, SUPPORTED_FILETYPES
@@ -35,6 +39,7 @@ from norefund.gui.widgets import (
     bind_mousewheel,
     card,
     export_via_dialog,
+    export_via_dialog_bytes,
 )
 
 _FREQUENCY_ITEMS = [
@@ -43,6 +48,7 @@ _FREQUENCY_ITEMS = [
     DropdownItem(value="monthly", label="Per month"),
 ]
 _DEFAULT_RUNS_PER_PERIOD = "100"
+_FREQUENCY_LABELS = {item.value: item.label for item in _FREQUENCY_ITEMS}
 
 _ROW_CONTEXT_BAR_HEIGHT = theme.SPACE_1 + 2  # 6px, denser than the default 8px bar
 
@@ -53,6 +59,8 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         self.shell = shell
         self._paths: list[Path] = []
         self._report: CompareReport | None = None
+        self._last_projections: list[PortfolioProjection] = []
+        self._last_projection_frequency: str | None = None
         self._running = False
         self.cancel_event: threading.Event | None = None
         self._active_tab = "results"
@@ -229,6 +237,12 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         ).pack(side="left", padx=(0, theme.SPACE_2))
         IconButton(
             toolbar, "Export MD", icon="file_text", command=self._export_md
+        ).pack(side="left", padx=(0, theme.SPACE_2))
+        IconButton(
+            toolbar, "Export PDF", icon="file_text", command=self._export_pdf
+        ).pack(side="left", padx=(0, theme.SPACE_2))
+        IconButton(
+            toolbar, "Export HTML", icon="file_text", command=self._export_html
         ).pack(side="left")
 
         self._results_scroll = ctk.CTkScrollableFrame(parent, fg_color=COLORS["bg"])
@@ -557,6 +571,8 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             else {}
         )
         if not corpus_tokens:
+            self._last_projections = []
+            self._last_projection_frequency = None
             EmptyState(
                 self._projection_scroll,
                 "bar_chart",
@@ -573,6 +589,10 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
 
         projections = project_costs(
             corpus_tokens, output_tokens, runs_per_period, frequency, models
+        )
+        self._last_projections = projections
+        self._last_projection_frequency = (
+            f"{runs_per_period:g} runs {_FREQUENCY_LABELS.get(frequency, frequency)}"
         )
         cheapest = cheapest_that_fits(projections)
 
@@ -671,4 +691,29 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             extension="md",
             filetype_label="Markdown",
             content_fn=lambda: comparison_to_markdown(self._report),
+        )
+
+    def _build_report(self) -> ReportModel:
+        return ReportModel(
+            title="NoRefund Comparison Report",
+            generated_at=datetime.now(),
+            comparison=self._report,
+            portfolio=self._last_projections or None,
+            portfolio_frequency_label=self._last_projection_frequency,
+        )
+
+    def _export_pdf(self) -> None:
+        export_via_dialog_bytes(
+            has_data=self._report is not None,
+            extension="pdf",
+            filetype_label="PDF",
+            content_fn=lambda: render_pdf(self._build_report()),
+        )
+
+    def _export_html(self) -> None:
+        export_via_dialog(
+            has_data=self._report is not None,
+            extension="html",
+            filetype_label="HTML",
+            content_fn=lambda: render_html(self._build_report()),
         )

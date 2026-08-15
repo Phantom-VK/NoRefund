@@ -757,6 +757,25 @@ def export_via_dialog(
         Path(path).write_text(content_fn(), encoding="utf-8")
 
 
+def export_via_dialog_bytes(
+    *,
+    has_data: bool,
+    extension: str,
+    filetype_label: str,
+    content_fn: Callable[[], bytes],
+) -> None:
+    """Bytes-writing sibling of `export_via_dialog`, for binary formats
+    (e.g. PDF) that can't go through `Path.write_text`."""
+    if not has_data:
+        return
+    path = native_dialog.ask_save_file(
+        defaultextension=f".{extension}",
+        filetypes=[(filetype_label, f"*.{extension}")],
+    )
+    if path:
+        Path(path).write_bytes(content_fn())
+
+
 def card(parent, **kwargs) -> ctk.CTkFrame:
     """Standard card container: `COLORS['card']` background, RADIUS_CARD.
 
