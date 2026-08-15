@@ -9,8 +9,7 @@ import customtkinter as ctk
 from norefund.core.models_registry import ModelInfo
 from norefund.gui import formatting, motion, theme
 from norefund.gui.theme import COLORS
-from norefund.gui.widgets import LoadingOverlay, ProviderBadge, bind_mousewheel
-from norefund.gui.widgets import card as card_factory
+from norefund.gui.widgets import LoadingOverlay, ProviderBadge, bind_mousewheel, card
 
 _MIN_CARD_WIDTH = 340
 _PILL_HEIGHT = theme.CONTROL_SM
@@ -162,11 +161,11 @@ class RegistryView(ctk.CTkFrame):
 
     def _build_card(self, model: ModelInfo) -> ctk.CTkFrame:
         accent = theme.provider_color(model.provider)
-        model_card = card_factory(self._scroll)
+        model_card = card(self._scroll)
 
         header_tint = (
-            formatting.tint(accent, COLORS["card"][0], 0.09),
-            formatting.tint(accent, COLORS["card"][1], 0.09),
+            formatting.blend(accent, COLORS["card"][0], 0.09),
+            formatting.blend(accent, COLORS["card"][1], 0.09),
         )
         header = ctk.CTkFrame(model_card, fg_color=header_tint, corner_radius=0)
         header.pack(fill="x")
@@ -280,8 +279,8 @@ class RegistryView(ctk.CTkFrame):
 
     def _visible_cards(self) -> list[ctk.CTkFrame]:
         return [
-            card
-            for model, card in self._cards
+            card_frame
+            for model, card_frame in self._cards
             if self._active_provider == "All" or model.provider == self._active_provider
         ]
 
@@ -297,12 +296,12 @@ class RegistryView(ctk.CTkFrame):
         for i in range(col_count):
             self._scroll.columnconfigure(i, weight=1)
 
-        for model, card in self._cards:
-            card.grid_forget()
+        for model, card_frame in self._cards:
+            card_frame.grid_forget()
 
-        for index, card in enumerate(self._visible_cards()):
+        for index, card_frame in enumerate(self._visible_cards()):
             row, col = divmod(index, col_count)
-            card.grid(
+            card_frame.grid(
                 row=row,
                 column=col,
                 sticky="nsew",

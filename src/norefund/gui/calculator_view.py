@@ -207,11 +207,11 @@ class CalculatorView(ctk.CTkFrame):
             sticky="nsew",
             padx=(theme.SPACE_4 if border else 0, 0),
         )
-        pad = ctk.CTkFrame(col_frame, fg_color="transparent")
-        pad.pack(padx=(theme.SPACE_3, 0) if border else 0, fill="x")
-        section_label(pad, label).pack(fill="x")
+        pad_frame = ctk.CTkFrame(col_frame, fg_color="transparent")
+        pad_frame.pack(padx=(theme.SPACE_3, 0) if border else 0, fill="x")
+        section_label(pad_frame, label).pack(fill="x")
         value_label = ctk.CTkLabel(
-            pad,
+            pad_frame,
             text="$0.00",
             font=theme.mono_font(theme.FONT_DISPLAY, "bold"),
             text_color=COLORS["primary"],
@@ -219,7 +219,7 @@ class CalculatorView(ctk.CTkFrame):
         )
         value_label.pack(fill="x")
         rate_label = ctk.CTkLabel(
-            pad,
+            pad_frame,
             text="",
             font=theme.font(theme.FONT_SMALL),
             text_color=COLORS["muted_fg"],

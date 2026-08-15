@@ -102,11 +102,16 @@ def elide_middle(text: str, max_chars: int) -> str:
     return f"{text[:head_len]}…{text[-tail_len:]}"
 
 
-def tint(accent_hex: str, bg_hex: str, alpha: float) -> str:
-    """Alpha-blend accent_hex over bg_hex, returning a flat hex color."""
-    a = _hex_to_rgb(accent_hex)
-    b = _hex_to_rgb(bg_hex)
-    blended = tuple(round(b[i] + (a[i] - b[i]) * alpha) for i in range(3))
+def blend(top_hex: str, bottom_hex: str, alpha: float) -> str:
+    """Alpha-composite top_hex over bottom_hex, returning a flat hex color.
+
+    Generic color math, not specific to "accent over background" -- e.g.
+    motion.py uses this to darken a button's own fg_color by blending
+    black over it, where neither color is an "accent."
+    """
+    top = _hex_to_rgb(top_hex)
+    bottom = _hex_to_rgb(bottom_hex)
+    blended = tuple(round(bottom[i] + (top[i] - bottom[i]) * alpha) for i in range(3))
     return "#{:02x}{:02x}{:02x}".format(*blended)
 
 

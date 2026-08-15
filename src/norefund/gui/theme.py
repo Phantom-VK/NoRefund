@@ -157,7 +157,7 @@ def mono_font(size: int = FONT_BODY, weight: str = "normal") -> tuple[str, int, 
     return (_mono_family_name(), size, weight)
 
 
-def font_px(
+def tk_font(
     size: int = FONT_BODY, weight: str = "normal", scaling: float = 1.0
 ) -> tuple[str, int, str]:
     """Like font(), but for plain tkinter widgets (tk.Label/tk.Frame, not

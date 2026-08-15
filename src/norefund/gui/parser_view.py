@@ -59,21 +59,22 @@ def _bind_row_hover(row: ctk.CTkFrame) -> None:
 
 
 class ResultsTable(ctk.CTkScrollableFrame):
-    _COLUMNS = [
-        "File",
-        "Tokens",
-        "Context %",
-        "Fits?",
-        "Chunks",
-        "Input Cost",
-        "Words",
-        "Chars",
+    # (column label, grid weight) -- one list instead of two parallel ones
+    # that had to stay index-aligned across every loop below.
+    _COLUMNS: list[tuple[str, int]] = [
+        ("File", 3),
+        ("Tokens", 1),
+        ("Context %", 2),
+        ("Fits?", 1),
+        ("Chunks", 1),
+        ("Input Cost", 1),
+        ("Words", 1),
+        ("Chars", 1),
     ]
-    _WEIGHTS = [3, 1, 2, 1, 1, 1, 1, 1]
 
     def __init__(self, parent, **kwargs) -> None:
         super().__init__(parent, fg_color=COLORS["bg"], **kwargs)
-        for i, weight in enumerate(self._WEIGHTS):
+        for i, (_label, weight) in enumerate(self._COLUMNS):
             self.columnconfigure(i, weight=weight)
         self._build_header()
         self._row_frames: list[ctk.CTkFrame] = []
@@ -84,11 +85,10 @@ class ResultsTable(ctk.CTkScrollableFrame):
         header.grid(
             row=0, column=0, columnspan=len(self._COLUMNS), sticky="ew", pady=(0, 2)
         )
-        for i, weight in enumerate(self._WEIGHTS):
+        for i, (label, weight) in enumerate(self._COLUMNS):
             header.columnconfigure(i, weight=weight)
-        for i, col in enumerate(self._COLUMNS):
             anchor = "w" if i == 0 else "e"
-            section_label(header, col, anchor=anchor).grid(
+            section_label(header, label, anchor=anchor).grid(
                 row=0, column=i, sticky="ew", padx=theme.SPACE_2, pady=theme.SPACE_1
             )
 
@@ -105,7 +105,7 @@ class ResultsTable(ctk.CTkScrollableFrame):
     def _add_row(self, row_index: int, result: AnalysisResult) -> None:
         row = ctk.CTkFrame(self, fg_color="transparent")
         row.grid(row=row_index, column=0, columnspan=len(self._COLUMNS), sticky="ew")
-        for i, weight in enumerate(self._WEIGHTS):
+        for i, (_label, weight) in enumerate(self._COLUMNS):
             row.columnconfigure(i, weight=weight)
         self._row_frames.append(row)
 
