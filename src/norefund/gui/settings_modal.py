@@ -102,14 +102,19 @@ class SettingsModal(ctk.CTkToplevel):
         self._output_tokens_var = ctk.StringVar(
             value=str(self._settings.default_output_tokens)
         )
-        ctk.CTkEntry(
+        self._output_tokens_entry = ctk.CTkEntry(
             body,
             textvariable=self._output_tokens_var,
             height=theme.CONTROL_MD,
             font=theme.mono_font(theme.FONT_LABEL),
             fg_color=COLORS["input_bg"],
-            border_width=0,
-        ).pack(fill="x")
+            border_width=1,
+            border_color=COLORS["input_bg"],
+        )
+        self._output_tokens_entry.pack(fill="x")
+        self._output_tokens_entry.bind(
+            "<KeyRelease>", lambda _e: self._on_output_tokens_edited()
+        )
 
         ctk.CTkLabel(
             body,
@@ -238,6 +243,15 @@ class SettingsModal(ctk.CTkToplevel):
         motion.press_feedback(cancel_btn)
 
     # ------------------------------------------------------------------
+
+    def _on_output_tokens_edited(self) -> None:
+        self._output_tokens_entry.configure(
+            border_color=(
+                COLORS["input_bg"]
+                if formatting.is_valid_int(self._output_tokens_var.get())
+                else COLORS["destructive"]
+            )
+        )
 
     def _clear_hf_token(self) -> None:
         secrets.delete_hf_token()

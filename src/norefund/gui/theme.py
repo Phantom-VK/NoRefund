@@ -32,13 +32,22 @@ COLORS: dict[str, tuple[str, str]] = {
     "popover_hover": ("#e8eaed", "#343b47"),
     "primary": ("#00b894", "#00d4aa"),
     "primary_hover": ("#009f7f", "#00b894"),
-    "primary_fg": ("#ffffff", "#0d1117"),
+    # Dark text, not white: white-on-#00b894 is ~2.5:1 contrast, well under
+    # WCAG AA's 4.5:1 for text. Dark mode's value already got this right
+    # (#0d1117 on #00d4aa) -- light mode now matches it, since primary's
+    # own brightness barely changes between modes.
+    "primary_fg": ("#0d1117", "#0d1117"),
     "secondary": ("#eef0f3", "#242830"),
     "secondary_fg": ("#0f1117", "#e6edf3"),
     "muted": ("#e8eaed", "#242830"),
     "muted_fg": ("#6b7280", "#7d8590"),
     "destructive": ("#ef4444", "#f85149"),
     "destructive_fg": ("#ffffff", "#ffffff"),
+    # A "muted" chip lightly tinted toward destructive -- rest-state
+    # background for IconButton's "danger" variant, so a destructive
+    # button (e.g. Clear) reads as different from a neutral one before
+    # hover, not just on it.
+    "destructive_muted": ("#e9cccf", "#4a2f34"),
     "border": ("#e2e2e4", "#2a2f39"),
     "input_bg": ("#eef0f3", "#242830"),
     "sidebar": ("#ffffff", "#181c23"),
