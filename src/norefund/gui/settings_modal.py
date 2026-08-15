@@ -26,8 +26,14 @@ class SettingsModal(ctk.CTkToplevel):
         self._on_save = on_save
 
         self.title("Settings")
-        self.geometry("480x620")
-        self.resizable(False, False)
+        # Clamp against the actual screen so the footer (Save/Cancel) can't
+        # be pushed off-screen -- the fixed 480x620 overflowed at 150% HiDPI
+        # scaling and on small/laptop screens. Height stays resizable as a
+        # safety net for anything smaller than this clamp still allows.
+        width = min(480, self.winfo_screenwidth() - 80)
+        height = min(620, self.winfo_screenheight() - 120)
+        self.geometry(f"{width}x{height}")
+        self.resizable(False, True)
         self.configure(fg_color=COLORS["card"])
         self.transient(parent.winfo_toplevel())
 
