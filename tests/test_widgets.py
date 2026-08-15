@@ -12,7 +12,11 @@ import pytest
 ctk = pytest.importorskip("customtkinter")
 
 from norefund.gui import theme  # noqa: E402
-from norefund.gui.widgets import DropdownButton, DropdownItem  # noqa: E402
+from norefund.gui.widgets import (  # noqa: E402
+    DropdownButton,
+    DropdownItem,
+    _popover_geometry,
+)
 
 from .conftest import _pump  # noqa: E402
 
@@ -148,6 +152,81 @@ def test_popover_follows_window_on_resize(root):
 
     assert after != before
     popover.destroy()
+
+
+def test_popover_matches_trigger_width_at_hidpi_scaling(root):
+    # Regression: CTkToplevel.geometry() re-multiplies width/height (but not
+    # x/y) by the window's scaling factor -- at scaling 1.0 that's a no-op,
+    # which is why the plain width test above didn't catch this. Force a
+    # HiDPI-like scaling factor and confirm the popover still renders at the
+    # trigger's real device-pixel width, not scaled again on top of it.
+    ctk.ScalingTracker.set_widget_scaling(1.5)
+    ctk.ScalingTracker.set_window_scaling(1.5)
+    try:
+        button = DropdownButton(root, _ITEMS, "a", on_select=lambda _v: None)
+        button.configure(width=300)
+        button.pack()
+        _pump(root, 20)
+
+        button._toggle()
+        _pump(root, 30)
+
+        expected = max(button.winfo_width(), 220)
+        assert abs(button._popover.winfo_width() - expected) <= 1
+        button._popover.destroy()
+    finally:
+        ctk.ScalingTracker.set_widget_scaling(1.0)
+        ctk.ScalingTracker.set_window_scaling(1.0)
+        _pump(root, 20)
+
+
+def test_popover_geometry_flips_upward_near_bottom_of_screen(root, monkeypatch):
+    # Drives _popover_geometry directly rather than through a real toggle:
+    # under a WM-less Xvfb (no window manager to honor absolute placement
+    # requests for a plain, non-override-redirect toplevel), `root`/`button`
+    # winfo_rooty() stays pinned at 0 regardless of any geometry() call, so
+    # a real end-to-end version of this test can't reliably force "anchor
+    # near the bottom of the screen" -- monkeypatching the winfo methods
+    # this function actually reads exercises the same decision directly.
+    button = DropdownButton(root, _ITEMS, "a", on_select=lambda _v: None)
+    button.pack()
+    _pump(root, 20)
+    monkeypatch.setattr(button, "winfo_rooty", lambda: 900)
+    monkeypatch.setattr(button, "winfo_screenheight", lambda: 1000)
+
+    geometry = _popover_geometry(button, root, row_count=3, row_height=42)
+
+    y = int(geometry.rsplit("+", 1)[-1])
+    assert y < 900  # opened above the anchor, not below it off-screen
+
+
+def test_unmap_closes_open_popovers(root):
+    button = DropdownButton(root, _ITEMS, "a", on_select=lambda _v: None)
+    button.pack()
+    _pump(root, 20)
+    button._toggle()
+    _pump(root, 20)
+    assert button._popover is not None
+
+    root.event_generate("<Unmap>")
+    _pump(root, 20)
+
+    assert button._popover is None
+
+
+def test_focus_out_closes_open_popovers_when_app_loses_focus(root, monkeypatch):
+    button = DropdownButton(root, _ITEMS, "a", on_select=lambda _v: None)
+    button.pack()
+    _pump(root, 20)
+    button._toggle()
+    _pump(root, 20)
+    assert button._popover is not None
+
+    monkeypatch.setattr(root, "focus_get", lambda: None)
+    root.event_generate("<FocusOut>")
+    _pump(root, 20)
+
+    assert button._popover is None
 
 
 def test_close_all_closes_every_open_popover(root):

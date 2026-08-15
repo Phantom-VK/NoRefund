@@ -210,12 +210,26 @@ class DropdownItem:
     icon: ctk.CTkImage | None = None
 
 
-def _popover_geometry(anchor, row_count: int, row_height: int) -> str:
+def _popover_geometry(anchor, popover, row_count: int, row_height: int) -> str:
     anchor.update_idletasks()
-    x = anchor.winfo_rootx()
-    y = anchor.winfo_rooty() + anchor.winfo_height() + 2
     width = max(anchor.winfo_width(), 220)
     height = min(row_height * row_count, 320)
+
+    x = anchor.winfo_rootx()
+    x = min(x, max(0, anchor.winfo_screenwidth() - width))
+    y = anchor.winfo_rooty() + anchor.winfo_height() + 2
+    if y + height > anchor.winfo_screenheight():
+        y = anchor.winfo_rooty() - height - 2  # doesn't fit below -- open above
+    y = max(0, y)
+
+    # CTkToplevel.geometry() re-multiplies width/height (but not x/y) by the
+    # window's own scaling factor before applying, while winfo_width()/
+    # winfo_height() above are already real device pixels -- pre-divide so
+    # the two cancel out, otherwise the popover renders `scaling`x too big
+    # on any HiDPI display.
+    scaling = ctk.ScalingTracker.get_window_scaling(popover)
+    width = round(width / scaling)
+    height = round(height / scaling)
     return f"{width}x{height}+{x}+{y}"
 
 
@@ -257,10 +271,33 @@ def _ensure_root_tracking(root) -> None:
             if not button.winfo_exists():
                 continue
             popover.geometry(
-                _popover_geometry(button, popover._row_count, popover._ROW_HEIGHT)
+                _popover_geometry(
+                    button, popover, popover._row_count, popover._ROW_HEIGHT
+                )
             )
 
     root.bind("<Configure>", _reposition_open_popovers, add="+")
+
+    def _on_root_unmap(event=None) -> None:
+        # Same bindtags quirk as <Configure> above -- filter to the root's
+        # own Unmap, not some descendant frame being pack_forget()'d.
+        if event is not None and event.widget is not root:
+            return
+        DropdownButton.close_all()
+
+    def _on_focus_out(_event=None) -> None:
+        # bind_all so this actually fires (a bare bind() on `root` only
+        # triggers if the root widget itself held focus, which it almost
+        # never does -- some descendant entry/button does). focus_get()
+        # returns None only when no widget in this app holds input focus
+        # any more, i.e. the OS moved focus to a different application --
+        # ordinary in-app focus changes (tabbing between fields) always
+        # leave some widget focused, so they don't trigger this.
+        if root.focus_get() is None:
+            DropdownButton.close_all()
+
+    root.bind("<Unmap>", _on_root_unmap, add="+")
+    root.bind_all("<FocusOut>", _on_focus_out, add="+")
 
 
 class DropdownButton(ctk.CTkFrame):
@@ -408,7 +445,9 @@ class DropdownPopover(ctk.CTkToplevel):
         self.configure(fg_color=COLORS["popover"])
         self.attributes("-topmost", True)
 
-        self.geometry(_popover_geometry(anchor, self._row_count, self._ROW_HEIGHT))
+        self.geometry(
+            _popover_geometry(anchor, self, self._row_count, self._ROW_HEIGHT)
+        )
         _ensure_root_tracking(anchor.winfo_toplevel())
 
         scroll = ctk.CTkScrollableFrame(self, fg_color=COLORS["popover"])
