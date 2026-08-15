@@ -167,8 +167,8 @@ def test_download_error_renders_inline(root, monkeypatch):
     _pump_until(root, lambda: not view.is_busy())
 
     row = view._rows[resource.key]
-    assert row._error_label.cget("text") == "network unreachable"
-    assert row._error_label.grid_info() != {}
+    assert row._notes_label.cget("text") == "network unreachable"
+    assert row._notes_label.grid_info() != {}
 
 
 def test_gated_repo_note_shows_open_page_link(root, monkeypatch):
@@ -187,9 +187,16 @@ def test_gated_repo_note_shows_open_page_link(root, monkeypatch):
         source_url="https://huggingface.co/meta-llama/Meta-Llama-3-8B",
         notes="Gated repo — requires HF account/token",
     )
-    row = _TokenizerRow(view._scroll, gated, view)
-    assert row._error_label.cget("text").endswith("open page")
-    assert row._error_label.cget("cursor") == "hand2"
+    row = _TokenizerRow(
+        view._scroll,
+        gated,
+        is_downloading=view.is_downloading,
+        is_busy=view.is_busy,
+        start_download=view.start_download,
+        cancel_download=view.cancel_download,
+    )
+    assert row._notes_label.cget("text").endswith("open page")
+    assert row._notes_label.cget("cursor") == "hand2"
 
 
 def test_destroy_mid_scan_does_not_crash(root, monkeypatch):

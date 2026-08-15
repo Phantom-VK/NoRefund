@@ -7,6 +7,7 @@ import subprocess
 import sys
 import threading
 import webbrowser
+from collections.abc import Callable
 from pathlib import Path
 
 import customtkinter as ctk
@@ -48,13 +49,23 @@ def _open_folder(path: Path) -> None:
 
 class _TokenizerRow(ctk.CTkFrame):
     def __init__(
-        self, parent, resource: TokenizerResource, view: ResourcesView
+        self,
+        parent,
+        resource: TokenizerResource,
+        *,
+        is_downloading: Callable[[str], bool],
+        is_busy: Callable[[], bool],
+        start_download: Callable[[TokenizerResource], None],
+        cancel_download: Callable[[], None],
     ) -> None:
         super().__init__(
             parent, fg_color=COLORS["card"], corner_radius=theme.RADIUS_CARD
         )
         self._resource = resource
-        self._view = view
+        self._is_downloading = is_downloading
+        self._is_busy = is_busy
+        self._start_download = start_download
+        self._cancel_download = cancel_download
 
         inner = ctk.CTkFrame(self, fg_color="transparent")
         inner.pack(fill="x", padx=theme.SPACE_4, pady=theme.SPACE_3)
@@ -115,7 +126,10 @@ class _TokenizerRow(ctk.CTkFrame):
         self._action_area = ctk.CTkFrame(inner, fg_color="transparent")
         self._action_area.grid(row=0, column=3, rowspan=2)
 
-        self._error_label = ctk.CTkLabel(
+        # Renders resource.notes, which is often not an error at all (e.g.
+        # an auth hint with an "open page" link) -- named for its content,
+        # not assumed failure state.
+        self._notes_label = ctk.CTkLabel(
             inner,
             text="",
             font=theme.font(theme.FONT_SMALL),
@@ -142,40 +156,43 @@ class _TokenizerRow(ctk.CTkFrame):
         else:
             self._path_label.configure(text="not downloaded")
 
-        show_link = resource.notes and resource.backend == "hf" and resource.source_url
+        link_url = (
+            resource.source_url
+            if resource.notes and resource.backend == "hf" and resource.source_url
+            else None
+        )
         if resource.notes:
             text = resource.notes
-            if show_link:
+            if link_url:
                 text += "  open page"
-            self._error_label.configure(
+            self._notes_label.configure(
                 text=text,
                 image=(
                     theme.icon_image(
                         "external_link", size=12, color=COLORS["destructive"]
                     )
-                    if show_link
+                    if link_url
                     else theme.blank_icon(size=12)
                 ),
                 compound="right",
             )
-            self._error_label.grid(
+            self._notes_label.grid(
                 row=3, column=1, columnspan=3, sticky="ew", pady=(theme.SPACE_1, 0)
             )
-            if show_link:
-                self._error_label.configure(cursor="hand2")
-                self._error_label.bind(
-                    "<Button-1>",
-                    lambda _e, url=resource.source_url: webbrowser.open(url),
+            if link_url:
+                self._notes_label.configure(cursor="hand2")
+                self._notes_label.bind(
+                    "<Button-1>", lambda _e, url=link_url: webbrowser.open(url)
                 )
             else:
-                self._error_label.configure(cursor="")
-                self._error_label.unbind("<Button-1>")
+                self._notes_label.configure(cursor="")
+                self._notes_label.unbind("<Button-1>")
         else:
-            self._error_label.grid_forget()
+            self._notes_label.grid_forget()
 
-        self._render_action()
+        self.refresh_action()
 
-    def _render_action(self) -> None:
+    def refresh_action(self) -> None:
         for child in self._action_area.winfo_children():
             child.destroy()
 
@@ -188,7 +205,7 @@ class _TokenizerRow(ctk.CTkFrame):
             ).pack(side="left")
             return
 
-        if self._view.is_downloading(self._resource.key):
+        if self._is_downloading(self._resource.key):
             self._progress = ctk.CTkProgressBar(
                 self._action_area,
                 width=120,
@@ -202,7 +219,7 @@ class _TokenizerRow(ctk.CTkFrame):
                 "Cancel",
                 icon="x",
                 variant="danger",
-                command=self._view.cancel_download,
+                command=self._cancel_download,
             ).pack(side="left")
             return
 
@@ -212,8 +229,8 @@ class _TokenizerRow(ctk.CTkFrame):
             "Download",
             icon="download",
             variant="primary",
-            command=lambda: self._view.start_download(self._resource),
-            state="normal" if can_download and not self._view.is_busy() else "disabled",
+            command=lambda: self._start_download(self._resource),
+            state="normal" if can_download and not self._is_busy() else "disabled",
         ).pack(side="left")
 
     def set_progress(self, downloaded: int, total: int | None) -> None:
@@ -384,7 +401,14 @@ class ResourcesView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             fill="x", pady=(0, theme.SPACE_2)
         )
         for resource in report.tokenizers:
-            row = _TokenizerRow(self._scroll, resource, self)
+            row = _TokenizerRow(
+                self._scroll,
+                resource,
+                is_downloading=self.is_downloading,
+                is_busy=self.is_busy,
+                start_download=self.start_download,
+                cancel_download=self.cancel_download,
+            )
             row.pack(fill="x", pady=theme.SPACE_1)
             self._rows[resource.key] = row
 
@@ -410,7 +434,7 @@ class ResourcesView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         self._downloading_key = resource.key
         self._cancel_event = threading.Event()
         for row in self._rows.values():
-            row._render_action()
+            row.refresh_action()
         threading.Thread(
             target=self._download_worker,
             args=(resource, self._cancel_event),
@@ -487,7 +511,7 @@ class ResourcesView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
                 formatting.fmt_bytes(self._report.total_tokenizer_bytes)
             )
         for r in self._rows.values():
-            r._render_action()
+            r.refresh_action()
         self._advance_queue()
 
     def _on_download_failed(self, resource: TokenizerResource, message: str) -> None:
@@ -508,12 +532,12 @@ class ResourcesView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         if row is not None:
             row.set_resource(failed)
         for r in self._rows.values():
-            r._render_action()
+            r.refresh_action()
         self._advance_queue()
 
     def _on_download_cancelled(self, resource: TokenizerResource) -> None:
         self._downloading_key = None
         self._cancel_event = None
         for r in self._rows.values():
-            r._render_action()
+            r.refresh_action()
         self._advance_queue()

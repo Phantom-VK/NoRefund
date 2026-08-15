@@ -151,12 +151,12 @@ class ProviderBadge(ctk.CTkLabel):
     def __init__(self, parent, provider: str, **kwargs) -> None:
         accent = theme.provider_color(provider)
         bg_tint = (
-            formatting.tint(accent, COLORS["card"][0], 0.13),
-            formatting.tint(accent, COLORS["card"][1], 0.18),
+            formatting.blend(accent, COLORS["card"][0], 0.13),
+            formatting.blend(accent, COLORS["card"][1], 0.18),
         )
         text_color = (
-            formatting.tint("#000000", accent, self._TEXT_BLEND),
-            formatting.tint("#ffffff", accent, self._TEXT_BLEND),
+            formatting.blend("#000000", accent, self._TEXT_BLEND),
+            formatting.blend("#ffffff", accent, self._TEXT_BLEND),
         )
         super().__init__(
             parent,
@@ -543,14 +543,14 @@ class DropdownPopover(ctk.CTkToplevel):
             icon_label.pack(side="left", padx=(8, theme.SPACE_2), pady=theme.SPACE_2)
             widgets.append(icon_label)
 
-        # font_px (not font): a plain tk.Label renders a positive font size
+        # tk_font (not font): a plain tk.Label renders a positive font size
         # in *points*, while the trigger's CTkLabel converts the same
         # nominal size to *pixels* internally -- using font() here would
         # render visibly larger than the trigger despite an equal number.
         label = tk.Label(
             row,
             text=item.label,
-            font=theme.font_px(theme.FONT_LABEL, scaling=widget_scaling),
+            font=theme.tk_font(theme.FONT_LABEL, scaling=widget_scaling),
             fg=text_hex,
             bg=resting_hex,
             bd=0,

@@ -2,7 +2,7 @@
 
 CustomTkinter has no transition system (no transforms, no opacity, no
 springs on Tk widgets), so both of these animate `fg_color`/`text_color`
-directly via `after()` and `formatting.tint()`. Per Emil Kowalski's
+directly via `after()` and `formatting.blend()`. Per Emil Kowalski's
 frequency rule, nothing here touches view switching or hover (CTk already
 handles hover) — only press feedback and the loading->loaded handoff.
 """
@@ -66,8 +66,8 @@ def press_feedback(button, *, alpha: float = 0.15) -> None:
         pressed_at = time.monotonic()
         original_fg = fg
         pressed_fg = (
-            formatting.tint("#000000", ref_light, alpha),
-            formatting.tint("#000000", ref_dark, alpha),
+            formatting.blend("#000000", ref_light, alpha),
+            formatting.blend("#000000", ref_dark, alpha),
         )
         _safe_configure(button, fg_color=pressed_fg)
 
@@ -118,8 +118,8 @@ def fade_text_color(
         if cancelled:
             return
         alpha = i / steps
-        light = formatting.tint(to_token[0], from_token[0], alpha)
-        dark = formatting.tint(to_token[1], from_token[1], alpha)
+        light = formatting.blend(to_token[0], from_token[0], alpha)
+        dark = formatting.blend(to_token[1], from_token[1], alpha)
         _safe_configure(widget, text_color=(light, dark))
         if i >= steps:
             if on_done is not None:
