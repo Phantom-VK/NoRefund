@@ -69,6 +69,30 @@ def test_loading_text_shows_first_then_atomic_reveal(root):
     assert len(final_cards) == len(shell.models)
 
 
+def test_configure_on_a_card_does_not_trigger_relayout(root):
+    # Tk's bindtags put the scroll frame's pathname in every descendant
+    # card's bindtags too, so a plain bind() fires on each card's own
+    # Configure as well as the scroll frame's -- the handler must filter
+    # to the scroll frame's own Configure only.
+    shell = _FakeShell(models=list_models())
+    view = RegistryView(root, shell)
+    _pump_until(root, lambda: not view._loading)
+    _pump(root, _FADE_SETTLE_MS)
+    assert view._cards, "expected cards to have loaded"
+
+    relayout_calls: list = []
+    view._relayout = lambda force=False: relayout_calls.append(force)
+
+    _, first_card = view._cards[0]
+    first_card.event_generate("<Configure>")
+    _pump(root, 20)
+    assert relayout_calls == []
+
+    view._scroll.event_generate("<Configure>")
+    _pump(root, 20)
+    assert relayout_calls == [False]
+
+
 def test_navigating_away_mid_load_does_not_crash(root):
     shell = _FakeShell(models=list_models())
     view = RegistryView(root, shell)
