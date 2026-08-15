@@ -247,3 +247,118 @@ def test_close_all_closes_every_open_popover(root):
 
     assert b1._popover is None
     assert b2._popover is None
+
+
+# Keyboard-navigation tests below need a *visible* (not withdrawn) root:
+# real KeyPress dispatch follows actual X input focus, and under a
+# window-manager-less Xvfb (this test environment), a withdrawn toplevel
+# can never hold real focus, so focus_set() silently no-ops and no
+# KeyPress ever arrives. A visible root's own focus_force() (bypassing
+# WM cooperation entirely, since there's no WM here to cooperate with)
+# does work, which is what these use instead of the shared `root` fixture.
+@pytest.fixture
+def visible_root():
+    try:
+        r = ctk.CTk()
+    except Exception as exc:  # no display available
+        pytest.skip(f"no Tk display available: {exc}")
+    yield r
+    r.destroy()
+
+
+def test_return_and_space_open_the_dropdown(visible_root):
+    root = visible_root
+    button = DropdownButton(root, _ITEMS, "a", on_select=lambda _v: None)
+    button.pack()
+    root.update()
+
+    button._canvas.focus_force()
+    root.update()
+    button._canvas.event_generate("<Return>")
+    root.update()
+
+    assert button._popover is not None
+    button._popover.destroy()
+    root.update()
+
+    button._canvas.event_generate("<space>")
+    root.update()
+    assert button._popover is not None
+
+
+def test_focus_in_and_out_toggle_the_border_color(visible_root):
+    root = visible_root
+    button = DropdownButton(root, _ITEMS, "a", on_select=lambda _v: None)
+    button.pack()
+    root.update()
+    rest_color = button.cget("border_color")
+
+    button._canvas.focus_force()
+    root.update()
+    assert button.cget("border_color") == theme.COLORS["primary"]
+
+    button._canvas.event_generate("<FocusOut>")
+    root.update()
+    assert button.cget("border_color") == rest_color
+
+
+def test_arrow_keys_move_highlight_and_return_selects_and_closes(visible_root):
+    root = visible_root
+    picks: list[str] = []
+    button = DropdownButton(root, _ITEMS, "a", on_select=picks.append)
+    button.pack()
+    root.update()
+
+    button._canvas.focus_force()
+    root.update()
+    button._canvas.event_generate("<Return>")
+    root.update()
+    popover = button._popover
+    assert popover is not None
+    popover.focus_force()
+    root.update()
+
+    assert popover._highlighted == "a"
+    popover.event_generate("<Down>")
+    root.update()
+    assert popover._highlighted == "b"
+    popover.event_generate("<Down>")
+    root.update()
+    assert popover._highlighted == "c"
+    popover.event_generate("<Up>")
+    root.update()
+    assert popover._highlighted == "b"
+
+    popover.event_generate("<Return>")
+    root.update()
+
+    assert picks == ["b"]
+    assert button.selected_value() == "b"
+    assert button._popover is None
+    # Focus returns to the trigger so Tab/Return keep working right after.
+    assert root.focus_get() is button._canvas
+
+
+def test_escape_closes_popover_without_selecting(visible_root):
+    root = visible_root
+    picks: list[str] = []
+    button = DropdownButton(root, _ITEMS, "a", on_select=picks.append)
+    button.pack()
+    root.update()
+
+    button._canvas.focus_force()
+    root.update()
+    button._canvas.event_generate("<Return>")
+    root.update()
+    popover = button._popover
+    popover.focus_force()
+    root.update()
+
+    popover.event_generate("<Down>")
+    root.update()
+    popover.event_generate("<Escape>")
+    root.update()
+
+    assert picks == []
+    assert button.selected_value() == "a"
+    assert button._popover is None
