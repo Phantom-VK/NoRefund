@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 
@@ -32,6 +33,28 @@ from norefund.gui.widgets import (
     section_label,
 )
 from norefund.logging_config import latest_log_file
+
+
+def _bind_row_hover(row: ctk.CTkFrame) -> None:
+    """Highlight `row` on hover, binding every descendant too (not just
+    `row` itself) -- Tk delivers <Leave> to a parent the instant the
+    pointer crosses into a child (NotifyInferior), so a plain frame-only
+    binding drops the highlight as soon as the pointer reaches any of the
+    row's cell labels. Mirrors DropdownPopover._build_row's same fix."""
+
+    def _on_enter(_event=None) -> None:
+        row.configure(fg_color=COLORS["muted"])
+
+    def _on_leave(_event=None) -> None:
+        row.configure(fg_color="transparent")
+
+    def _bind_recursive(widget) -> None:
+        widget.bind("<Enter>", _on_enter)
+        widget.bind("<Leave>", _on_leave)
+        for child in widget.winfo_children():
+            _bind_recursive(child)
+
+    _bind_recursive(row)
 
 
 class ResultsTable(ctk.CTkScrollableFrame):
@@ -83,8 +106,6 @@ class ResultsTable(ctk.CTkScrollableFrame):
         row.grid(row=row_index, column=0, columnspan=len(self._COLUMNS), sticky="ew")
         for i, weight in enumerate(self._WEIGHTS):
             row.columnconfigure(i, weight=weight)
-        row.bind("<Enter>", lambda _e: row.configure(fg_color=COLORS["muted"]))
-        row.bind("<Leave>", lambda _e: row.configure(fg_color="transparent"))
         self._row_frames.append(row)
 
         name = Path(result.file_path).name
@@ -115,6 +136,7 @@ class ResultsTable(ctk.CTkScrollableFrame):
                 sticky="ew",
                 **pad,
             )
+            _bind_row_hover(row)
             return
 
         ctk.CTkLabel(
@@ -178,6 +200,7 @@ class ResultsTable(ctk.CTkScrollableFrame):
             font=theme.mono_font(theme.FONT_BODY),
             anchor="e",
         ).grid(row=0, column=7, sticky="ew", **pad)
+        _bind_row_hover(row)
 
 
 class LogsPanel(ctk.CTkFrame):
@@ -199,13 +222,18 @@ class LogsPanel(ctk.CTkFrame):
             state="disabled",
         )
         self._textbox.pack(fill="both", expand=True)
-        for level, token in self._TAG_COLORS.items():
-            is_dark = ctk.get_appearance_mode() == "Dark"
-            self._textbox.tag_config(level, foreground=theme.resolve(token, is_dark))
 
     def refresh(self) -> None:
         if not self.winfo_exists():
             return
+        # Re-applied on every refresh (not just once at construction) so a
+        # theme toggle after this view was first built doesn't leave log
+        # colors stuck on the old appearance mode -- views are cached and
+        # never rebuilt, so __init__ alone would only ever run once.
+        is_dark = ctk.get_appearance_mode() == "Dark"
+        for level, token in self._TAG_COLORS.items():
+            self._textbox.tag_config(level, foreground=theme.resolve(token, is_dark))
+
         self._textbox.configure(state="normal")
         self._textbox.delete("1.0", "end")
         log_path = latest_log_file()
@@ -397,20 +425,30 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
     # File selection
     # ------------------------------------------------------------------
 
+    def _add_paths(self, new_paths: Iterable[Path]) -> None:
+        """Append `new_paths`, skipping any already in `self._paths` (by
+        resolved path) -- re-adding or re-dropping the same file/folder
+        would otherwise double it up and analyze it twice."""
+        existing = {p.resolve() for p in self._paths}
+        for p in new_paths:
+            resolved = p.resolve()
+            if resolved not in existing:
+                self._paths.append(p)
+                existing.add(resolved)
+
     def _add_files(self) -> None:
         paths = native_dialog.ask_open_files(SUPPORTED_FILETYPES)
-        for p in paths:
-            self._paths.append(Path(p))
+        self._add_paths(Path(p) for p in paths)
         self._refresh_file_strip()
 
     def _add_folder(self) -> None:
         folder = native_dialog.ask_directory()
         if folder:
-            self._paths.append(Path(folder))
+            self._add_paths([Path(folder)])
         self._refresh_file_strip()
 
     def _on_files_dropped(self, paths: list[Path]) -> None:
-        self._paths.extend(paths)
+        self._add_paths(paths)
         self._refresh_file_strip()
 
     def _remove_path(self, path: Path) -> None:
@@ -421,12 +459,22 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         if self.analyzing and self.cancel_event is not None:
             self.cancel_event.set()
         self._reset_busy_state()
+        cleared_count = len(self._paths)
         self._paths = []
         self._results = []
         self._refresh_file_strip()
         self._show_empty_results()
-        self._status_bar.pack_forget()
         self.shell.update_header_count(0)
+
+        if cleared_count:
+            self._status_left.configure(
+                text=f"Cleared — {cleared_count} file(s) removed",
+                image=theme.blank_icon(size=14),
+            )
+            self._status_right.configure(text="")
+            self._status_bar.pack(side="bottom", fill="x")
+        else:
+            self._status_bar.pack_forget()
 
     def _refresh_file_strip(self) -> None:
         for child in self._file_strip.winfo_children():

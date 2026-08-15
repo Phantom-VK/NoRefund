@@ -100,7 +100,15 @@ class RegistryView(ctk.CTkFrame):
         self._scroll.pack(
             fill="both", expand=True, padx=theme.PAGE_GUTTER, pady=(0, theme.SPACE_5)
         )
-        self._scroll.bind("<Configure>", lambda _e: self._relayout())
+        # Tk's bindtags put the scroll frame's pathname in every descendant
+        # card's bindtags too, so a plain bind() here fires on each of the
+        # ~40 model cards' own Configure events, not just the scroll
+        # frame's own resize -- filter to the real thing (same pattern as
+        # widgets.py's root <Configure> handler).
+        self._scroll.bind(
+            "<Configure>",
+            lambda e: self._relayout() if e.widget is self._scroll else None,
+        )
         self._loading_overlay = LoadingOverlay(self._scroll, "Loading models…")
 
     # ------------------------------------------------------------------
