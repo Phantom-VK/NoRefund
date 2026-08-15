@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+from datetime import datetime
 from pathlib import Path
 
 import customtkinter as ctk
@@ -11,6 +12,9 @@ import customtkinter as ctk
 from norefund.core.export import analysis_results_to_csv, analysis_results_to_markdown
 from norefund.core.models_registry import ModelInfo
 from norefund.core.parsing import SUPPORTED_EXTENSIONS
+from norefund.core.report.html import render_html
+from norefund.core.report.model import ReportModel
+from norefund.core.report.pdf import render_pdf
 from norefund.core.service import AnalysisResult, analyze_file, analyze_folder
 from norefund.gui import formatting, motion, native_dialog, theme
 from norefund.gui.dnd import enable_file_drop
@@ -24,6 +28,7 @@ from norefund.gui.widgets import (
     ThreadSafeSchedulerMixin,
     bind_mousewheel,
     export_via_dialog,
+    export_via_dialog_bytes,
     section_label,
 )
 from norefund.logging_config import latest_log_file
@@ -515,7 +520,13 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         ).pack(side="right", padx=(theme.SPACE_2, 0))
         IconButton(
             stats_row, "Export MD", icon="file_text", command=self._export_md
-        ).pack(side="right")
+        ).pack(side="right", padx=(theme.SPACE_2, 0))
+        IconButton(
+            stats_row, "Export PDF", icon="file_text", command=self._export_pdf
+        ).pack(side="right", padx=(theme.SPACE_2, 0))
+        IconButton(
+            stats_row, "Export HTML", icon="file_text", command=self._export_html
+        ).pack(side="right", padx=(theme.SPACE_2, 0))
 
         table = ResultsTable(self._results_frame)
         table.pack(
@@ -541,6 +552,29 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             extension="md",
             filetype_label="Markdown",
             content_fn=lambda: analysis_results_to_markdown(self._results),
+        )
+
+    def _build_report(self) -> ReportModel:
+        return ReportModel(
+            title="NoRefund Analysis Report",
+            generated_at=datetime.now(),
+            analysis=self._results,
+        )
+
+    def _export_pdf(self) -> None:
+        export_via_dialog_bytes(
+            has_data=bool(self._results),
+            extension="pdf",
+            filetype_label="PDF",
+            content_fn=lambda: render_pdf(self._build_report()),
+        )
+
+    def _export_html(self) -> None:
+        export_via_dialog(
+            has_data=bool(self._results),
+            extension="html",
+            filetype_label="HTML",
+            content_fn=lambda: render_html(self._build_report()),
         )
 
     # ------------------------------------------------------------------

@@ -6,6 +6,8 @@ thread) so every control recalculates on the spot, the moment it changes.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import customtkinter as ctk
 
 from norefund.core.architectures import ModelArchitecture, list_architectures
@@ -16,6 +18,9 @@ from norefund.core.quantization import (
     list_quantization_levels,
     quantization_display_name,
 )
+from norefund.core.report.html import render_html
+from norefund.core.report.model import ReportModel
+from norefund.core.report.pdf import render_pdf
 from norefund.core.selfhost import FitResult, evaluate_fit
 from norefund.gui import formatting, theme
 from norefund.gui.theme import COLORS
@@ -23,9 +28,12 @@ from norefund.gui.widgets import (
     ContextBar,
     DropdownButton,
     DropdownItem,
+    IconButton,
     StatPill,
     bind_mousewheel,
     card,
+    export_via_dialog,
+    export_via_dialog_bytes,
     section_label,
 )
 
@@ -47,6 +55,11 @@ class FitCheckView(ctk.CTkFrame):
         super().__init__(parent, fg_color=COLORS["bg"])
         self.shell = shell
         self._context_edited = False
+        self._fit_result: FitResult | None = None
+        self._fit_architecture_name = ""
+        self._fit_hardware_name = ""
+        self._fit_quantization_name = ""
+        self._fit_kv_cache_name = ""
 
         self._architectures = list_architectures()
         self._hardware = list_hardware()
@@ -105,6 +118,13 @@ class FitCheckView(ctk.CTkFrame):
             anchor="w",
         )
         self._verdict_text.pack(side="left")
+
+        IconButton(
+            verdict_row, "Export PDF", icon="file_text", command=self._export_pdf
+        ).pack(side="right", padx=(theme.SPACE_2, 0))
+        IconButton(
+            verdict_row, "Export HTML", icon="file_text", command=self._export_html
+        ).pack(side="right")
 
         self._error_label = ctk.CTkLabel(
             parent,
@@ -304,6 +324,11 @@ class FitCheckView(ctk.CTkFrame):
             context_length,
             kv_cache_dtype=kv_cache_dtype,
         )
+        self._fit_result = result
+        self._fit_architecture_name = architecture.display_name
+        self._fit_hardware_name = hardware.display_name
+        self._fit_quantization_name = quantization_display_name(quantization)
+        self._fit_kv_cache_name = kv_cache_dtype_display_name(kv_cache_dtype)
         self._render_result(result)
 
     def _render_result(self, result: FitResult) -> None:
@@ -391,3 +416,34 @@ class FitCheckView(ctk.CTkFrame):
                 wraplength=800,
                 justify="left",
             ).pack(fill="x", pady=(0, theme.SPACE_2))
+
+    # ------------------------------------------------------------------
+    # Export
+    # ------------------------------------------------------------------
+
+    def _build_report(self) -> ReportModel:
+        return ReportModel(
+            title="NoRefund Fit Check Report",
+            generated_at=datetime.now(),
+            fit=self._fit_result,
+            fit_architecture_name=self._fit_architecture_name,
+            fit_hardware_name=self._fit_hardware_name,
+            fit_quantization_name=self._fit_quantization_name,
+            fit_kv_cache_name=self._fit_kv_cache_name,
+        )
+
+    def _export_pdf(self) -> None:
+        export_via_dialog_bytes(
+            has_data=self._fit_result is not None,
+            extension="pdf",
+            filetype_label="PDF",
+            content_fn=lambda: render_pdf(self._build_report()),
+        )
+
+    def _export_html(self) -> None:
+        export_via_dialog(
+            has_data=self._fit_result is not None,
+            extension="html",
+            filetype_label="HTML",
+            content_fn=lambda: render_html(self._build_report()),
+        )

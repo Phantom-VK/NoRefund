@@ -33,6 +33,10 @@ datas += [
     for icon_path in (SRC / "assets" / "icons" / "providers").iterdir()
 ]
 datas += collect_data_files("customtkinter")
+# reportlab ships its Type 1 font metrics/AFM data as package data, not
+# importable modules -- static analysis can't see it, so PDF export would
+# fail to find the standard fonts in a frozen build without this.
+datas += collect_data_files("reportlab")
 
 hiddenimports = [
     # PIL.ImageTk resolves this at runtime via a try/except import to find

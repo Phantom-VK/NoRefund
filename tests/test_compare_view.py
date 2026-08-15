@@ -174,6 +174,22 @@ def test_export_csv_and_md_write_expected_content(root, monkeypatch, tmp_path):
     view._export_md()
     assert md_path.read_text(encoding="utf-8") == comparison_to_markdown(view._report)
 
+    pdf_path = tmp_path / "out.pdf"
+    monkeypatch.setattr(
+        native_dialog_module, "ask_save_file", lambda **kwargs: str(pdf_path)
+    )
+    view._export_pdf()
+    assert pdf_path.read_bytes().startswith(b"%PDF")
+
+    html_path = tmp_path / "out.html"
+    monkeypatch.setattr(
+        native_dialog_module, "ask_save_file", lambda **kwargs: str(html_path)
+    )
+    view._export_html()
+    html = html_path.read_text(encoding="utf-8")
+    assert html.startswith("<!doctype html>")
+    assert model.display_name in html
+
 
 def test_destroy_mid_run_does_not_crash(root, monkeypatch):
     model = _model("test:only")
