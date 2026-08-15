@@ -151,6 +151,22 @@ def mono_font(size: int = FONT_BODY, weight: str = "normal") -> tuple[str, int, 
     return (_mono_family_name(), size, weight)
 
 
+def font_px(
+    size: int = FONT_BODY, weight: str = "normal", scaling: float = 1.0
+) -> tuple[str, int, str]:
+    """Like font(), but for plain tkinter widgets (tk.Label/tk.Frame, not
+    CTkLabel) that don't run font tuples through CTk's own point->pixel
+    scaling. A *positive* Tk font size means points; CTkLabel always
+    converts to a *negative* (pixel) size before handing it to the
+    underlying Tk widget, so the exact same nominal size renders visibly
+    larger on a plain tk widget than on a CTkLabel. This applies the same
+    conversion CTk uses internally, so plain-tk text matches CTk text at
+    the same nominal size. `scaling` should be
+    `ctk.ScalingTracker.get_widget_scaling(widget)`.
+    """
+    return (_ui_family_name(), -abs(round(size * scaling)), weight)
+
+
 def resolve(token: str, dark: bool) -> str:
     """Resolve a COLORS token to a single hex string for non-CTk widgets
     (e.g. raw tkinter.Text tag colors) that don't auto-switch on appearance mode."""
