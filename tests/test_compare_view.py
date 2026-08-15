@@ -20,7 +20,9 @@ from norefund.core.compare import CompareReport, ModelComparison  # noqa: E402
 from norefund.core.export import comparison_to_csv, comparison_to_markdown  # noqa: E402
 from norefund.core.models_registry import ModelInfo  # noqa: E402
 from norefund.core.settings import Settings  # noqa: E402
+from norefund.gui import theme  # noqa: E402
 from norefund.gui.compare_view import CompareView  # noqa: E402
+from norefund.gui.theme import COLORS  # noqa: E402
 
 from .conftest import _pump, _pump_until  # noqa: E402
 
@@ -45,13 +47,18 @@ def _model(id_: str) -> ModelInfo:
 
 
 def _comparison(
-    model: ModelInfo, *, token_count=100, total_cost=0.01, error=None
+    model: ModelInfo,
+    *,
+    token_count=100,
+    total_cost=0.01,
+    error=None,
+    fits_in_context=True,
 ) -> ModelComparison:
     return ModelComparison(
         model=model,
         token_count=token_count,
         context_usage_pct=1.0,
-        fits_in_context=True,
+        fits_in_context=fits_in_context,
         min_chunks_needed=1,
         output_tokens=1024,
         input_cost=total_cost / 2,
@@ -73,6 +80,17 @@ def _label_texts(widget) -> list[str]:
             texts.append(child.cget("text"))
         texts.extend(_label_texts(child))
     return texts
+
+
+def _images(widget) -> list:
+    images = []
+    for child in widget.winfo_children():
+        if isinstance(child, ctk.CTkLabel):
+            img = child.cget("image")
+            if img is not None:
+                images.append(img)
+        images.extend(_images(child))
+    return images
 
 
 def test_run_compare_renders_sorted_results_cheapest_highlighted(root, monkeypatch):
@@ -98,6 +116,96 @@ def test_run_compare_renders_sorted_results_cheapest_highlighted(root, monkeypat
     assert len(cards) == 2
     assert any("cheapest" in t for t in _label_texts(cards[0]))
     assert not any("cheapest" in t for t in _label_texts(cards[1]))
+
+
+def test_cheapest_row_keeps_card_background_with_accent_strip(root, monkeypatch):
+    # The cheapest row used to recolor the whole card COLORS["primary"],
+    # which collided with primary_fg text/icons also defaulting to a
+    # primary-ish color -- a left accent strip should signal "cheapest"
+    # instead, with every card keeping the same neutral surface.
+    cheap = _model("test:cheap")
+    pricey = _model("test:pricey")
+    report = CompareReport(
+        source_label="x",
+        results=[
+            _comparison(pricey, total_cost=0.05),
+            _comparison(cheap, total_cost=0.01),
+        ],
+    )
+    monkeypatch.setattr(
+        compare_view_module, "compare_text", lambda text, models, output_tokens: report
+    )
+
+    view = CompareView(root, _shell([cheap, pricey]))
+    view._text_box.insert("1.0", "hello world")
+    view._run_compare()
+    _pump_until(root, lambda: not view._running)
+
+    cheapest_card, other_card = view._results_scroll.winfo_children()
+    assert cheapest_card.cget("fg_color") == COLORS["card"]
+    assert other_card.cget("fg_color") == COLORS["card"]
+
+    accent_strip = cheapest_card.winfo_children()[0]
+    assert accent_strip.cget("fg_color") == COLORS["primary"]
+
+
+def test_cheapest_row_fits_icon_stays_destructive_when_not_fitting(root, monkeypatch):
+    cheap = _model("test:cheap")
+    report = CompareReport(
+        source_label="x",
+        results=[_comparison(cheap, total_cost=0.01, fits_in_context=False)],
+    )
+    monkeypatch.setattr(
+        compare_view_module, "compare_text", lambda text, models, output_tokens: report
+    )
+
+    view = CompareView(root, _shell([cheap]))
+    view._text_box.insert("1.0", "hello world")
+    view._run_compare()
+    _pump_until(root, lambda: not view._running)
+
+    card = view._results_scroll.winfo_children()[0]
+    images = _images(card)
+    destructive_icon = theme.icon_image(
+        "x_circle", size=14, color=COLORS["destructive"]
+    )
+    muted_icon = theme.icon_image("x_circle", size=14, color=COLORS["muted_fg"])
+
+    assert destructive_icon in images
+    assert muted_icon not in images
+
+
+def test_run_button_disabled_with_no_models_selected(root, monkeypatch):
+    model = _model("test:only")
+    view = CompareView(root, _shell([model]))
+
+    assert view._check_list._on_change == view._sync_run_button_state
+    assert view._run_btn.cget("state") == "normal"
+
+    for var in view._check_list._vars.values():
+        var.set(False)
+    view._check_list._notify_change()
+    assert view._run_btn.cget("state") == "disabled"
+
+    for var in view._check_list._vars.values():
+        var.set(True)
+    view._check_list._notify_change()
+    assert view._run_btn.cget("state") == "normal"
+
+
+def test_output_tokens_entry_flags_invalid_input(root):
+    model = _model("test:only")
+    view = CompareView(root, _shell([model]))
+
+    assert view._output_entry.cget("border_color") == COLORS["input_bg"]
+
+    view._output_var.set("not a number")
+    view._on_output_tokens_change()
+    assert view._output_entry.cget("border_color") == COLORS["destructive"]
+
+    view._output_var.set("2048")
+    view._on_output_tokens_change()
+    assert view._output_entry.cget("border_color") == COLORS["input_bg"]
 
 
 def test_what_if_recomputes_without_recalling_compare_text(root, monkeypatch):

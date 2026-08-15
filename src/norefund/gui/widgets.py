@@ -97,7 +97,7 @@ class IconButton(ctk.CTkButton):
     _VARIANTS = {
         "primary": ("primary", "primary_fg", "primary_hover"),
         "muted": ("muted", "fg", "border"),
-        "danger": ("muted", "fg", "destructive")
+        "danger": ("destructive_muted", "fg", "destructive"),
     }
 
     def __init__(
@@ -140,18 +140,30 @@ class IconButton(ctk.CTkButton):
 class ProviderBadge(ctk.CTkLabel):
     """Small uppercase pill tinted with the provider's brand color."""
 
+    # Provider brand colors are mid-brightness hues that fail WCAG AA
+    # directly against their own tinted background (as low as 2.05:1,
+    # measured for Anthropic) -- blend toward black in light mode and
+    # toward white in dark mode, since the badge's own background flips
+    # from mostly-light to mostly-dark between modes (0.4 is the minimum
+    # that clears 4.5:1 for every provider color in both modes).
+    _TEXT_BLEND = 0.4
+
     def __init__(self, parent, provider: str, **kwargs) -> None:
         accent = theme.provider_color(provider)
         bg_tint = (
             formatting.tint(accent, COLORS["card"][0], 0.13),
             formatting.tint(accent, COLORS["card"][1], 0.18),
         )
+        text_color = (
+            formatting.tint("#000000", accent, self._TEXT_BLEND),
+            formatting.tint("#ffffff", accent, self._TEXT_BLEND),
+        )
         super().__init__(
             parent,
             text=provider.upper(),
             font=theme.font(theme.FONT_MICRO, "bold"),
             fg_color=bg_tint,
-            text_color=accent,
+            text_color=text_color,
             corner_radius=8,
             width=1,
             height=22,

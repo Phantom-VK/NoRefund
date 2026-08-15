@@ -68,6 +68,20 @@ def parse_int(value: str, default: int = 0) -> int:
         return default
 
 
+def is_valid_int(value: str) -> bool:
+    """Whether `value` would parse as a real number for parse_int(), rather
+    than silently falling back to its default -- lets a numeric entry flag
+    unparseable input instead of correcting it with no feedback."""
+    cleaned = value.replace(",", "").strip()
+    if not cleaned:
+        return False
+    try:
+        int(float(cleaned))
+        return True
+    except ValueError:
+        return False
+
+
 def context_color(pct: float | None) -> tuple[str, str]:
     """Returns a (light_hex, dark_hex) COLORS-style tuple for the given
     context-usage percentage: primary <75%, warning 75-100%, destructive >=100%."""

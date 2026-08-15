@@ -66,6 +66,7 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         self._active_tab = "results"
 
         self._build_layout()
+        self._sync_run_button_state()
 
     # ------------------------------------------------------------------
     # Layout
@@ -139,16 +140,19 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         self._output_var = ctk.StringVar(
             value=str(self.shell.settings.default_output_tokens)
         )
-        entry = ctk.CTkEntry(
+        self._output_entry = ctk.CTkEntry(
             out_row,
             textvariable=self._output_var,
             width=90,
             font=theme.mono_font(theme.FONT_BODY),
             fg_color=COLORS["input_bg"],
-            border_width=0,
+            border_width=1,
+            border_color=COLORS["input_bg"],
         )
-        entry.pack(side="left")
-        entry.bind("<KeyRelease>", lambda _e: self._on_output_tokens_change())
+        self._output_entry.pack(side="left")
+        self._output_entry.bind(
+            "<KeyRelease>", lambda _e: self._on_output_tokens_change()
+        )
 
         self._run_btn = IconButton(
             inner, "Compare", icon="zap", variant="primary", command=self._run_compare
@@ -170,7 +174,9 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             text_color=COLORS["fg"],
         ).pack(side="left")
 
-        self._check_list = ModelCheckList(inner, self.shell.models, height=260)
+        self._check_list = ModelCheckList(
+            inner, self.shell.models, on_change=self._sync_run_button_state, height=260
+        )
         self._check_list.pack(fill="both", expand=True)
 
     def _build_results_area(self, parent) -> None:
@@ -401,14 +407,30 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             text="Compare",
             image=theme.icon_image("zap", size=16, color=COLORS["primary_fg"]),
             command=self._run_compare,
-            state="normal",
         )
+        self._sync_run_button_state()
+
+    def _sync_run_button_state(self) -> None:
+        """Keep the Run/Compare button's enabled state in sync with model
+        selection, instead of only silently no-oping on click with nothing
+        selected. Never overrides the busy Cancel/Cancelling state."""
+        if self._running:
+            return
+        has_selection = bool(self._check_list.selected_models())
+        self._run_btn.configure(state="normal" if has_selection else "disabled")
 
     # ------------------------------------------------------------------
     # What-if: recompute cost only, no re-tokenization
     # ------------------------------------------------------------------
 
     def _on_output_tokens_change(self) -> None:
+        self._output_entry.configure(
+            border_color=(
+                COLORS["input_bg"]
+                if formatting.is_valid_int(self._output_var.get())
+                else COLORS["destructive"]
+            )
+        )
         if self._report is None:
             return
         from norefund.core.compare import what_if
@@ -463,17 +485,26 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             self._build_result_row(result, is_cheapest=result.model.id == cheapest_id)
 
     def _build_result_row(self, result: ModelComparison, is_cheapest: bool) -> None:
+        # The cheapest row used to recolor the whole card COLORS["primary"],
+        # which then made every child that also defaulted to a primary-ish
+        # color (the context bar, the "muted" text, a fits-icon tinted
+        # "muted") blend into the background it was sitting on -- most
+        # visibly, primary_fg-on-primary text is ~2.5:1 contrast, well under
+        # WCAG AA. A left accent strip signals "cheapest" without touching
+        # the card surface, so every child keeps its own normal semantic
+        # color regardless of is_cheapest.
         row_card = ctk.CTkFrame(
             self._results_scroll,
-            fg_color=COLORS["primary"] if is_cheapest else COLORS["card"],
+            fg_color=COLORS["card"],
             corner_radius=theme.RADIUS_CARD,
         )
         row_card.pack(fill="x", pady=theme.SPACE_1)
+        if is_cheapest:
+            ctk.CTkFrame(
+                row_card, fg_color=COLORS["primary"], corner_radius=0, width=4
+            ).pack(side="left", fill="y")
         inner = ctk.CTkFrame(row_card, fg_color="transparent")
         inner.pack(fill="x", padx=theme.SPACE_4, pady=theme.SPACE_3)
-
-        fg = COLORS["primary_fg"] if is_cheapest else COLORS["fg"]
-        muted = COLORS["primary_fg"] if is_cheapest else COLORS["muted_fg"]
 
         top_row = ctk.CTkFrame(inner, fg_color="transparent")
         top_row.pack(fill="x")
@@ -481,17 +512,17 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             top_row,
             text=result.model.display_name,
             font=theme.font(theme.FONT_TITLE, "bold"),
-            text_color=fg,
+            text_color=COLORS["fg"],
             anchor="w",
         ).pack(side="left")
         if is_cheapest:
             ctk.CTkLabel(
                 top_row,
                 text="cheapest",
-                image=theme.icon_image("check", size=12, color=fg),
+                image=theme.icon_image("check", size=12, color=COLORS["fg"]),
                 compound="left",
                 font=theme.font(theme.FONT_SMALL, "bold"),
-                text_color=fg,
+                text_color=COLORS["fg"],
             ).pack(side="right")
 
         if result.error is not None:
@@ -519,7 +550,7 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             stats,
             text=f"Tokens: {tokens_str}",
             font=theme.mono_font(theme.FONT_BODY),
-            text_color=muted,
+            text_color=COLORS["muted_fg"],
         ).pack(side="left", padx=(0, theme.SPACE_4))
 
         bar_cell = ctk.CTkFrame(stats, fg_color="transparent")
@@ -531,12 +562,15 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             stats,
             text=formatting.fmt_context_pct(result.context_usage_pct),
             font=theme.mono_font(theme.FONT_BODY),
-            text_color=muted,
+            text_color=COLORS["muted_fg"],
         ).pack(side="left", padx=(0, theme.SPACE_4))
 
         fits_icon = "check_circle" if result.fits_in_context else "x_circle"
+        fits_color = (
+            COLORS["primary"] if result.fits_in_context else COLORS["destructive"]
+        )
         ctk.CTkLabel(
-            stats, text="", image=theme.icon_image(fits_icon, size=14, color=muted)
+            stats, text="", image=theme.icon_image(fits_icon, size=14, color=fits_color)
         ).pack(side="left", padx=(0, theme.SPACE_4))
 
         cost_row = ctk.CTkFrame(inner, fg_color="transparent")
@@ -549,7 +583,7 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
                 f"Total {formatting.fmt_cost(result.total_cost)}"
             ),
             font=theme.mono_font(theme.FONT_LABEL, "bold"),
-            text_color=fg,
+            text_color=COLORS["fg"],
             anchor="w",
         ).pack(side="left")
 
@@ -618,16 +652,21 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
     def _build_projection_row(
         self, projection: PortfolioProjection, is_cheapest: bool
     ) -> None:
+        # Same left-accent-strip treatment as _build_result_row, and for
+        # the same reason: a whole-card COLORS["primary"] fill collided
+        # with primary_fg text/icons sitting on it (~2.5:1 contrast).
         row_card = ctk.CTkFrame(
             self._projection_scroll,
-            fg_color=COLORS["primary"] if is_cheapest else COLORS["card"],
+            fg_color=COLORS["card"],
             corner_radius=theme.RADIUS_CARD,
         )
         row_card.pack(fill="x", pady=theme.SPACE_1)
+        if is_cheapest:
+            ctk.CTkFrame(
+                row_card, fg_color=COLORS["primary"], corner_radius=0, width=4
+            ).pack(side="left", fill="y")
         inner = ctk.CTkFrame(row_card, fg_color="transparent")
         inner.pack(fill="x", padx=theme.SPACE_4, pady=theme.SPACE_3)
-
-        fg = COLORS["primary_fg"] if is_cheapest else COLORS["fg"]
 
         top_row = ctk.CTkFrame(inner, fg_color="transparent")
         top_row.pack(fill="x")
@@ -635,7 +674,7 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             top_row,
             text=projection.model.display_name,
             font=theme.font(theme.FONT_TITLE, "bold"),
-            text_color=fg,
+            text_color=COLORS["fg"],
             anchor="w",
         ).pack(side="left")
         if not projection.fits_in_context:
@@ -653,10 +692,10 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             ctk.CTkLabel(
                 top_row,
                 text="cheapest",
-                image=theme.icon_image("check", size=12, color=fg),
+                image=theme.icon_image("check", size=12, color=COLORS["fg"]),
                 compound="left",
                 font=theme.font(theme.FONT_SMALL, "bold"),
-                text_color=fg,
+                text_color=COLORS["fg"],
             ).pack(side="right")
 
         cost_row = ctk.CTkFrame(inner, fg_color="transparent")
@@ -669,7 +708,7 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
                 f"Annual {formatting.fmt_cost(projection.annual_cost)}"
             ),
             font=theme.mono_font(theme.FONT_LABEL, "bold"),
-            text_color=fg,
+            text_color=COLORS["fg"],
             anchor="w",
         ).pack(side="left")
 
