@@ -31,17 +31,25 @@ def _maximize(window: ctk.CTk) -> None:
     actually enforces it (e.g. no window manager, or a minimal/tiling one
     that ignores the hint), so a bare `try/except TclError` alone would
     silently leave the window at its pre-maximize size in that case.
+
+    Caller must have already given the window at least one full `update()`
+    (not just `update_idletasks()`) before calling this. Requesting the
+    zoomed state before the window manager has mapped and decorated the
+    window makes some WMs compute the maximized geometry without knowing
+    the title bar's height yet, then apply the title bar on top of that
+    once it does decorate -- pushing it above the screen's top edge, off
+    screen, taking the minimize/restore/close buttons with it.
     """
     try:
         window.state("zoomed")
-        window.update_idletasks()
+        window.update()
         if window.state() == "zoomed":
             return
     except tk.TclError:
         pass
     try:
         window.attributes("-zoomed", True)
-        window.update_idletasks()
+        window.update()
         if window.attributes("-zoomed"):
             return
     except tk.TclError:
@@ -64,6 +72,9 @@ class App(*_BaseWindow):
         # screen (a common resolution this app was previously too tall for).
         self.geometry("1440x900")
         self.minsize(1024, 640)
+        # Force the window manager to map and decorate the window at this
+        # size before we ask it to maximize -- see _maximize()'s docstring.
+        self.update()
         _maximize(self)
 
         MainView(self).pack(fill="both", expand=True)
