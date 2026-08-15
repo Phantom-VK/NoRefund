@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -24,7 +25,7 @@ from norefund.core.portfolio import (
 from norefund.core.report.html import render_html
 from norefund.core.report.model import ReportModel
 from norefund.core.report.pdf import render_pdf
-from norefund.gui import formatting, motion, native_dialog, theme
+from norefund.gui import formatting, native_dialog, theme
 from norefund.gui.dnd import enable_file_drop
 from norefund.gui.theme import COLORS, SUPPORTED_FILETYPES
 from norefund.gui.widgets import (
@@ -35,6 +36,7 @@ from norefund.gui.widgets import (
     IconButton,
     ModelCheckList,
     StatPill,
+    TabBar,
     ThreadSafeSchedulerMixin,
     bind_mousewheel,
     card,
@@ -196,37 +198,16 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         self._results_frame.tkraise()
 
     def _build_tabs(self, parent) -> None:
-        tabs = ctk.CTkFrame(parent, fg_color="transparent")
-        tabs.pack(fill="x", pady=(0, theme.SPACE_2))
-        self._tab_buttons: dict[str, ctk.CTkButton] = {}
-        for tab_id, label in [("results", "Results"), ("projection", "Projection")]:
-            btn = ctk.CTkButton(
-                tabs,
-                text=label,
-                font=theme.font(theme.FONT_LABEL),
-                corner_radius=theme.RADIUS_CARD,
-                height=theme.CONTROL_MD,
-                width=110,
-                fg_color="transparent",
-                hover_color=COLORS["muted"],
-                text_color=COLORS["muted_fg"],
-                command=lambda t=tab_id: self._switch_tab(t),
-            )
-            btn.pack(side="left", padx=(0, theme.SPACE_2))
-            motion.press_feedback(btn)
-            self._tab_buttons[tab_id] = btn
-        self._sync_tab_styles()
-
-    def _sync_tab_styles(self) -> None:
-        for tab_id, btn in self._tab_buttons.items():
-            active = tab_id == self._active_tab
-            btn.configure(
-                text_color=COLORS["primary"] if active else COLORS["muted_fg"]
-            )
+        tab_bar = TabBar(
+            parent,
+            [("results", "Results"), ("projection", "Projection")],
+            self._active_tab,
+            on_change=self._switch_tab,
+        )
+        tab_bar.pack(fill="x", pady=(0, theme.SPACE_2))
 
     def _switch_tab(self, tab_id: str) -> None:
         self._active_tab = tab_id
-        self._sync_tab_styles()
         if tab_id == "projection":
             self._projection_frame.tkraise()
         else:
@@ -238,18 +219,15 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
 
         toolbar = ctk.CTkFrame(parent, fg_color="transparent")
         toolbar.pack(fill="x", pady=(0, theme.SPACE_2))
-        IconButton(
-            toolbar, "Export CSV", icon="file_text", command=self._export_csv
-        ).pack(side="left", padx=(0, theme.SPACE_2))
-        IconButton(
-            toolbar, "Export MD", icon="file_text", command=self._export_md
-        ).pack(side="left", padx=(0, theme.SPACE_2))
-        IconButton(
-            toolbar, "Export PDF", icon="file_text", command=self._export_pdf
-        ).pack(side="left", padx=(0, theme.SPACE_2))
-        IconButton(
-            toolbar, "Export HTML", icon="file_text", command=self._export_html
-        ).pack(side="left")
+        for label, command in (
+            ("Export CSV", self._export_csv),
+            ("Export MD", self._export_md),
+            ("Export PDF", self._export_pdf),
+            ("Export HTML", self._export_html),
+        ):
+            IconButton(toolbar, label, icon="file_text", command=command).pack(
+                side="left", padx=(0, theme.SPACE_2)
+            )
 
         self._results_scroll = ctk.CTkScrollableFrame(parent, fg_color=COLORS["bg"])
         self._results_scroll.pack(fill="both", expand=True)
@@ -716,17 +694,31 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
     # Export
     # ------------------------------------------------------------------
 
-    def _export_csv(self) -> None:
-        export_via_dialog(
+    def _do_export(
+        self,
+        *,
+        extension: str,
+        filetype_label: str,
+        content_fn: Callable[[], str | bytes],
+        as_bytes: bool = False,
+    ) -> None:
+        exporter = export_via_dialog_bytes if as_bytes else export_via_dialog
+        exporter(
             has_data=self._report is not None,
+            extension=extension,
+            filetype_label=filetype_label,
+            content_fn=content_fn,
+        )
+
+    def _export_csv(self) -> None:
+        self._do_export(
             extension="csv",
             filetype_label="CSV",
             content_fn=lambda: comparison_to_csv(self._report),
         )
 
     def _export_md(self) -> None:
-        export_via_dialog(
-            has_data=self._report is not None,
+        self._do_export(
             extension="md",
             filetype_label="Markdown",
             content_fn=lambda: comparison_to_markdown(self._report),
@@ -742,16 +734,15 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         )
 
     def _export_pdf(self) -> None:
-        export_via_dialog_bytes(
-            has_data=self._report is not None,
+        self._do_export(
             extension="pdf",
             filetype_label="PDF",
             content_fn=lambda: render_pdf(self._build_report()),
+            as_bytes=True,
         )
 
     def _export_html(self) -> None:
-        export_via_dialog(
-            has_data=self._report is not None,
+        self._do_export(
             extension="html",
             filetype_label="HTML",
             content_fn=lambda: render_html(self._build_report()),

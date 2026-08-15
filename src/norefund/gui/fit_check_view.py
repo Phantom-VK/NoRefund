@@ -119,12 +119,13 @@ class FitCheckView(ctk.CTkFrame):
         )
         self._verdict_text.pack(side="left")
 
-        IconButton(
-            verdict_row, "Export PDF", icon="file_text", command=self._export_pdf
-        ).pack(side="right", padx=(theme.SPACE_2, 0))
-        IconButton(
-            verdict_row, "Export HTML", icon="file_text", command=self._export_html
-        ).pack(side="right")
+        for label, command in (
+            ("Export PDF", self._export_pdf),
+            ("Export HTML", self._export_html),
+        ):
+            IconButton(verdict_row, label, icon="file_text", command=command).pack(
+                side="right", padx=(theme.SPACE_2, 0)
+            )
 
         self._error_label = ctk.CTkLabel(
             parent,

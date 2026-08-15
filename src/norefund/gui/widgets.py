@@ -172,6 +172,54 @@ class ProviderBadge(ctk.CTkLabel):
         )
 
 
+class TabBar(ctk.CTkFrame):
+    """Row of pill-style tab buttons. Tracks and styles which tab is
+    active; the caller's `on_change(tab_id)` is responsible for actually
+    switching the visible content."""
+
+    def __init__(
+        self,
+        parent,
+        tabs: list[tuple[str, str]],
+        active: str,
+        on_change: Callable[[str], None],
+        **kwargs,
+    ) -> None:
+        super().__init__(parent, fg_color="transparent", **kwargs)
+        self._on_change = on_change
+        self._active = active
+        self._buttons: dict[str, ctk.CTkButton] = {}
+        for tab_id, label in tabs:
+            btn = ctk.CTkButton(
+                self,
+                text=label,
+                font=theme.font(theme.FONT_LABEL),
+                corner_radius=theme.RADIUS_CARD,
+                height=theme.CONTROL_MD,
+                width=110,
+                fg_color="transparent",
+                hover_color=COLORS["muted"],
+                text_color=COLORS["muted_fg"],
+                command=lambda t=tab_id: self._select(t),
+            )
+            btn.pack(side="left", padx=(0, theme.SPACE_2))
+            motion.press_feedback(btn)
+            self._buttons[tab_id] = btn
+        self._sync_styles()
+
+    def _select(self, tab_id: str) -> None:
+        self._active = tab_id
+        self._sync_styles()
+        self._on_change(tab_id)
+
+    def _sync_styles(self) -> None:
+        for tab_id, btn in self._buttons.items():
+            active = tab_id == self._active
+            btn.configure(
+                text_color=COLORS["primary"] if active else COLORS["muted_fg"]
+            )
+
+
 class SidebarItem(ctk.CTkButton):
     """Full-width sidebar nav row with an active/inactive visual state."""
 
@@ -249,18 +297,11 @@ _root_tracking_installed: set[int] = set()
 
 
 def _ensure_root_tracking(root) -> None:
-    """Install (once per root window, ever) a watcher that keeps every open
-    DropdownPopover glued to its trigger field while the window moves or
-    resizes (e.g. maximizing) -- otherwise a popover left open during a
-    resize is stranded at its old screen position.
-
-    Installed once and shared across every popover, like bind_mousewheel()
-    / DropdownPopover._ensure_click_watch(): binding+unbinding a fresh
-    <Configure> handler on every single open/close would mean accumulating
-    one live Tcl-level handler per dropdown interaction ever made in the
-    session (and each open constructs/destroys the popover before the
-    matching unbind can run in the fast toggle-twice-to-close case).
-    """
+    """Install (once per root, ever) a watcher that keeps every open
+    DropdownPopover glued to its trigger on move/resize, closes them on
+    minimize/focus-loss, and discards its own tracking entry on root
+    <Destroy> -- shared across every popover to avoid accumulating a fresh
+    handler per open/close."""
     root_id = id(root)
     if root_id in _root_tracking_installed:
         return
@@ -425,17 +466,10 @@ class DropdownPopover(ctk.CTkToplevel):
 
     Width matches the trigger (never narrower than 220px); the currently
     selected row is tinted and check-marked at rest, and every row
-    highlights on hover.
-
-    Rows are built with plain tkinter.Frame/Label, not CTkFrame/CTkLabel:
-    CTkFrame draws its rounded background via an internal Canvas +
-    DrawEngine, which measured ~5-10ms per widget -- for a 28-row list
-    (rebuilt from scratch on every open, since a value can change any time
-    the popover is closed) that's ~300ms of visible lag opening a single
-    dropdown. Plain tkinter rows carry no rounding/scaling/appearance-mode
-    machinery and cut that to ~50ms; the resting color is resolved to a
-    flat hex up front instead, since plain tk widgets don't auto-track
-    light/dark mode the way COLORS tuples do.
+    highlights on hover. Rows are plain tkinter.Frame/Label rather than
+    CTkFrame/CTkLabel -- CTkFrame's Canvas+DrawEngine background cost
+    ~300ms of visible lag rebuilding a 28-row list on every open; plain
+    rows cut that to ~50ms.
     """
 
     _ROW_HEIGHT = theme.CONTROL_LG
@@ -741,18 +775,11 @@ _wheel_scroll_installed = False
 def bind_mousewheel(frame: ctk.CTkScrollableFrame) -> None:
     """Enable Linux (X11) mouse-wheel scrolling for a CTkScrollableFrame.
 
-    CustomTkinter only binds <MouseWheel> internally, which fires on
-    Windows/macOS. X11 sends <Button-4>/<Button-5> instead, so without this,
-    wheel scrolling silently does nothing on Linux.
-
-    The handler is installed once for the whole app, not once per frame: it
-    walks up from whatever widget is under the pointer to find the nearest
-    CTkScrollableFrame and scrolls that. Re-registering a fresh bind_all() on
-    every call -- e.g. every time a ModelDropdownPopover opens -- would leak
-    one global handler per open with no way to remove just that one
-    afterwards (Tkinter's unbind_all() clears *all* handlers for the
-    sequence, not a single one), so callers can call this on every
-    scrollable frame they build without worrying about leaks.
+    CustomTkinter only binds <MouseWheel>, which fires on Windows/macOS;
+    X11 sends <Button-4>/<Button-5> instead. Installed once app-wide (not
+    per frame) and walks up from whatever's under the pointer to the
+    nearest CTkScrollableFrame, so callers can call this on every
+    scrollable frame they build without leaking a handler per call.
     """
     global _wheel_scroll_installed
     if _wheel_scroll_installed:
@@ -854,15 +881,13 @@ def status_dot(
 
 
 def provider_mark(parent, provider: str, *, size: int = 14, **kwargs) -> ctk.CTkLabel:
-    """The provider's brand mark, tinted to its accent color.
-
-    Falls back to a plain status_dot() for a provider with no bundled logo
-    (defensive only -- every provider in default_models.yaml has one).
-    """
-    icon = theme.provider_icon(provider, size=size)
-    if icon is not None:
-        return ctk.CTkLabel(parent, text="", image=icon, **kwargs)
-    return status_dot(parent, color=theme.provider_color(provider), **kwargs)
+    """The provider's brand mark, tinted to its accent color -- falls back
+    to a plain colored dot for a provider with no bundled logo. Delegates
+    the icon-or-dot fallback to theme.provider_icon_or_dot(), the one place
+    that logic lives (rather than reimplementing it here too)."""
+    return ctk.CTkLabel(
+        parent, text="", image=theme.provider_icon_or_dot(provider, size=size), **kwargs
+    )
 
 
 def section_label(
