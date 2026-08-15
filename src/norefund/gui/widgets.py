@@ -448,19 +448,24 @@ class DropdownPopover(ctk.CTkToplevel):
         self.rows[item.value] = row
         widgets = [row]
 
+        widget_scaling = ctk.ScalingTracker.get_widget_scaling(scroll)
+
         if item.icon is not None:
             mode = "dark" if is_dark else "light"
-            widget_scaling = ctk.ScalingTracker.get_widget_scaling(scroll)
             photo = item.icon.create_scaled_photo_image(widget_scaling, mode)
             self._icon_photos.append(photo)
             icon_label = tk.Label(row, image=photo, bg=resting_hex, bd=0)
             icon_label.pack(side="left", padx=(8, theme.SPACE_2), pady=theme.SPACE_2)
             widgets.append(icon_label)
 
+        # font_px (not font): a plain tk.Label renders a positive font size
+        # in *points*, while the trigger's CTkLabel converts the same
+        # nominal size to *pixels* internally -- using font() here would
+        # render visibly larger than the trigger despite an equal number.
         label = tk.Label(
             row,
             text=item.label,
-            font=theme.font(theme.FONT_BODY),
+            font=theme.font_px(theme.FONT_LABEL, scaling=widget_scaling),
             fg=text_hex,
             bg=resting_hex,
             bd=0,
@@ -474,7 +479,6 @@ class DropdownPopover(ctk.CTkToplevel):
 
         if is_selected:
             check_icon = theme.icon_image("check", size=14, color=COLORS["primary"])
-            widget_scaling = ctk.ScalingTracker.get_widget_scaling(scroll)
             check_photo = check_icon.create_scaled_photo_image(
                 widget_scaling, "dark" if is_dark else "light"
             )
