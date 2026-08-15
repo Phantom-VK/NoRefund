@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import datetime
 from pathlib import Path
 
@@ -17,7 +17,7 @@ from norefund.core.report.html import render_html
 from norefund.core.report.model import ReportModel
 from norefund.core.report.pdf import render_pdf
 from norefund.core.service import AnalysisResult, analyze_file, analyze_folder
-from norefund.gui import formatting, motion, native_dialog, theme
+from norefund.gui import formatting, native_dialog, theme
 from norefund.gui.dnd import enable_file_drop
 from norefund.gui.theme import COLORS, SUPPORTED_FILETYPES
 from norefund.gui.widgets import (
@@ -26,6 +26,7 @@ from norefund.gui.widgets import (
     IconButton,
     ModelDropdownButton,
     StatPill,
+    TabBar,
     ThreadSafeSchedulerMixin,
     bind_mousewheel,
     export_via_dialog,
@@ -359,37 +360,13 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         enable_file_drop(wrapper, self._on_files_dropped, suffixes=SUPPORTED_EXTENSIONS)
 
     def _build_tabs(self) -> None:
-        tabs = ctk.CTkFrame(self, fg_color=COLORS["card"], corner_radius=0)
-        tabs.pack(side="top", fill="x")
-        self._tab_buttons: dict[str, ctk.CTkButton] = {}
-        for tab_id, label in [("results", "Results"), ("logs", "Logs")]:
-            btn = ctk.CTkButton(
-                tabs,
-                text=label,
-                font=theme.font(theme.FONT_LABEL),
-                corner_radius=0,
-                height=theme.CONTROL_LG,
-                width=100,
-                fg_color="transparent",
-                hover_color=COLORS["muted"],
-                text_color=COLORS["muted_fg"],
-                command=lambda t=tab_id: self._switch_tab(t),
-            )
-            btn.pack(
-                side="left",
-                padx=(theme.SPACE_3 if tab_id == "results" else 0, 0),
-                pady=(theme.SPACE_1, 0),
-            )
-            motion.press_feedback(btn)
-            self._tab_buttons[tab_id] = btn
-        self._sync_tab_styles()
-
-    def _sync_tab_styles(self) -> None:
-        for tab_id, btn in self._tab_buttons.items():
-            active = tab_id == self._active_tab
-            btn.configure(
-                text_color=COLORS["primary"] if active else COLORS["muted_fg"]
-            )
+        tab_bar = TabBar(
+            self,
+            [("results", "Results"), ("logs", "Logs")],
+            self._active_tab,
+            on_change=self._switch_tab,
+        )
+        tab_bar.pack(side="top", fill="x", padx=theme.SPACE_3, pady=(theme.SPACE_1, 0))
 
     def _build_content(self) -> None:
         self._content = ctk.CTkFrame(self, fg_color=COLORS["bg"], corner_radius=0)
@@ -563,18 +540,15 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         StatPill(stats_row, "Avg context", formatting.fmt_context_pct(avg_pct)).pack(
             side="left", padx=theme.SPACE_6
         )
-        IconButton(
-            stats_row, "Export CSV", icon="file_text", command=self._export_csv
-        ).pack(side="right", padx=(theme.SPACE_2, 0))
-        IconButton(
-            stats_row, "Export MD", icon="file_text", command=self._export_md
-        ).pack(side="right", padx=(theme.SPACE_2, 0))
-        IconButton(
-            stats_row, "Export PDF", icon="file_text", command=self._export_pdf
-        ).pack(side="right", padx=(theme.SPACE_2, 0))
-        IconButton(
-            stats_row, "Export HTML", icon="file_text", command=self._export_html
-        ).pack(side="right", padx=(theme.SPACE_2, 0))
+        for label, command in (
+            ("Export CSV", self._export_csv),
+            ("Export MD", self._export_md),
+            ("Export PDF", self._export_pdf),
+            ("Export HTML", self._export_html),
+        ):
+            IconButton(stats_row, label, icon="file_text", command=command).pack(
+                side="right", padx=(theme.SPACE_2, 0)
+            )
 
         table = ResultsTable(self._results_frame)
         table.pack(
@@ -586,17 +560,31 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
     # Export
     # ------------------------------------------------------------------
 
-    def _export_csv(self) -> None:
-        export_via_dialog(
+    def _do_export(
+        self,
+        *,
+        extension: str,
+        filetype_label: str,
+        content_fn: Callable[[], str | bytes],
+        as_bytes: bool = False,
+    ) -> None:
+        exporter = export_via_dialog_bytes if as_bytes else export_via_dialog
+        exporter(
             has_data=bool(self._results),
+            extension=extension,
+            filetype_label=filetype_label,
+            content_fn=content_fn,
+        )
+
+    def _export_csv(self) -> None:
+        self._do_export(
             extension="csv",
             filetype_label="CSV",
             content_fn=lambda: analysis_results_to_csv(self._results),
         )
 
     def _export_md(self) -> None:
-        export_via_dialog(
-            has_data=bool(self._results),
+        self._do_export(
             extension="md",
             filetype_label="Markdown",
             content_fn=lambda: analysis_results_to_markdown(self._results),
@@ -610,16 +598,15 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         )
 
     def _export_pdf(self) -> None:
-        export_via_dialog_bytes(
-            has_data=bool(self._results),
+        self._do_export(
             extension="pdf",
             filetype_label="PDF",
             content_fn=lambda: render_pdf(self._build_report()),
+            as_bytes=True,
         )
 
     def _export_html(self) -> None:
-        export_via_dialog(
-            has_data=bool(self._results),
+        self._do_export(
             extension="html",
             filetype_label="HTML",
             content_fn=lambda: render_html(self._build_report()),
@@ -631,7 +618,6 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
 
     def _switch_tab(self, tab_id: str) -> None:
         self._active_tab = tab_id
-        self._sync_tab_styles()
         if tab_id == "logs":
             self._logs_frame.tkraise()
             self._logs_frame.refresh()
@@ -680,26 +666,14 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
                     break
                 if path.is_dir():
                     results.extend(
-                        analyze_folder(
-                            path,
-                            model.id,
-                            on_progress=lambda r: self._schedule(
-                                self._on_file_progress, r
-                            ),
-                            cancel_event=cancel_event,
-                        )
+                        analyze_folder(path, model.id, cancel_event=cancel_event)
                     )
                 else:
-                    result = analyze_file(path, model.id)
-                    results.append(result)
-                    self._schedule(self._on_file_progress, result)
+                    results.append(analyze_file(path, model.id))
         except Exception as exc:  # noqa: BLE001
             self._schedule(self._analysis_error, str(exc))
             return
         self._schedule(self._analysis_complete, results, model, cancel_event.is_set())
-
-    def _on_file_progress(self, _result: AnalysisResult) -> None:
-        pass
 
     def _reset_busy_state(self) -> None:
         self.analyzing = False

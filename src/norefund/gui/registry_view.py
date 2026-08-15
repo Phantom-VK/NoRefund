@@ -250,12 +250,10 @@ class RegistryView(ctk.CTkFrame):
         cell = ctk.CTkFrame(
             parent, fg_color=COLORS["muted"], corner_radius=theme.RADIUS_CARD
         )
-        cell.grid(
-            row=0,
-            column=col,
-            sticky="ew",
-            padx=(0 if col == 0 else theme.SPACE_2, 0 if col == 1 else theme.SPACE_2),
-        )
+        # Only ever called with col=0 (left cell) or col=1 (right cell): a
+        # gap between them, no outer padding.
+        padx = (0, theme.SPACE_2) if col == 0 else (theme.SPACE_2, 0)
+        cell.grid(row=0, column=col, sticky="ew", padx=padx)
         inner = ctk.CTkFrame(cell, fg_color="transparent")
         inner.pack(padx=theme.SPACE_2, pady=theme.SPACE_2, fill="x")
         ctk.CTkLabel(

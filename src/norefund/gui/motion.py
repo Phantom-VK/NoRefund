@@ -50,37 +50,38 @@ def press_feedback(button, *, alpha: float = 0.15) -> None:
     since the press-darken was applied -- otherwise it would clobber the
     command's recolor a moment after it happens.
     """
-    state = {"pressed_at": 0.0, "original_fg": None, "pressed_fg": None}
+    pressed_at = 0.0
+    original_fg: str | tuple[str, str] | None = None
+    pressed_fg: tuple[str, str] | None = None
 
     def _on_press(_event=None) -> None:
-        original_fg = button.cget("fg_color")
+        nonlocal pressed_at, original_fg, pressed_fg
+        fg = button.cget("fg_color")
         hover = button.cget("hover_color")
-        reference = original_fg if original_fg not in (None, "transparent") else hover
+        reference = fg if fg not in (None, "transparent") else hover
         if reference in (None, "transparent"):
-            state["original_fg"] = None
+            original_fg = None
             return
         ref_light, ref_dark = _as_pair(reference)
-        pressed = (
+        pressed_at = time.monotonic()
+        original_fg = fg
+        pressed_fg = (
             formatting.tint("#000000", ref_light, alpha),
             formatting.tint("#000000", ref_dark, alpha),
         )
-        state["pressed_at"] = time.monotonic()
-        state["original_fg"] = original_fg
-        state["pressed_fg"] = pressed
-        _safe_configure(button, fg_color=pressed)
+        _safe_configure(button, fg_color=pressed_fg)
 
     def _on_release(_event=None) -> None:
-        original_fg = state["original_fg"]
         if original_fg is None:
             return
-        elapsed_ms = (time.monotonic() - state["pressed_at"]) * 1000
+        elapsed_ms = (time.monotonic() - pressed_at) * 1000
         remaining = max(0, _PRESS_FLOOR_MS - int(elapsed_ms))
 
         def _restore() -> None:
             if not button.winfo_exists():
                 return
             current = _as_pair(button.cget("fg_color"))
-            if current == _as_pair(state["pressed_fg"]):
+            if current == _as_pair(pressed_fg):
                 _safe_configure(button, fg_color=original_fg)
 
         try:
@@ -105,15 +106,16 @@ def fade_text_color(
     callback can't fire against a dead widget.
     """
     steps = max(1, duration // _FADE_STEP_MS)
-    cancelled = {"value": False}
+    cancelled = False
 
     def _cancel(_event=None) -> None:
-        cancelled["value"] = True
+        nonlocal cancelled
+        cancelled = True
 
     widget.bind("<Destroy>", _cancel, add="+")
 
     def _step(i: int) -> None:
-        if cancelled["value"]:
+        if cancelled:
             return
         alpha = i / steps
         light = formatting.tint(to_token[0], from_token[0], alpha)

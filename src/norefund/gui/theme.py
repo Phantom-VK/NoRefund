@@ -78,9 +78,7 @@ SUPPORTED_FILETYPES: list[tuple[str, str]] = [
 ]
 
 # ----------------------------------------------------------------------
-# Type scale — 7 named steps, collapsing the 9 ad-hoc sizes the app used
-# to have. Hierarchy comes from weight + size together (Apple's typography
-# guidance), so this stays a small step scale rather than growing further.
+# Type scale
 # ----------------------------------------------------------------------
 
 FONT_MICRO = 11
@@ -92,8 +90,7 @@ FONT_HEADING = 20
 FONT_DISPLAY = 26
 
 # ----------------------------------------------------------------------
-# Spacing — single 4px grid. Card padding standardizes on CARD_PAD_X/Y
-# instead of the three different pad values views used to pick.
+# Spacing — single 4px grid
 # ----------------------------------------------------------------------
 
 SPACE_1 = 4
@@ -108,7 +105,7 @@ CARD_PAD_Y = 16
 PAGE_GUTTER = 24
 
 # ----------------------------------------------------------------------
-# Controls — three height tiers replacing the six-value 26-36px band.
+# Controls
 # ----------------------------------------------------------------------
 
 CONTROL_SM = 30
@@ -116,7 +113,7 @@ CONTROL_MD = 36
 CONTROL_LG = 42
 
 # ----------------------------------------------------------------------
-# Radius — tokenized but unchanged in value; card look stays as-is.
+# Radius
 # ----------------------------------------------------------------------
 
 RADIUS_CARD = 6
