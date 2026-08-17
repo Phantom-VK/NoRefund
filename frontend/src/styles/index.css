@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@import "./theme.css";
+@import "./motion.css";
+@import "./typography.css";
 
 html,
 body,
