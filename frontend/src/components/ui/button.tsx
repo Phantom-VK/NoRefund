@@ -10,8 +10,13 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        // text-destructive-foreground (not text-white) so the button tracks
+        // the corrected token; dark:bg-destructive/60 removed — it composited
+        // to ~2.7:1 against the page background, failing AA even with the
+        // fixed foreground (GUI_REVIEW.md §4.2/§4.5: danger must read as
+        // danger at rest, not just on hover).
         destructive:
-          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
         outline:
           "border bg-background text-foreground hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
         secondary:
