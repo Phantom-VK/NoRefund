@@ -227,3 +227,8 @@ docs/packaging.md
 docs/PLAN_WALKTHROUGH.md
 backend_changes.md
 .idea
+
+# Built frontend assets — produced by `cd frontend && npm run build`
+/src/norefund/web/
+/frontend/node_modules/
+/frontend/tsconfig.tsbuildinfo
