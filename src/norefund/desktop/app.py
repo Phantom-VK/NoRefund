@@ -101,7 +101,7 @@ def create_app_window(js_api: object | None = None) -> webview.Window:
         width, height = PREFERRED_WIDTH, PREFERRED_HEIGHT
     return webview.create_window(
         WINDOW_TITLE,
-        resolve_entrypoint(),
+        str(resolve_entrypoint()),
         js_api=js_api,
         width=width,
         height=height,
@@ -121,7 +121,6 @@ def main() -> None:
     webview.start(
         gui=preferred_gui(),
         debug=os.environ.get("NOREFUND_DEV") == "1",
-        private_mode=True,
     )
 
 
