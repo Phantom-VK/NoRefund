@@ -13,9 +13,32 @@ function resolve(mode: ThemeMode): "light" | "dark" {
   return mode;
 }
 
+// pywebview's private_mode disables localStorage entirely in WebKitGTK —
+// accessing it there throws a ReferenceError, not a quota/security error, and
+// synchronously during React's render phase that crash was invisible (no
+// console output, blank window). Read/write are best-effort; Phase 03 wires
+// this to the real Settings backend so this remains a soft fallback only.
+function readStoredMode(): ThemeMode | null {
+  try {
+    return localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredMode(mode: ThemeMode): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, mode);
+  } catch {
+    // Storage unavailable (private mode, disabled cookies, etc.) — the
+    // in-memory state set alongside this call is still correct for the
+    // current session, it just won't survive a restart.
+  }
+}
+
 export function useTheme() {
   const [mode, setModeState] = useState<ThemeMode>(
-    () => (localStorage.getItem(STORAGE_KEY) as ThemeMode | null) ?? "system",
+    () => readStoredMode() ?? "system",
   );
   const [resolved, setResolved] = useState<"light" | "dark">(() => resolve(mode));
 
@@ -34,7 +57,7 @@ export function useTheme() {
   }, [mode]);
 
   const setMode = useCallback((next: ThemeMode) => {
-    localStorage.setItem(STORAGE_KEY, next);
+    writeStoredMode(next);
     setModeState(next);
   }, []);
 
