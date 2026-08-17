@@ -232,3 +232,8 @@ backend_changes.md
 /src/norefund/web/
 /frontend/node_modules/
 /frontend/tsconfig.tsbuildinfo
+
+# The Python packaging "lib/" rule above is unanchored and would otherwise
+# swallow the frontend's own src/lib/ directory.
+!/frontend/src/lib/
+!/frontend/src/lib/**
