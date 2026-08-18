@@ -16,23 +16,25 @@ export interface ModelSelectProps {
   value: string;
   onChange: (model: ModelInfo) => void;
   className?: string;
+  /** For associating an external <Label htmlFor>. */
+  id?: string;
 }
 
 /** Radix-based replacement for gui/widgets.py's DropdownButton/DropdownPopover
  *  (~300 lines of hand-rolled popover). Shared by Calculator, Parser, and
  *  Compare -- built once here. */
-export function ModelSelect({ models, value, onChange, className }: ModelSelectProps) {
+export function ModelSelect({ models, value, onChange, className, id }: ModelSelectProps) {
   const selected = models.find((m) => m.id === value) ?? null;
 
   return (
     <Select
       value={value}
-      onValueChange={(id) => {
-        const model = models.find((m) => m.id === id);
+      onValueChange={(newId) => {
+        const model = models.find((m) => m.id === newId);
         if (model) onChange(model);
       }}
     >
-      <SelectTrigger className={cn("w-full", className)}>
+      <SelectTrigger id={id} className={cn("w-full", className)}>
         <SelectValue placeholder="Select a model">
           {selected && (
             <span className="flex min-w-0 items-center gap-2">
