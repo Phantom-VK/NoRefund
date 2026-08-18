@@ -23,7 +23,7 @@ from typing import Any
 
 import webview
 
-from norefund.core import secrets
+from norefund.core import currency, secrets
 from norefund.core.architectures import get_architecture as core_get_architecture
 from norefund.core.architectures import list_architectures
 from norefund.core.compare import (
@@ -221,6 +221,21 @@ class Api:
     @_guard
     def delete_hf_token(self) -> None:
         secrets.delete_hf_token()
+
+    # -- currency -------------------------------------------------------------
+
+    @_guard
+    def get_exchange_rates(self) -> dict:
+        """Cached rates only -- no network. Callers get whatever was last
+        fetched (or the built-in fallback), instantly."""
+        return to_jsonable(currency.load_cached_rates())
+
+    @_guard
+    def refresh_exchange_rates(self) -> dict:
+        """The one place the frontend can trigger currency.py's network
+        call -- wired to an explicit "Refresh rates" action in Settings,
+        never automatic."""
+        return to_jsonable(currency.fetch_exchange_rates())
 
     # -- native dialogs (replaces gui/native_dialog.py entirely) ------------
 
