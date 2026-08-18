@@ -1,6 +1,12 @@
-import { FileText, Sparkles } from "lucide-react";
+import { FileText, Sparkles, Trophy, Star, Gem, Play, Triangle, Music } from "lucide-react";
 import { Button } from "@/components/app/Button";
-import { Card } from "@/components/app/Card";
+import {
+  Card,
+  CardTopRow,
+  CardBadge,
+  CardBody,
+  type CardArt,
+} from "@/components/app/Card";
 import { StatPill } from "@/components/app/StatPill";
 import { ContextBar } from "@/components/app/ContextBar";
 import { ProviderBadge } from "@/components/app/ProviderBadge";
@@ -17,6 +23,71 @@ const PROVIDERS = [
   "Meta",
   "Mistral",
   "Qwen", // unknown provider — exercises the --provider-default-* fallback
+];
+
+const AWARD_DEMO: {
+  art: CardArt;
+  color: string;
+  icon: typeof Trophy;
+  category: string;
+  title: string;
+  meta: string;
+  date: string;
+}[] = [
+  {
+    art: "contours",
+    color: "var(--chart-5)",
+    icon: Trophy,
+    category: "Winner",
+    title: "Media UX Award 2018-19",
+    meta: "Toronto, Canada",
+    date: "12 Oct 2019",
+  },
+  {
+    art: "dots-flow",
+    color: "var(--chart-2)",
+    icon: Star,
+    category: "Gold Winner",
+    title: "Design Award 2018-19",
+    meta: "United States",
+    date: "28 Dec 2019",
+  },
+  {
+    art: "chevron",
+    color: "var(--chart-3)",
+    icon: Gem,
+    category: "Asia Pacific",
+    title: "Yellow Dot Award 2019-20",
+    meta: "United Nation",
+    date: "28 Nov 2019",
+  },
+  {
+    art: "dots",
+    color: "var(--chart-1)",
+    icon: Play,
+    category: "Runner up",
+    title: "Best Design 2019-20",
+    meta: "North America",
+    date: "28 Nov 2019",
+  },
+  {
+    art: "stripes",
+    color: "var(--chart-3)",
+    icon: Triangle,
+    category: "Silver Winner",
+    title: "UX India Award 2020-21",
+    meta: "Hyderabad, India",
+    date: "30 Dec 2019",
+  },
+  {
+    art: "dashes",
+    color: "var(--chart-4)",
+    icon: Music,
+    category: "Winner",
+    title: "Best Music Album 2018-19",
+    meta: "Mumbai, India",
+    date: "13 Aug 2019",
+  },
 ];
 
 function Section({
@@ -82,20 +153,40 @@ export default function Gallery() {
         </Button>
       </Section>
 
-      <Section title="Card">
-        <Card className="w-64 p-4">
+      <Section title="Card — plain">
+        <Card className="w-64">
           <p className="type-title">Plain card</p>
           <p className="type-body text-muted-foreground">
-            Neutral surface, no accent.
+            Neutral surface, no border, no art.
           </p>
         </Card>
-        <Card accent className="w-64 p-4">
-          <p className="type-title">Accented card</p>
-          <p className="type-body text-muted-foreground">
-            3px primary strip on the left edge only — the surface itself
-            never recolours (GUI_REVIEW.md §4.1).
-          </p>
-        </Card>
+      </Section>
+
+      <Section title="Card — art variants">
+        <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+          {AWARD_DEMO.map(({ art, color, icon: Icon, category, title, meta, date }) => (
+            <Card
+              key={art}
+              art={art}
+              artColor={color}
+              className="aspect-square min-w-0 min-h-[280px]"
+            >
+              <CardTopRow>
+                <CardBadge style={{ background: color }}>
+                  <Icon size={26} aria-hidden="true" />
+                </CardBadge>
+                <span className="type-small text-muted-foreground">{date}</span>
+              </CardTopRow>
+              <CardBody>
+                <p className="type-small text-muted-foreground mb-3.5">
+                  {category}
+                </p>
+                <h3 className="type-heading">{title}</h3>
+              </CardBody>
+              <p className="type-small text-muted-foreground">{meta}</p>
+            </Card>
+          ))}
+        </div>
       </Section>
 
       <Section title="StatPill">

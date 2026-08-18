@@ -1,0 +1,191 @@
+/* Decorative bottom-right corner illustrations for Card's `art` prop.
+   Shapes/positions are ported from the award-card reference; colour comes
+   from a single --art-color custom property (default --primary) so every
+   illustration follows the design system's tokens instead of the
+   reference's own hardcoded hues. */
+
+.card-art {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+  --art-color: var(--primary);
+}
+
+/* 1. Concentric contour rings */
+.card-art--contours {
+  width: 280px;
+  height: 280px;
+  right: -38px;
+  bottom: -38px;
+  transform: rotate(-12deg);
+}
+.card-art--contours::before,
+.card-art--contours::after {
+  content: "";
+  position: absolute;
+  border-radius: 48% 52% 0 50%;
+  border: 2px solid color-mix(in srgb, var(--art-color) 85%, transparent);
+}
+.card-art--contours::before {
+  width: 210px;
+  height: 300px;
+  right: 0;
+  bottom: 0;
+  box-shadow:
+    -12px 12px 0 -1px color-mix(in srgb, var(--art-color) 85%, transparent),
+    -24px 24px 0 -1px color-mix(in srgb, var(--art-color) 70%, transparent),
+    -36px 36px 0 -1px color-mix(in srgb, var(--art-color) 58%, transparent),
+    -48px 48px 0 -1px color-mix(in srgb, var(--art-color) 46%, transparent),
+    -60px 60px 0 -1px color-mix(in srgb, var(--art-color) 36%, transparent),
+    -72px 72px 0 -1px color-mix(in srgb, var(--art-color) 26%, transparent),
+    -84px 84px 0 -1px color-mix(in srgb, var(--art-color) 18%, transparent);
+}
+.card-art--contours::after {
+  width: 150px;
+  height: 235px;
+  right: 30px;
+  bottom: -15px;
+  border-radius: 50% 50% 0 50%;
+  box-shadow:
+    -15px 15px 0 -1px color-mix(in srgb, var(--art-color) 65%, transparent),
+    -30px 30px 0 -1px color-mix(in srgb, var(--art-color) 48%, transparent),
+    -45px 45px 0 -1px color-mix(in srgb, var(--art-color) 32%, transparent),
+    -60px 60px 0 -1px color-mix(in srgb, var(--art-color) 20%, transparent);
+}
+
+/* 2. Flowing dot field with a curved stream underneath */
+.card-art--dots-flow {
+  width: 300px;
+  height: 330px;
+  right: -15px;
+  bottom: -30px;
+  transform: rotate(-5deg);
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--art-color) 95%, transparent) 2px, transparent 2.5px)
+      0 0 / 16px 16px,
+    radial-gradient(circle, color-mix(in srgb, var(--art-color) 55%, transparent) 2px, transparent 2.5px)
+      8px 8px / 18px 18px;
+  -webkit-mask-image: radial-gradient(ellipse at 75% 55%, black 0%, black 35%, transparent 72%);
+  mask-image: radial-gradient(ellipse at 75% 55%, black 0%, black 35%, transparent 72%);
+}
+.card-art--dots-flow::after {
+  content: "";
+  position: absolute;
+  width: 160px;
+  height: 300px;
+  right: 25px;
+  bottom: -20px;
+  border-right: 3px solid color-mix(in srgb, var(--art-color) 80%, transparent);
+  border-radius: 0 65% 50% 0;
+  transform: rotate(12deg);
+}
+
+/* 3. Chevron / mountain */
+.card-art--chevron {
+  width: 330px;
+  height: 240px;
+  right: -25px;
+  bottom: -15px;
+  transform: rotate(-1deg);
+}
+.card-art--chevron::before {
+  content: "";
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  right: 0;
+  bottom: -100px;
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 13px,
+    color-mix(in srgb, var(--art-color) 90%, transparent) 13px 17px
+  );
+  clip-path: polygon(0 100%, 52% 25%, 100% 72%, 100% 100%);
+}
+.card-art--chevron::after {
+  content: "";
+  position: absolute;
+  width: 245px;
+  height: 190px;
+  right: 10px;
+  bottom: -48px;
+  border-top: 5px solid color-mix(in srgb, var(--art-color) 90%, transparent);
+  border-right: 5px solid color-mix(in srgb, var(--art-color) 90%, transparent);
+  transform: rotate(45deg) skew(-12deg);
+  opacity: 0.95;
+}
+
+/* 4. Dot field, two densities plus a scatter of irregular dots */
+.card-art--dots {
+  width: 270px;
+  height: 250px;
+  right: -15px;
+  bottom: -15px;
+  background:
+    radial-gradient(circle, var(--art-color) 0 6px, transparent 7px) 0 0 / 42px 42px,
+    radial-gradient(circle, var(--art-color) 0 3px, transparent 4px) 21px 21px / 30px 30px;
+  -webkit-mask-image: radial-gradient(ellipse at 80% 80%, black 0%, black 45%, transparent 78%);
+  mask-image: radial-gradient(ellipse at 80% 80%, black 0%, black 45%, transparent 78%);
+}
+.card-art--dots::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 70%, var(--art-color) 0 8px, transparent 9px),
+    radial-gradient(circle at 36% 58%, var(--art-color) 0 12px, transparent 13px),
+    radial-gradient(circle at 55% 77%, var(--art-color) 0 6px, transparent 7px),
+    radial-gradient(circle at 70% 48%, var(--art-color) 0 10px, transparent 11px),
+    radial-gradient(circle at 85% 70%, var(--art-color) 0 5px, transparent 6px);
+}
+
+/* 5. Diagonal stripes wrapping a curved edge */
+.card-art--stripes {
+  width: 280px;
+  height: 310px;
+  right: -40px;
+  bottom: -60px;
+  border-radius: 50%;
+  background: repeating-linear-gradient(-55deg, var(--art-color) 0 7px, transparent 7px 16px);
+  transform: rotate(12deg) scaleX(0.85);
+}
+.card-art--stripes::after {
+  content: "";
+  position: absolute;
+  width: 270px;
+  height: 300px;
+  left: -105px;
+  top: -35px;
+  border-radius: 50%;
+  /* Cuts the curved boundary using the card's own surface colour, so the
+     stripe wrap reads correctly against whatever card bg the theme has. */
+  background: var(--card);
+  transform: rotate(-3deg);
+}
+
+/* 6. Dash / particle field */
+.card-art--dashes {
+  width: 260px;
+  height: 250px;
+  right: -20px;
+  bottom: -20px;
+  transform: rotate(-8deg);
+  background: repeating-linear-gradient(
+    100deg,
+    transparent 0 19px,
+    color-mix(in srgb, var(--art-color) 90%, transparent) 19px 23px,
+    transparent 23px 38px
+  );
+  -webkit-mask-image: radial-gradient(ellipse at 80% 80%, black 0%, black 48%, transparent 82%);
+  mask-image: radial-gradient(ellipse at 80% 80%, black 0%, black 48%, transparent 82%);
+}
+.card-art--dashes::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 60%, var(--art-color) 0 2px, transparent 3px),
+    radial-gradient(circle at 42% 35%, var(--art-color) 0 2px, transparent 3px),
+    radial-gradient(circle at 60% 55%, var(--art-color) 0 2px, transparent 3px),
+    radial-gradient(circle at 78% 30%, var(--art-color) 0 2px, transparent 3px);
+}

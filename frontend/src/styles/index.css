@@ -1,7 +1,9 @@
 @import "tailwindcss";
+@import "@fontsource-variable/bricolage-grotesque";
 @import "./theme.css";
 @import "./motion.css";
 @import "./typography.css";
+@import "./card-art.css";
 
 html,
 body,
@@ -11,9 +13,13 @@ body,
 }
 
 body {
+  /* Bricolage Grotesque, not Inter/Poppins/Space Grotesk — those three read
+     as "AI-generated" on sight now. Self-hosted (woff2, OFL) via
+     @fontsource-variable so the app never needs network access to render
+     text, matching the local-only privacy model. */
   font-family:
-    Inter, "Segoe UI", -apple-system, BlinkMacSystemFont, Helvetica, Arial,
-    sans-serif;
+    "Bricolage Grotesque Variable", "Segoe UI", -apple-system,
+    BlinkMacSystemFont, Helvetica, Arial, sans-serif;
   /* The window chrome is native; the page must never scroll as a whole.
      Individual panes own their own overflow. */
   overflow: hidden;
