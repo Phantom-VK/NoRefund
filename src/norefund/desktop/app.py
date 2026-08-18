@@ -9,6 +9,7 @@ from pathlib import Path
 import webview
 
 from norefund.core.paths import bundled_resource
+from norefund.desktop.api import Api
 
 DEV_SERVER_URL = "http://localhost:5173"
 WINDOW_TITLE = "NoRefund — Token & Cost Analyzer"
@@ -117,7 +118,9 @@ def main() -> None:
     if problem is not None:
         print(problem, file=sys.stderr)
         raise SystemExit(2)
-    create_app_window()
+    api = Api()
+    window = create_app_window(js_api=api)
+    api.bind_window(window)
     webview.start(
         gui=preferred_gui(),
         debug=os.environ.get("NOREFUND_DEV") == "1",
