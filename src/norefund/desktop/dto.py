@@ -20,7 +20,9 @@ def to_jsonable(obj: Any) -> Any:
     if obj is None or isinstance(obj, (str, int, float, bool)):
         return obj
     if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
-        return {f.name: to_jsonable(getattr(obj, f.name)) for f in dataclasses.fields(obj)}
+        return {
+            f.name: to_jsonable(getattr(obj, f.name)) for f in dataclasses.fields(obj)
+        }
     if isinstance(obj, Path):
         return str(obj)
     if isinstance(obj, (datetime, date)):
