@@ -16,6 +16,8 @@ import subprocess
 import sys
 import webbrowser
 from datetime import datetime
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 from typing import Any
 
@@ -65,6 +67,8 @@ from norefund.desktop.dto import to_jsonable
 from norefund.desktop.jobs import JobEvent, JobManager
 
 logger = logging.getLogger(__name__)
+
+_FALLBACK_VERSION = "0.1.0"
 
 
 def _guard(fn):
@@ -152,6 +156,15 @@ class Api:
             return [catalog[mid] for mid in model_ids]
         except KeyError as exc:
             raise ValueError(f"Unknown model id: {exc.args[0]}") from exc
+
+    # -- app metadata -------------------------------------------------------
+
+    @_guard
+    def get_app_version(self) -> str:
+        try:
+            return pkg_version("norefund")
+        except PackageNotFoundError:
+            return _FALLBACK_VERSION
 
     # -- registry / static data --------------------------------------------
 

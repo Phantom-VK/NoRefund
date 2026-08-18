@@ -24,7 +24,9 @@ from norefund.core.service import AnalysisResult
 from norefund.core.settings import Settings
 from norefund.desktop.api import Api
 
-_TYPES_TS = Path(__file__).resolve().parents[1] / "frontend" / "src" / "lib" / "types.ts"
+_TYPES_TS = (
+    Path(__file__).resolve().parents[1] / "frontend" / "src" / "lib" / "types.ts"
+)
 
 
 class _FakeWindow:
@@ -38,6 +40,14 @@ class _FakeWindow:
 
     def run_js(self, script: str) -> None:
         pass
+
+
+def test_get_app_version_returns_a_nonempty_string():
+    api = Api()
+    out = api.get_app_version()
+    assert out["ok"] is True
+    assert isinstance(out["data"], str)
+    assert out["data"]
 
 
 def test_get_models_returns_all_models_with_full_fields():

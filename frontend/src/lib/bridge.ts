@@ -65,6 +65,9 @@ export interface ProjectCostsResult {
 }
 
 export const bridge = {
+  // -- app metadata -------------------------------------------------------
+  getAppVersion: () => call<string>("get_app_version"),
+
   // -- registry / static data --------------------------------------------
   getModels: () => call<ModelInfo[]>("get_models"),
   getArchitectures: () => call<ModelArchitecture[]>("get_architectures"),
