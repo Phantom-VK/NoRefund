@@ -46,6 +46,11 @@
   transform: scale(0.96);
 }
 
+/* Centre-origin scale/fade for dialogs. The -50%/-50% translate is baked
+   into the transform (not left to a separate Tailwind utility) because it
+   has to share the `transform` property with the scale -- a modal is
+   already positioned at top:50%/left:50%, so this is what actually keeps
+   it centred through the animation, not just at rest. */
 .anim-modal {
   transform-origin: center;
   transition:
@@ -54,11 +59,11 @@
 }
 .anim-modal[data-state="open"] {
   opacity: 1;
-  transform: scale(1);
+  transform: translate(-50%, -50%) scale(1);
 }
 .anim-modal[data-state="closed"] {
   opacity: 0;
-  transform: scale(0.97);
+  transform: translate(-50%, -50%) scale(0.97);
   transition-duration: var(--dur-exit);
 }
 
@@ -98,8 +103,10 @@
     transition-duration: 120ms !important;
   }
   .pressable:active { transform: none; }
-  .anim-popover[data-state="closed"],
-  .anim-modal[data-state="closed"] { transform: none; }
+  .anim-popover[data-state="closed"] { transform: none; }
+  /* Not transform: none -- the modal's centering translate must survive
+     reduced motion, only the scale should drop. */
+  .anim-modal[data-state="closed"] { transform: translate(-50%, -50%); }
   .stagger > * { animation: none; }
 }
 
