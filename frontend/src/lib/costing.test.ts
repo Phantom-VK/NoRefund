@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   contextUsagePct,
+  convertCurrency,
   fitsInContext,
   inputCost,
   minChunks,
@@ -68,5 +69,20 @@ describe("inputCost / outputCost / totalCost", () => {
   });
   it("sums input and output", () => {
     expect(totalCost(1_000_000, 1_000_000, MODEL)).toBeCloseTo(10.0);
+  });
+});
+
+describe("convertCurrency", () => {
+  it("applies the rate for the target currency", () => {
+    const rates = { base: "USD", rates: { EUR: 0.5 }, fetched_at: null };
+    expect(convertCurrency(10, "EUR", rates)).toBe(5);
+  });
+  it("is the identity for USD", () => {
+    const rates = { base: "USD", rates: { USD: 1.0, EUR: 0.5 }, fetched_at: null };
+    expect(convertCurrency(10, "USD", rates)).toBe(10);
+  });
+  it("falls through unconverted for a currency missing from the cache", () => {
+    const rates = { base: "USD", rates: { EUR: 0.5 }, fetched_at: null };
+    expect(convertCurrency(10, "JPY", rates)).toBe(10);
   });
 });

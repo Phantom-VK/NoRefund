@@ -12,7 +12,7 @@ import { ContextCard } from "./ContextCard";
 import { CostCard } from "./CostCard";
 
 export default function Calculator() {
-  const { models, settings } = useApp();
+  const { models, settings, exchangeRates } = useApp();
   const [modelId, setModelId] = useState(models[0]?.id ?? "");
   const [inputRaw, setInputRaw] = useState("0");
   const [outputRaw, setOutputRaw] = useState(String(settings.default_output_tokens));
@@ -81,7 +81,14 @@ export default function Calculator() {
         showWarnings={settings.show_chunk_warnings}
       />
 
-      <CostCard inputCost={inCost} outputCost={outCost} totalCost={total} model={model} />
+      <CostCard
+        inputCost={inCost}
+        outputCost={outCost}
+        totalCost={total}
+        model={model}
+        currency={settings.currency}
+        rates={exchangeRates}
+      />
     </div>
   );
 }
