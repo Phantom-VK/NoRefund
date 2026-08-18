@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -48,11 +48,19 @@ export function SettingsModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // The gear button lives in Header, a different subtree from this Dialog,
+  // so Radix's default onCloseAutoFocus (which only knows about a
+  // <DialogTrigger> inside the same tree) has nothing to restore focus to.
+  // Capture whatever was focused right as we open -- that's the gear
+  // button for a real click -- and restore it ourselves on close.
+  const openerRef = useRef<HTMLElement | null>(null);
+
   // Re-seed the draft from the latest known-good settings every time the
   // modal opens, and load the two secrets-only fields that live outside
   // the Settings dataclass.
   useEffect(() => {
     if (!open) return;
+    openerRef.current = document.activeElement as HTMLElement | null;
     setOutputTokensRaw(String(settings.default_output_tokens));
     setCurrency(settings.currency);
     setChunkWarnings(settings.show_chunk_warnings);
@@ -102,7 +110,12 @@ export function SettingsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent
+        onCloseAutoFocus={(e) => {
+          e.preventDefault();
+          openerRef.current?.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>Defaults, currency, and API tokens.</DialogDescription>
