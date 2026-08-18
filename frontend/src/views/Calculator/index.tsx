@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/app/Card";
 import { EmptyState } from "@/components/app/EmptyState";
 import { useApp } from "@/lib/appContext";
@@ -33,6 +33,16 @@ export default function Calculator() {
     setModelId(m.id);
     setOutputRaw(String(settings.default_output_tokens));
   }
+
+  // Views stay mounted for the app's lifetime (see lib/views.ts), so this
+  // component doesn't get to re-read settings.default_output_tokens simply
+  // by remounting when the user changes it in the Settings modal -- without
+  // this, the new default only took effect after switching models or
+  // restarting the app.
+  useEffect(() => {
+    setOutputRaw(String(settings.default_output_tokens));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.default_output_tokens]);
 
   const inputTokens = parseIntSafe(inputRaw);
   const outputTokens = parseIntSafe(outputRaw);
