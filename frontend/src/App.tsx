@@ -1,5 +1,5 @@
-import Gallery from "./views/Gallery";
+import DebugBridge from "./views/DebugBridge";
 
 export default function App() {
-  return <Gallery />;
+  return <DebugBridge />;
 }
