@@ -12,12 +12,21 @@ export function fmtFloat(v: number | null, decimals = 1): string {
   });
 }
 
+/** Cost in an arbitrary ISO currency, with the same "more decimals under a
+ *  cent" rule as fmtCost -- tiny per-token costs would otherwise all read
+ *  as the same rounded-to-zero figure. */
+export function fmtCostIn(v: number, currencyCode: string): string {
+  const digits = v < 0.01 ? 6 : 2;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currencyCode,
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(v);
+}
+
 export function fmtCost(v: number): string {
-  if (v < 0.01) return `$${v.toFixed(6)}`;
-  return `$${v.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  return fmtCostIn(v, "USD");
 }
 
 export function fmtContextPct(pct: number | null): string {

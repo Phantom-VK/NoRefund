@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { bridge, BridgeError } from "@/lib/bridge";
+import { useApp } from "@/lib/appContext";
 import { parseIntSafe } from "@/lib/format";
 import type { Settings } from "@/lib/types";
 
@@ -47,6 +48,10 @@ export function SettingsModal({
   const [hasToken, setHasToken] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+
+  const { exchangeRates, refreshExchangeRates } = useApp();
 
   // The gear button lives in Header, a different subtree from this Dialog,
   // so Radix's default onCloseAutoFocus (which only knows about a
@@ -108,6 +113,18 @@ export function SettingsModal({
     setTokenInput("");
   }
 
+  async function handleRefreshRates() {
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      await refreshExchangeRates();
+    } catch (err) {
+      setRefreshError(err instanceof BridgeError ? err.message : String(err));
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -136,6 +153,25 @@ export function SettingsModal({
                 ))}
               </SelectContent>
             </Select>
+            <div className="flex items-center justify-between gap-2">
+              <p className="type-small text-muted-foreground">
+                {exchangeRates.fetched_at
+                  ? `Rates updated ${new Date(exchangeRates.fetched_at).toLocaleString()}`
+                  : "Using built-in approximate rates — not yet fetched"}
+              </p>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleRefreshRates}
+                disabled={refreshing}
+              >
+                {refreshing ? "Refreshing…" : "Refresh rates"}
+              </Button>
+            </div>
+            {refreshError && (
+              <p className="type-small text-destructive">{refreshError}</p>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">

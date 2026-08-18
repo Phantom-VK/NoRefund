@@ -1,5 +1,6 @@
 import type {
   AnalysisResult,
+  ExchangeRates,
   FitResult,
   HardwareTarget,
   ModelArchitecture,
@@ -82,6 +83,10 @@ export const bridge = {
   hasHfToken: () => call<boolean>("has_hf_token"),
   setHfToken: (token: string) => call<void>("set_hf_token", token),
   deleteHfToken: () => call<void>("delete_hf_token"),
+
+  // -- currency ---------------------------------------------------------------
+  getExchangeRates: () => call<ExchangeRates>("get_exchange_rates"),
+  refreshExchangeRates: () => call<ExchangeRates>("refresh_exchange_rates"),
 
   // -- native dialogs -------------------------------------------------------
   pickFiles: () => call<string[]>("pick_files"),

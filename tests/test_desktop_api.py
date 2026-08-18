@@ -15,6 +15,7 @@ import pytest
 
 from norefund.core.architectures import ModelArchitecture
 from norefund.core.compare import ModelComparison
+from norefund.core.currency import ExchangeRates
 from norefund.core.hardware_registry import HardwareTarget
 from norefund.core.models_registry import ModelInfo, list_models
 from norefund.core.portfolio import PortfolioProjection
@@ -76,6 +77,32 @@ def test_evaluate_fit_unknown_architecture_returns_ok_false():
     assert "error" in out
 
 
+def test_get_exchange_rates_returns_cached_or_fallback(tmp_path, monkeypatch):
+    import norefund.core.currency as currency_module
+
+    monkeypatch.setattr(
+        currency_module, "_cache_path", lambda: tmp_path / "exchange_rates.json"
+    )
+    api = Api()
+    out = api.get_exchange_rates()
+    assert out["ok"] is True
+    assert out["data"]["base"] == "USD"
+    assert "EUR" in out["data"]["rates"]
+
+
+def test_refresh_exchange_rates_wraps_fetch_failure_as_ok_false(monkeypatch):
+    import urllib.error
+
+    def raise_error(req, timeout=None):
+        raise urllib.error.URLError("no route to host")
+
+    monkeypatch.setattr("urllib.request.urlopen", raise_error)
+    api = Api()
+    out = api.refresh_exchange_rates()
+    assert out["ok"] is False
+    assert "error" in out
+
+
 def test_save_file_appends_missing_extension():
     api = Api()
     api._window = _FakeWindow(dialog_result=("/tmp/report",))
@@ -128,6 +155,7 @@ _CONTRACT_CLASSES = [
     Settings,
     ModelArchitecture,
     HardwareTarget,
+    ExchangeRates,
 ]
 
 

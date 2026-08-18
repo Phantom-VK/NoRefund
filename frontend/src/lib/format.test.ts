@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   contextLevel, elideMiddle, fmtBytes, fmtContextPct, fmtContextWindow,
-  fmtCost, fmtNum, parseIntSafe,
+  fmtCost, fmtCostIn, fmtNum, parseIntSafe,
 } from "./format";
 
 describe("fmtCost", () => {
@@ -11,6 +11,16 @@ describe("fmtCost", () => {
   it("uses 2dp at or above a cent", () => {
     expect(fmtCost(12.5)).toBe("$12.50");
     expect(fmtCost(1234.5)).toBe("$1,234.50");
+  });
+});
+
+describe("fmtCostIn", () => {
+  it("uses the currency's own symbol", () => {
+    expect(fmtCostIn(12.5, "EUR")).toBe("€12.50");
+    expect(fmtCostIn(1234.5, "INR")).toBe("₹1,234.50");
+  });
+  it("uses 6dp under a cent regardless of currency", () => {
+    expect(fmtCostIn(0.000123, "GBP")).toBe("£0.000123");
   });
 });
 

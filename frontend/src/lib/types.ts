@@ -152,6 +152,12 @@ export interface Settings {
   onboarding_dismissed: boolean;
 }
 
+export interface ExchangeRates {
+  base: string;
+  rates: Record<string, number>;
+  fetched_at: string | null;
+}
+
 export type JobKind = "progress" | "done" | "error" | "cancelled";
 export interface JobEventDetail<T = unknown> {
   job_id: string;

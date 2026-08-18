@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { ModelInfo, Settings } from "./types";
+import type { ExchangeRates, ModelInfo, Settings } from "./types";
 import type { ViewId } from "./views";
 
 export interface AppContextValue {
@@ -11,6 +11,12 @@ export interface AppContextValue {
   setLastAnalysisTokens: (n: number) => void;
   fileCount: number;
   setFileCount: (n: number) => void;
+  /** Cached rates -- always available instantly, no network. */
+  exchangeRates: ExchangeRates;
+  /** The only place in the frontend that triggers a network fetch of fresh
+   *  rates -- wired to Settings' "Refresh rates" action. Throws BridgeError
+   *  on failure; callers show that inline rather than this swallowing it. */
+  refreshExchangeRates: () => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextValue | null>(null);

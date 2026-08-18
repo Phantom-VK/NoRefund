@@ -11,7 +11,7 @@ import { useShortcuts } from "@/hooks/useShortcuts";
 import { useJob } from "@/hooks/useJob";
 import { useTheme, type ThemeMode } from "@/hooks/useTheme";
 import { bridge, bridgeReady, BridgeError } from "@/lib/bridge";
-import type { ModelInfo, ResourceReport } from "@/lib/types";
+import type { ExchangeRates, ModelInfo, ResourceReport } from "@/lib/types";
 
 import Calculator from "@/views/Calculator";
 import Parser from "@/views/Parser";
@@ -34,6 +34,7 @@ const THEME_ORDER: ThemeMode[] = ["light", "dark", "system"];
 export default function App() {
   const [bridgeErr, setBridgeErr] = useState<string | null>(null);
   const [models, setModels] = useState<ModelInfo[] | null>(null);
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRates | null>(null);
   const [activeView, setActiveView] = useState<ViewId>("calculator");
   const [lastAnalysisTokens, setLastAnalysisTokens] = useState<number | null>(null);
   const [fileCount, setFileCount] = useState(0);
@@ -47,9 +48,11 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     bridgeReady()
-      .then(() => bridge.getModels())
-      .then((m) => {
-        if (!cancelled) setModels(m);
+      .then(() => Promise.all([bridge.getModels(), bridge.getExchangeRates()]))
+      .then(([m, rates]) => {
+        if (cancelled) return;
+        setModels(m);
+        setExchangeRates(rates);
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -60,6 +63,14 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  // Cached rates only -- no network call happens just from switching
+  // currency. A fresh fetch only ever happens from Settings' explicit
+  // "Refresh rates" action, via this function.
+  async function refreshExchangeRates() {
+    const fresh = await bridge.refreshExchangeRates();
+    setExchangeRates(fresh);
+  }
 
   // The backend Settings file is the source of truth for theme (it survives
   // a restart even where localStorage doesn't -- see useTheme.ts); once it
@@ -101,7 +112,7 @@ export default function App() {
   });
 
   const ctxValue = useMemo<AppContextValue | null>(() => {
-    if (!settings || !models) return null;
+    if (!settings || !models || !exchangeRates) return null;
     return {
       models,
       settings,
@@ -111,8 +122,14 @@ export default function App() {
       setLastAnalysisTokens,
       fileCount,
       setFileCount,
+      exchangeRates,
+      refreshExchangeRates,
     };
-  }, [models, settings, activeView, lastAnalysisTokens, fileCount]);
+    // refreshExchangeRates is a stable function body (only closes over
+    // setExchangeRates); omitting it avoids invalidating ctxValue's
+    // identity every render for a dependency that never actually changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [models, settings, activeView, lastAnalysisTokens, fileCount, exchangeRates]);
 
   if (bridgeErr) {
     return (
