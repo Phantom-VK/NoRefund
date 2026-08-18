@@ -1,0 +1,111 @@
+:root {
+  /* Custom curves. The CSS built-ins are too weak to read as intentional. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* ease-in is deliberately absent. It delays the first frame — the one the
+     user is watching — so it reads as sluggish at any duration. */
+
+  --dur-press: 120ms;    /* pointer-down feedback        */
+  --dur-tooltip: 150ms;  /* tooltips, small popovers     */
+  --dur-dropdown: 180ms; /* selects, dropdowns, menus    */
+  --dur-modal: 240ms;    /* dialogs, drawers, sheets     */
+  --dur-exit: 140ms;     /* exits are always faster      */
+}
+
+/* Pressable: responds on pointer-DOWN, not on click.
+   Apple: "the moment lag appears, the feeling of directness falls off a
+   cliff." :active fires on press, which is exactly what we want. */
+.pressable {
+  transition: transform var(--dur-press) var(--ease-out);
+  will-change: transform;
+}
+.pressable:active {
+  transform: scale(0.97);
+}
+
+/* Radix data-state entrances. Origin-aware: popovers scale from their
+   trigger, never from their own centre. Modals are exempt and stay centred. */
+.anim-popover {
+  transform-origin: var(--radix-popper-transform-origin);
+  transition:
+    opacity var(--dur-dropdown) var(--ease-out),
+    transform var(--dur-dropdown) var(--ease-out);
+}
+.anim-popover[data-state="closed"] {
+  transition-duration: var(--dur-exit);
+}
+.anim-popover[data-state="open"] {
+  opacity: 1;
+  transform: scale(1);
+}
+.anim-popover[data-state="closed"] {
+  opacity: 0;
+  /* Never scale(0) — nothing in the real world appears from nothing. */
+  transform: scale(0.96);
+}
+
+.anim-modal {
+  transform-origin: center;
+  transition:
+    opacity var(--dur-modal) var(--ease-out),
+    transform var(--dur-modal) var(--ease-out);
+}
+.anim-modal[data-state="open"] {
+  opacity: 1;
+  transform: scale(1);
+}
+.anim-modal[data-state="closed"] {
+  opacity: 0;
+  transform: scale(0.97);
+  transition-duration: var(--dur-exit);
+}
+
+/* Hover is gated: touch devices fire hover on tap, causing false positives. */
+@media (hover: hover) and (pointer: fine) {
+  .hoverable {
+    transition: background-color var(--dur-press) var(--ease-out);
+  }
+}
+
+/* Stagger for lists that appear as a group. 40ms steps — long enough to read
+   as a cascade, short enough not to feel slow. Decorative only: never gate
+   interaction on a stagger finishing. */
+.stagger > * {
+  animation: rise-in 260ms var(--ease-out) backwards;
+}
+.stagger > *:nth-child(1)  { animation-delay: 0ms; }
+.stagger > *:nth-child(2)  { animation-delay: 40ms; }
+.stagger > *:nth-child(3)  { animation-delay: 80ms; }
+.stagger > *:nth-child(4)  { animation-delay: 120ms; }
+.stagger > *:nth-child(5)  { animation-delay: 160ms; }
+.stagger > *:nth-child(n + 6) { animation-delay: 200ms; }
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Reduced motion means gentler, not absent: opacity and colour survive
+   because they aid comprehension; movement and scaling do not. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 120ms !important;
+  }
+  .pressable:active { transform: none; }
+  .anim-popover[data-state="closed"],
+  .anim-modal[data-state="closed"] { transform: none; }
+  .stagger > * { animation: none; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .translucent {
+    background: var(--card) !important;
+    backdrop-filter: none !important;
+  }
+}
