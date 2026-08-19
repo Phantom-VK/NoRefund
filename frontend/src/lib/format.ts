@@ -62,6 +62,10 @@ export function parseIntSafe(value: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+export function basename(path: string): string {
+  return path.split(/[/\\]/).pop() || path;
+}
+
 export function elideMiddle(text: string, maxChars: number): string {
   if (text.length <= maxChars || maxChars <= 1) return text;
   const tail = Math.max(1, Math.floor(maxChars / 3));

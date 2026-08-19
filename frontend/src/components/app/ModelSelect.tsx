@@ -18,17 +18,19 @@ export interface ModelSelectProps {
   className?: string;
   /** For associating an external <Label htmlFor>. */
   id?: string;
+  disabled?: boolean;
 }
 
 /** Radix-based replacement for gui/widgets.py's DropdownButton/DropdownPopover
  *  (~300 lines of hand-rolled popover). Shared by Calculator, Parser, and
  *  Compare -- built once here. */
-export function ModelSelect({ models, value, onChange, className, id }: ModelSelectProps) {
+export function ModelSelect({ models, value, onChange, className, id, disabled }: ModelSelectProps) {
   const selected = models.find((m) => m.id === value) ?? null;
 
   return (
     <Select
       value={value}
+      disabled={disabled}
       onValueChange={(newId) => {
         const model = models.find((m) => m.id === newId);
         if (model) onChange(model);

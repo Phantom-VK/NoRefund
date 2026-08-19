@@ -10,6 +10,7 @@ on:
 jobs:
   test-and-lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -22,7 +23,8 @@ jobs:
 
       - name: Run tests
         run: |
-          sudo apt-get update -y && sudo apt-get install -y xvfb
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 update -y
+          sudo apt-get install -y xvfb
           xvfb-run --auto-servernum pytest
 
       - name: Lint

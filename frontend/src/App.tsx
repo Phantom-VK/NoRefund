@@ -104,6 +104,21 @@ export default function App() {
     void saveSettings({ theme: next });
   }
 
+  // A drop that lands outside the Parser view's own drop zone (its handler
+  // only covers its own subtree) would otherwise hit the browser's default
+  // behaviour: navigating the whole webview to the dropped file, killing
+  // the running app. This is a floor under every view, not the Parser
+  // feature itself -- useFileDrop still owns highlighting/parsing there.
+  useEffect(() => {
+    const preventNavigation = (e: DragEvent) => e.preventDefault();
+    window.addEventListener("dragover", preventNavigation);
+    window.addEventListener("drop", preventNavigation);
+    return () => {
+      window.removeEventListener("dragover", preventNavigation);
+      window.removeEventListener("drop", preventNavigation);
+    };
+  }, []);
+
   useShortcuts({
     onView: setActiveView,
     onEscape: () => {

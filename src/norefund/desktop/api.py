@@ -42,6 +42,7 @@ from norefund.core.export import (
 from norefund.core.hardware_registry import get_hardware as core_get_hardware
 from norefund.core.hardware_registry import list_hardware
 from norefund.core.models_registry import ModelInfo, list_models
+from norefund.core.parsing import SUPPORTED_EXTENSIONS
 from norefund.core.portfolio import PortfolioProjection, cheapest_that_fits
 from norefund.core.portfolio import project_costs as core_project_costs
 from norefund.core.quantization import (
@@ -65,6 +66,7 @@ from norefund.core.service import AnalysisResult, analyze_file, analyze_folder
 from norefund.core.settings import Settings, SettingsStore
 from norefund.desktop.dto import to_jsonable
 from norefund.desktop.jobs import JobEvent, JobManager
+from norefund.logging_config import latest_log_file
 
 logger = logging.getLogger(__name__)
 
@@ -237,13 +239,46 @@ class Api:
         never automatic."""
         return to_jsonable(currency.fetch_exchange_rates())
 
+    # -- logs -----------------------------------------------------------------
+
+    @_guard
+    def get_logs(self, limit: int = 500) -> list[dict]:
+        """Recent structured log lines, newest last. Each entry is
+        {"level": str, "message": str, "ctx": dict}. Malformed lines come back
+        as {"level": "INFO", "message": <raw>, "ctx": {}} rather than being
+        dropped -- a corrupt line shouldn't hide every line around it."""
+        log_path = latest_log_file()
+        if log_path is None:
+            return []
+        lines = log_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        # A plain lines[-limit:] returns everything for limit == 0 (since
+        # -0 == 0) and slices from the wrong end for a negative limit.
+        n = max(limit, 0)
+        entries: list[dict] = []
+        for raw in lines[-n:] if n > 0 else []:
+            try:
+                data = json.loads(raw)
+                entries.append(
+                    {
+                        "level": data.get("level", "INFO"),
+                        "message": data.get("message", ""),
+                        "ctx": data.get("ctx") or {},
+                    }
+                )
+            except json.JSONDecodeError:
+                entries.append({"level": "INFO", "message": raw, "ctx": {}})
+        return entries
+
     # -- native dialogs (replaces gui/native_dialog.py entirely) ------------
 
     @_guard
     def pick_files(self) -> list[str]:
         assert self._window is not None
+        pattern = "*" + ";*".join(sorted(SUPPORTED_EXTENSIONS))
         result = self._window.create_file_dialog(
-            webview.FileDialog.OPEN, allow_multiple=True
+            webview.FileDialog.OPEN,
+            allow_multiple=True,
+            file_types=(f"Supported documents ({pattern})",),
         )
         return list(result) if result else []
 
@@ -255,8 +290,12 @@ class Api:
             return None
         return result if isinstance(result, str) else result[0]
 
-    @_guard
-    def save_file(self, suggested_name: str, extension: str, label: str) -> str | None:
+    def _pick_save_path(
+        self, suggested_name: str, extension: str, label: str
+    ) -> str | None:
+        """Unguarded core of save_file -- export_* call this directly rather
+        than self.save_file(), which is @_guard-wrapped and would hand them
+        back an {"ok", "data"} envelope instead of a path."""
         assert self._window is not None
         result = self._window.create_file_dialog(
             webview.FileDialog.SAVE,
@@ -271,6 +310,10 @@ class Api:
         if not path.lower().endswith(f".{extension}"):
             path = f"{path}.{extension}"
         return path
+
+    @_guard
+    def save_file(self, suggested_name: str, extension: str, label: str) -> str | None:
+        return self._pick_save_path(suggested_name, extension, label)
 
     # -- jobs -----------------------------------------------------------------
 
@@ -412,7 +455,7 @@ class Api:
 
     @_guard
     def export_analysis(self, results: list[dict], fmt: str) -> str | None:
-        path = self.save_file("analysis", fmt, "Analysis report")
+        path = self._pick_save_path("analysis", fmt, "Analysis report")
         if path is None:
             return None
         analysis = [_analysis_result(r) for r in results]
@@ -429,7 +472,7 @@ class Api:
         frequency_label: str | None,
         fmt: str,
     ) -> str | None:
-        path = self.save_file("comparison", fmt, "Comparison report")
+        path = self._pick_save_path("comparison", fmt, "Comparison report")
         if path is None:
             return None
         compare_report = _compare_report(report)
@@ -456,7 +499,7 @@ class Api:
 
     @_guard
     def export_fit(self, fit: dict, names: dict, fmt: str) -> str | None:
-        path = self.save_file("fit-check", fmt, "Fit check report")
+        path = self._pick_save_path("fit-check", fmt, "Fit check report")
         if path is None:
             return None
         self._write_export(

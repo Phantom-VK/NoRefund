@@ -6,10 +6,21 @@ import os
 import sys
 from pathlib import Path
 
-import webview
+from norefund.core.paths import tiktoken_cache_dir
 
-from norefund.core.paths import bundled_resource
-from norefund.desktop.api import Api
+# Point tiktoken at a persistent cache dir before it's imported anywhere --
+# it otherwise defaults to a tempdir the OS can wipe, which would make a
+# tokenizer downloaded via the Resources view "not downloaded" again on the
+# next run. main.py (the legacy Tk entrypoint) does this same thing at
+# import time; this is the equivalent for the desktop entrypoint, since
+# nothing here imports main.py.
+if "TIKTOKEN_CACHE_DIR" not in os.environ:
+    os.environ["TIKTOKEN_CACHE_DIR"] = str(tiktoken_cache_dir())
+
+import webview  # noqa: E402
+
+from norefund.core.paths import bundled_resource  # noqa: E402
+from norefund.desktop.api import Api  # noqa: E402
 
 DEV_SERVER_URL = "http://localhost:5173"
 WINDOW_TITLE = "NoRefund — Token & Cost Analyzer"
