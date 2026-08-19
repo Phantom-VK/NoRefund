@@ -48,21 +48,38 @@ export function useFileDrop({ onPaths, extensions }: UseFileDropOptions): UseFil
       dragDepth.current = 0;
       setDropping(false);
 
-      const items = e.dataTransfer.items;
       const paths: string[] = [];
+      const items = e.dataTransfer.items;
 
-      Array.from(e.dataTransfer.files).forEach((file, i) => {
-        const path = (file as unknown as { path?: string }).path;
-        if (!path) return;
-        // webkitGetAsEntry is how a Chromium-based webview (every pywebview
-        // desktop backend) tells a dropped directory apart from a file --
-        // the standard File object gives no such signal on its own.
-        const entry = items?.[i]?.webkitGetAsEntry?.();
-        const isDirectory = entry?.isDirectory ?? false;
-        if (isDirectory || hasExtension(file.name, extensions)) {
-          paths.push(path);
-        }
-      });
+      // dataTransfer.items and dataTransfer.files are NOT guaranteed to be
+      // index-aligned -- a drag that also carries a text/uri-list or
+      // text/plain representation (common from real file managers, e.g.
+      // GNOME Nautilus) adds non-file entries into `items` that `files`
+      // silently filters out, shifting every index after it. Read file and
+      // entry off the *same* item instead of correlating two lists by i.
+      if (items) {
+        Array.from(items).forEach((item) => {
+          if (item.kind !== "file") return;
+          const file = item.getAsFile();
+          const path = (file as unknown as { path?: string } | null)?.path;
+          if (!file || !path) return;
+          // webkitGetAsEntry is how a Chromium/WebKit-based webview (every
+          // pywebview desktop backend) tells a dropped directory apart from
+          // a file -- the standard File object gives no such signal alone.
+          const entry = item.webkitGetAsEntry?.();
+          const isDirectory = entry?.isDirectory ?? false;
+          if (isDirectory || hasExtension(file.name, extensions)) {
+            paths.push(path);
+          }
+        });
+      } else {
+        // Fallback for a plain browser dev environment where `.path` is
+        // absent anyway, so directory detection wouldn't matter.
+        Array.from(e.dataTransfer.files).forEach((file) => {
+          const path = (file as unknown as { path?: string }).path;
+          if (path && hasExtension(file.name, extensions)) paths.push(path);
+        });
+      }
 
       if (paths.length > 0) onPaths(paths);
     },

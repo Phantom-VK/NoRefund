@@ -24,10 +24,9 @@ interface Status {
 }
 
 export default function Parser() {
-  const { models, settings, setLastAnalysisTokens, setFileCount } = useApp();
+  const { models, setLastAnalysisTokens, setFileCount } = useApp();
   const [paths, setPaths] = useState<string[]>([]);
   const [modelId, setModelId] = useState(models[0]?.id ?? "");
-  const [outputRaw, setOutputRaw] = useState(String(settings.default_output_tokens));
   const [results, setResults] = useState<AnalysisResult[]>([]);
   const [activeTab, setActiveTab] = useState<TabId>("results");
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -37,13 +36,6 @@ export default function Parser() {
 
   const job = useJob<AnalysisResult, AnalysisResult[]>();
   const model = models.find((m) => m.id === modelId) ?? models[0];
-
-  // Views stay mounted for the app's lifetime, so this doesn't get to
-  // re-read the default just by remounting when Settings changes it.
-  useEffect(() => {
-    setOutputRaw(String(settings.default_output_tokens));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.default_output_tokens]);
 
   useEffect(() => {
     setFileCount(paths.length);
@@ -132,12 +124,15 @@ export default function Parser() {
     job.cancel();
   }
 
-  // Each progress event is one completed file. Append, never rebuild --
-  // rebuilding the whole table on every event was the 26-second bug.
+  // job.progress is itself the full accumulated list, so mirroring it
+  // directly (never reading just the "last" entry) can't drop rows even
+  // when several progress events land in the same React batch. Row keys
+  // are positional (see ResultsTable), so this is still append-only for
+  // the DOM -- not the whole-table rebuild that was the 26-second bug.
   useEffect(() => {
     if (job.progress.length === 0) return;
-    setResults((prev) => [...prev, job.progress[job.progress.length - 1]]);
-  }, [job.progress.length]);
+    setResults(job.progress);
+  }, [job.progress]);
 
   useEffect(() => {
     if (job.result === null) return;
@@ -211,8 +206,7 @@ export default function Parser() {
         models={models}
         modelId={model.id}
         onModelChange={(m) => setModelId(m.id)}
-        outputRaw={outputRaw}
-        onOutputChange={setOutputRaw}
+        modelDisabled={job.running}
         analyzing={job.running}
         cancelling={cancelling}
         analyzeDisabled={paths.length === 0 || job.running}
@@ -229,23 +223,19 @@ export default function Parser() {
           onCancel={handleCancel}
         />
       )}
-      <div className="px-3 pt-2">
-        <TabBar
-          tabs={[
-            { id: "results", label: "Results", badge: results.length || undefined },
-            { id: "logs", label: "Logs" },
-          ]}
-          value={activeTab}
-          onChange={handleTabChange}
-        />
-      </div>
-      <div className="min-h-0 flex-1">
-        {activeTab === "results" ? (
-          <ResultsTable results={results} onExport={handleExport} />
-        ) : (
-          <LogsPanel entries={logs} />
-        )}
-      </div>
+      <TabBar
+        tabs={[
+          {
+            id: "results",
+            label: "Results",
+            badge: results.length || undefined,
+            panel: <ResultsTable results={results} onExport={handleExport} />,
+          },
+          { id: "logs", label: "Logs", panel: <LogsPanel entries={logs} /> },
+        ]}
+        value={activeTab}
+        onChange={handleTabChange}
+      />
       <StatusBar left={status?.left ?? null} right={status?.right ?? null} />
     </div>
   );

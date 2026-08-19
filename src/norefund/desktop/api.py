@@ -251,8 +251,11 @@ class Api:
         if log_path is None:
             return []
         lines = log_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        # A plain lines[-limit:] returns everything for limit == 0 (since
+        # -0 == 0) and slices from the wrong end for a negative limit.
+        n = max(limit, 0)
         entries: list[dict] = []
-        for raw in lines[-limit:]:
+        for raw in lines[-n:] if n > 0 else []:
             try:
                 data = json.loads(raw)
                 entries.append(

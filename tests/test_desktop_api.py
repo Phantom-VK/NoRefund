@@ -292,6 +292,16 @@ def test_get_logs_respects_limit(tmp_path, monkeypatch):
     assert [e["message"] for e in out["data"]] == ["line7", "line8", "line9"]
 
 
+def test_get_logs_limit_zero_or_negative_returns_no_lines(tmp_path, monkeypatch):
+    log_path = tmp_path / "norefund-test.log"
+    lines = [f'{{"level": "INFO", "message": "line{i}"}}' for i in range(10)]
+    log_path.write_text("\n".join(lines), encoding="utf-8")
+    monkeypatch.setattr("norefund.desktop.api.latest_log_file", lambda: log_path)
+    api = Api()
+    assert api.get_logs(limit=0)["data"] == []
+    assert api.get_logs(limit=-5)["data"] == []
+
+
 # -- dataclass <-> TS interface contract --------------------------------
 
 

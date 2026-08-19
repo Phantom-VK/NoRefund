@@ -1,7 +1,5 @@
 import { FilePlus, FolderPlus, X, Zap } from "lucide-react";
 import { Button } from "@/components/app/Button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ModelSelect } from "@/components/app/ModelSelect";
 import type { ModelInfo } from "@/lib/types";
 
@@ -13,8 +11,7 @@ export interface ToolbarProps {
   models: ModelInfo[];
   modelId: string;
   onModelChange: (m: ModelInfo) => void;
-  outputRaw: string;
-  onOutputChange: (v: string) => void;
+  modelDisabled: boolean;
   analyzing: boolean;
   cancelling: boolean;
   analyzeDisabled: boolean;
@@ -30,8 +27,7 @@ export function Toolbar({
   models,
   modelId,
   onModelChange,
-  outputRaw,
-  onOutputChange,
+  modelDisabled,
   analyzing,
   cancelling,
   analyzeDisabled,
@@ -62,22 +58,10 @@ export function Toolbar({
         models={models}
         value={modelId}
         onChange={onModelChange}
+        disabled={modelDisabled}
         className="w-56"
         id="parser-model"
       />
-
-      <div className="flex items-center gap-2">
-        <Label htmlFor="parser-output-tokens" className="text-muted-foreground">
-          Est. output:
-        </Label>
-        <Input
-          id="parser-output-tokens"
-          value={outputRaw}
-          onChange={(e) => onOutputChange(e.target.value)}
-          inputMode="numeric"
-          className="tabular w-24 font-mono"
-        />
-      </div>
 
       {analyzing ? (
         <Button

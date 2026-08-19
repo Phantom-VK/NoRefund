@@ -1,19 +1,30 @@
+import type { ReactNode } from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { cn } from "@/lib/cn";
 
 export interface TabBarProps<T extends string> {
-  tabs: readonly { id: T; label: string; badge?: string | number }[];
+  tabs: readonly { id: T; label: string; badge?: string | number; panel: ReactNode }[];
   value: T;
   onChange: (id: T) => void;
+  className?: string;
 }
 
 /** Underline tabs on Radix Tabs (roving tabindex, arrow-key nav, correct
  *  ARIA for free) -- parser_view.py and compare_view.py each hand-rolled
- *  this with five cosmetic differences between them. Built once here. */
-export function TabBar<T extends string>({ tabs, value, onChange }: TabBarProps<T>) {
+ *  this with five cosmetic differences between them. Built once here.
+ *
+ *  Panels are rendered as TabsPrimitive.Content inside this same Root,
+ *  not by the caller off to the side -- a Trigger's auto-generated
+ *  aria-controls points at the Content with the matching `value`, so the
+ *  two have to live in one Radix tree or the reference dangles. */
+export function TabBar<T extends string>({ tabs, value, onChange, className }: TabBarProps<T>) {
   return (
-    <TabsPrimitive.Root value={value} onValueChange={(v) => onChange(v as T)}>
-      <TabsPrimitive.List className="flex items-center gap-5 border-b border-border">
+    <TabsPrimitive.Root
+      value={value}
+      onValueChange={(v) => onChange(v as T)}
+      className={cn("flex min-h-0 flex-1 flex-col", className)}
+    >
+      <TabsPrimitive.List className="flex items-center gap-5 border-b border-border px-3 pt-2">
         {tabs.map((tab) => (
           <TabsPrimitive.Trigger
             key={tab.id}
@@ -35,6 +46,11 @@ export function TabBar<T extends string>({ tabs, value, onChange }: TabBarProps<
           </TabsPrimitive.Trigger>
         ))}
       </TabsPrimitive.List>
+      {tabs.map((tab) => (
+        <TabsPrimitive.Content key={tab.id} value={tab.id} className="min-h-0 flex-1">
+          {tab.panel}
+        </TabsPrimitive.Content>
+      ))}
     </TabsPrimitive.Root>
   );
 }
