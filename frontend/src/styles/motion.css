@@ -110,6 +110,18 @@
   .stagger > * { animation: none; }
 }
 
+/* Indeterminate progress: transform only (translateX + scaleX), never width
+   -- animating width forces layout on every frame (00-OVERVIEW.md §4). */
+@keyframes indeterminate-slide {
+  0%   { transform: translateX(-100%) scaleX(0.4); }
+  50%  { transform: translateX(50%) scaleX(0.4); }
+  100% { transform: translateX(150%) scaleX(0.4); }
+}
+.animate-indeterminate {
+  transform-origin: left;
+  animation: indeterminate-slide 1.2s var(--ease-in-out) infinite;
+}
+
 @media (prefers-reduced-transparency: reduce) {
   .translucent {
     background: var(--card) !important;
