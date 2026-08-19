@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { KNOWN_PROVIDERS } from "@/components/app/provider-logos";
 
 // WCAG 2.1 relative luminance + contrast ratio, implemented inline so this
 // test has no dependency on theme.css's own correctness to check itself.
@@ -71,16 +72,7 @@ const strippedCss = stripMediaBlocks(rawCss);
 const lightVars = extractVars(strippedCss, ":root");
 const darkVars = { ...lightVars, ...extractVars(strippedCss, ".dark") };
 
-const PROVIDERS = [
-  "openai",
-  "anthropic",
-  "google",
-  "deepseek",
-  "meta",
-  "mistral",
-  "qwen",
-  "default",
-];
+const PROVIDERS = [...KNOWN_PROVIDERS, "default"];
 
 const PAIRS: [fg: string, bg: string][] = [
   ["primary-foreground", "primary"],

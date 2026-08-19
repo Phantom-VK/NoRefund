@@ -2,24 +2,19 @@ import * as React from "react";
 import { ExternalLink, Hash } from "lucide-react";
 import { Card, CardBadge, CardTopRow, type CardArt } from "@/components/app/Card";
 import { ProviderBadge } from "@/components/app/ProviderBadge";
-import { ProviderLogo } from "@/components/app/provider-logos";
+import { KNOWN_PROVIDERS, ProviderLogo } from "@/components/app/provider-logos";
 import { bridge } from "@/lib/bridge";
-import { fmtContextWindow, fmtCost } from "@/lib/format";
-import type { ModelInfo } from "@/lib/types";
+import { convertCurrency } from "@/lib/costing";
+import { fmtContextWindow, fmtCostIn } from "@/lib/format";
+import type { ExchangeRates, ModelInfo } from "@/lib/types";
 
 export interface ModelCardProps {
   model: ModelInfo;
+  /** Display currency (settings.currency) -- prices are converted into this
+   *  from the model's USD list price before rendering. */
+  currency: string;
+  rates: ExchangeRates;
 }
-
-const KNOWN_PROVIDERS = new Set([
-  "openai",
-  "anthropic",
-  "google",
-  "deepseek",
-  "meta",
-  "mistral",
-  "qwen",
-]);
 
 // Picked per provider (not the fixed six-item Gallery demo mapping) so each
 // brand reads consistently across the grid; providers past the sixth reuse
@@ -36,42 +31,72 @@ const PROVIDER_ART: Record<string, CardArt> = {
 };
 
 function providerKey(provider: string): string {
-  return KNOWN_PROVIDERS.has(provider.toLowerCase()) ? provider.toLowerCase() : "default";
+  const key = provider.toLowerCase();
+  return (KNOWN_PROVIDERS as readonly string[]).includes(key) ? key : "default";
 }
 
-function PriceCell({ label, price }: { label: string; price: number }) {
+function PriceCell({
+  label,
+  priceUsd,
+  currency,
+  rates,
+}: {
+  label: string;
+  priceUsd: number;
+  currency: string;
+  rates: ExchangeRates;
+}) {
   return (
     <div className="rounded-md bg-muted px-2 py-2">
       <p className="type-micro text-muted-foreground">{label}</p>
       <p className="type-label tabular font-mono font-semibold text-card-foreground">
-        {fmtCost(price)}
+        {fmtCostIn(convertCurrency(priceUsd, currency, rates), currency)}
       </p>
     </div>
   );
 }
 
-export function ModelCard({ model }: ModelCardProps) {
+export function ModelCard({ model, currency, rates }: ModelCardProps) {
   const key = providerKey(model.provider);
-  const accent = `var(--provider-${key}-fg)`;
+  const hasLogo = key !== "default";
+  // -bg/-fg is the pairing contrast.test.ts actually verifies (4.5:1+ in
+  // both themes) -- using -fg as the badge's own background, as a first cut
+  // of this card did, put a white icon on the *light* dark-theme tint
+  // (e.g. anthropic's dark -fg is a light tan), measuring 2.27:1.
+  const badgeBg = `var(--provider-${key}-bg)`;
+  const badgeFg = `var(--provider-${key}-fg)`;
   const art = PROVIDER_ART[key] ?? "dots";
   // The award-card reference these illustrations came from is sparse (one
   // headline + a date); this card is dense with pricing data, so the same
   // full-strength art reads as noise across the price cells and Docs link
   // instead of a background flourish. Feed card-art.css an already-faded
   // input color so its own internal color-mix() layers land much lighter.
-  const artAccent = `color-mix(in srgb, ${accent} 8%, transparent)`;
+  const artAccent = `color-mix(in srgb, ${badgeFg} 8%, transparent)`;
 
   function handleDocsClick(e: React.MouseEvent) {
     e.preventDefault();
-    if (model.docs_url) void bridge.openUrl(model.docs_url);
+    if (!model.docs_url) return;
+    // Fire-and-forget from a click handler -- still worth swallowing a
+    // rejection (bridge not ready yet, webbrowser.open failing) so it
+    // doesn't surface as an unhandled promise rejection in devtools.
+    bridge.openUrl(model.docs_url).catch(() => {});
   }
 
   return (
     <Card art={art} artColor={artAccent} className="min-w-0">
       <CardTopRow className="mb-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <CardBadge className="size-9 shrink-0 rounded-lg" style={{ background: accent }}>
-            <ProviderLogo provider={model.provider} size={17} />
+          <CardBadge
+            className="size-9 shrink-0 rounded-lg"
+            style={{ background: badgeBg, color: badgeFg }}
+          >
+            {hasLogo ? (
+              <ProviderLogo provider={model.provider} size={17} />
+            ) : (
+              <span className="type-small font-semibold" aria-hidden="true">
+                {model.provider.charAt(0).toUpperCase()}
+              </span>
+            )}
           </CardBadge>
           <div className="min-w-0">
             <p className="type-title truncate">{model.display_name}</p>
@@ -91,8 +116,18 @@ export function ModelCard({ model }: ModelCardProps) {
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <PriceCell label="Input / 1M" price={model.input_price_per_million} />
-        <PriceCell label="Output / 1M" price={model.output_price_per_million} />
+        <PriceCell
+          label="Input / 1M"
+          priceUsd={model.input_price_per_million}
+          currency={currency}
+          rates={rates}
+        />
+        <PriceCell
+          label="Output / 1M"
+          priceUsd={model.output_price_per_million}
+          currency={currency}
+          rates={rates}
+        />
       </div>
 
       <div className="mt-auto flex items-center justify-between border-t border-border pt-2">
