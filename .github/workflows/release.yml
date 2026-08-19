@@ -46,6 +46,7 @@ jobs:
   build-linux:
     needs: version
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -66,7 +67,8 @@ jobs:
           # and kill it. A clean launch exits 124 (timeout killed it); any
           # other code means it crashed on startup (this is exactly how the
           # PIL._tkinter_finder packaging bug was first caught).
-          sudo apt-get update -y && sudo apt-get install -y xvfb
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 update -y
+          sudo apt-get install -y xvfb
           set +e
           xvfb-run --auto-servernum timeout 5 ./dist/NoRefund/NoRefund
           code=$?
