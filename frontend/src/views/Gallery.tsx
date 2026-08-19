@@ -22,7 +22,8 @@ const PROVIDERS = [
   "DeepSeek",
   "Meta",
   "Mistral",
-  "Qwen", // unknown provider — exercises the --provider-default-* fallback
+  "Qwen",
+  "Cohere", // unknown provider — exercises the --provider-default-* fallback
 ];
 
 const AWARD_DEMO: {

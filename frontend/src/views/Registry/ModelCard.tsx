@@ -1,6 +1,8 @@
 import * as React from "react";
 import { ExternalLink, Hash } from "lucide-react";
+import { Card, CardBadge, CardTopRow, type CardArt } from "@/components/app/Card";
 import { ProviderBadge } from "@/components/app/ProviderBadge";
+import { ProviderLogo } from "@/components/app/provider-logos";
 import { bridge } from "@/lib/bridge";
 import { fmtContextWindow, fmtCost } from "@/lib/format";
 import type { ModelInfo } from "@/lib/types";
@@ -16,7 +18,22 @@ const KNOWN_PROVIDERS = new Set([
   "deepseek",
   "meta",
   "mistral",
+  "qwen",
 ]);
+
+// Picked per provider (not the fixed six-item Gallery demo mapping) so each
+// brand reads consistently across the grid; providers past the sixth reuse
+// an art variant -- the corner illustration is a texture, not an identity
+// signal on its own (the logo + colour already are).
+const PROVIDER_ART: Record<string, CardArt> = {
+  openai: "contours",
+  anthropic: "dots-flow",
+  google: "chevron",
+  deepseek: "dots",
+  meta: "stripes",
+  mistral: "dashes",
+  qwen: "contours",
+};
 
 function providerKey(provider: string): string {
   return KNOWN_PROVIDERS.has(provider.toLowerCase()) ? provider.toLowerCase() : "default";
@@ -34,7 +51,15 @@ function PriceCell({ label, price }: { label: string; price: number }) {
 }
 
 export function ModelCard({ model }: ModelCardProps) {
-  const accent = `var(--provider-${providerKey(model.provider)}-fg)`;
+  const key = providerKey(model.provider);
+  const accent = `var(--provider-${key}-fg)`;
+  const art = PROVIDER_ART[key] ?? "dots";
+  // The award-card reference these illustrations came from is sparse (one
+  // headline + a date); this card is dense with pricing data, so the same
+  // full-strength art reads as noise across the price cells and Docs link
+  // instead of a background flourish. Feed card-art.css an already-faded
+  // input color so its own internal color-mix() layers land much lighter.
+  const artAccent = `color-mix(in srgb, ${accent} 8%, transparent)`;
 
   function handleDocsClick(e: React.MouseEvent) {
     e.preventDefault();
@@ -42,49 +67,51 @@ export function ModelCard({ model }: ModelCardProps) {
   }
 
   return (
-    <div className="overflow-hidden rounded-xl bg-card text-card-foreground">
-      <div
-        className="flex items-center justify-between px-4 py-3"
-        style={{ background: `color-mix(in srgb, ${accent} 9%, var(--card))` }}
-      >
-        <div className="min-w-0">
-          <p className="type-title truncate">{model.display_name}</p>
-          <p className="type-small font-mono text-muted-foreground">{model.id}</p>
+    <Card art={art} artColor={artAccent} className="min-w-0">
+      <CardTopRow className="mb-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <CardBadge className="size-9 shrink-0 rounded-lg" style={{ background: accent }}>
+            <ProviderLogo provider={model.provider} size={17} />
+          </CardBadge>
+          <div className="min-w-0">
+            <p className="type-title truncate">{model.display_name}</p>
+            <p className="type-small truncate font-mono text-muted-foreground">
+              {model.id}
+            </p>
+          </div>
         </div>
         <ProviderBadge provider={model.provider} />
+      </CardTopRow>
+
+      <div>
+        <p className="type-small text-muted-foreground">Context window</p>
+        <p className="type-title tabular font-mono">
+          {fmtContextWindow(model.context_window)}
+        </p>
       </div>
 
-      <div className="flex flex-col gap-3 px-4 py-3">
-        <div>
-          <p className="type-small text-muted-foreground">Context window</p>
-          <p className="type-title tabular font-mono">
-            {fmtContextWindow(model.context_window)}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <PriceCell label="Input / 1M" price={model.input_price_per_million} />
-          <PriceCell label="Output / 1M" price={model.output_price_per_million} />
-        </div>
-
-        <div className="flex items-center justify-between border-t border-border pt-2">
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <Hash size={12} aria-hidden="true" />
-            <span className="type-small font-mono">{model.tokenizer_name}</span>
-          </div>
-          {model.docs_url && (
-            <a
-              href={model.docs_url}
-              onClick={handleDocsClick}
-              className="flex items-center gap-1 text-muted-foreground transition-colors hover:text-primary"
-              aria-label={`Docs for ${model.display_name}`}
-            >
-              <span className="type-small">Docs</span>
-              <ExternalLink size={12} aria-hidden="true" />
-            </a>
-          )}
-        </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <PriceCell label="Input / 1M" price={model.input_price_per_million} />
+        <PriceCell label="Output / 1M" price={model.output_price_per_million} />
       </div>
-    </div>
+
+      <div className="mt-auto flex items-center justify-between border-t border-border pt-2">
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <Hash size={12} aria-hidden="true" />
+          <span className="type-small font-mono">{model.tokenizer_name}</span>
+        </div>
+        {model.docs_url && (
+          <a
+            href={model.docs_url}
+            onClick={handleDocsClick}
+            className="flex items-center gap-1 text-muted-foreground transition-colors hover:text-primary"
+            aria-label={`Docs for ${model.display_name}`}
+          >
+            <span className="type-small">Docs</span>
+            <ExternalLink size={12} aria-hidden="true" />
+          </a>
+        )}
+      </div>
+    </Card>
   );
 }

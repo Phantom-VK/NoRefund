@@ -9,6 +9,7 @@ const KNOWN_PROVIDERS = new Set([
   "deepseek",
   "meta",
   "mistral",
+  "qwen",
 ]);
 
 export function ProviderBadge({ provider }: ProviderBadgeProps) {

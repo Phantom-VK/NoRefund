@@ -78,6 +78,7 @@ const PROVIDERS = [
   "deepseek",
   "meta",
   "mistral",
+  "qwen",
   "default",
 ];
 
