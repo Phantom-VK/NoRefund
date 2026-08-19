@@ -3,7 +3,7 @@ import { Button } from "@/components/app/Button";
 import { ContextBar } from "@/components/app/ContextBar";
 import { EmptyState } from "@/components/app/EmptyState";
 import { StatPill } from "@/components/app/StatPill";
-import { contextLevel, fmtContextPct, fmtCost, fmtNum } from "@/lib/format";
+import { basename, contextLevel, fmtContextPct, fmtCost, fmtNum } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { AnalysisResult } from "@/lib/types";
 
@@ -40,10 +40,6 @@ const EXPORT_LABELS: Record<ExportFormat, string> = {
   pdf: "PDF",
   html: "HTML",
 };
-
-function basename(path: string): string {
-  return path.split(/[/\\]/).pop() || path;
-}
 
 function alignClass(align: Column["align"]): string {
   return align === "left" ? "text-left" : align === "center" ? "text-center" : "text-right";
@@ -157,33 +153,33 @@ export function ResultsTable({ results, onExport }: ResultsTableProps) {
           description="Add files and click Analyze to see results"
         />
       ) : (
-        // Relies on the parent tab panel being the scrolling ancestor, so
-        // the sticky header below sticks to that scroll, not a nested one.
-        <table className="w-full flex-1 border-collapse">
-          <colgroup>
-            {COLUMNS.map((c) => (
-              <col key={c.key} style={{ width: `${(c.weight / TOTAL_WEIGHT) * 100}%` }} />
-            ))}
-          </colgroup>
-          <thead className="sticky top-0 z-10 bg-muted">
-            <tr>
+        <div className="flex-1 overflow-y-auto px-3 pb-3">
+          <table className="w-full border-collapse">
+            <colgroup>
               {COLUMNS.map((c) => (
-                <th
-                  key={c.key}
-                  scope="col"
-                  className={cn("type-micro px-2 py-1.5 text-muted-foreground", alignClass(c.align))}
-                >
-                  {c.label}
-                </th>
+                <col key={c.key} style={{ width: `${(c.weight / TOTAL_WEIGHT) * 100}%` }} />
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((r, i) => (
-              <ResultRow key={`${r.file_path}-${i}`} result={r} />
-            ))}
-          </tbody>
-        </table>
+            </colgroup>
+            <thead className="sticky top-0 z-10 bg-muted">
+              <tr>
+                {COLUMNS.map((c) => (
+                  <th
+                    key={c.key}
+                    scope="col"
+                    className={cn("type-micro px-2 py-1.5 text-muted-foreground", alignClass(c.align))}
+                  >
+                    {c.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {results.map((r, i) => (
+                <ResultRow key={`${r.file_path}-${i}`} result={r} />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

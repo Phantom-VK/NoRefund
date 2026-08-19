@@ -1,15 +1,12 @@
 import { File, Folder, X } from "lucide-react";
 import { hasSupportedExtension } from "@/lib/parsing";
+import { basename } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
 export interface FileStripProps {
   paths: string[];
   onRemove: (path: string) => void;
   dropping: boolean;
-}
-
-function basename(path: string): string {
-  return path.split(/[/\\]/).pop() || path;
 }
 
 export function FileStrip({ paths, onRemove, dropping }: FileStripProps) {
@@ -22,7 +19,7 @@ export function FileStrip({ paths, onRemove, dropping }: FileStripProps) {
     >
       {paths.length === 0 ? (
         <p className="type-body flex h-full items-center justify-center text-center text-muted-foreground">
-          No files selected. Click &quot;Add File&quot; or &quot;Add Folder&quot; to get
+          No files selected. Click &apos;Add File&apos; or &apos;Add Folder&apos; to get
           started.
         </p>
       ) : (
