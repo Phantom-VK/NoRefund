@@ -42,6 +42,7 @@ from norefund.core.export import (
 from norefund.core.hardware_registry import get_hardware as core_get_hardware
 from norefund.core.hardware_registry import list_hardware
 from norefund.core.models_registry import ModelInfo, list_models
+from norefund.core.parsing import SUPPORTED_EXTENSIONS
 from norefund.core.portfolio import PortfolioProjection, cheapest_that_fits
 from norefund.core.portfolio import project_costs as core_project_costs
 from norefund.core.quantization import (
@@ -65,6 +66,7 @@ from norefund.core.service import AnalysisResult, analyze_file, analyze_folder
 from norefund.core.settings import Settings, SettingsStore
 from norefund.desktop.dto import to_jsonable
 from norefund.desktop.jobs import JobEvent, JobManager
+from norefund.logging_config import latest_log_file
 
 logger = logging.getLogger(__name__)
 
@@ -237,13 +239,43 @@ class Api:
         never automatic."""
         return to_jsonable(currency.fetch_exchange_rates())
 
+    # -- logs -----------------------------------------------------------------
+
+    @_guard
+    def get_logs(self, limit: int = 500) -> list[dict]:
+        """Recent structured log lines, newest last. Each entry is
+        {"level": str, "message": str, "ctx": dict}. Malformed lines come back
+        as {"level": "INFO", "message": <raw>, "ctx": {}} rather than being
+        dropped -- a corrupt line shouldn't hide every line around it."""
+        log_path = latest_log_file()
+        if log_path is None:
+            return []
+        lines = log_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        entries: list[dict] = []
+        for raw in lines[-limit:]:
+            try:
+                data = json.loads(raw)
+                entries.append(
+                    {
+                        "level": data.get("level", "INFO"),
+                        "message": data.get("message", ""),
+                        "ctx": data.get("ctx") or {},
+                    }
+                )
+            except json.JSONDecodeError:
+                entries.append({"level": "INFO", "message": raw, "ctx": {}})
+        return entries
+
     # -- native dialogs (replaces gui/native_dialog.py entirely) ------------
 
     @_guard
     def pick_files(self) -> list[str]:
         assert self._window is not None
+        pattern = "*" + ";*".join(sorted(SUPPORTED_EXTENSIONS))
         result = self._window.create_file_dialog(
-            webview.FileDialog.OPEN, allow_multiple=True
+            webview.FileDialog.OPEN,
+            allow_multiple=True,
+            file_types=(f"Supported documents ({pattern})",),
         )
         return list(result) if result else []
 

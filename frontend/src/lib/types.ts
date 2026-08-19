@@ -158,6 +158,12 @@ export interface ExchangeRates {
   fetched_at: string | null;
 }
 
+export interface LogEntry {
+  level: string;
+  message: string;
+  ctx: Record<string, unknown>;
+}
+
 export type JobKind = "progress" | "done" | "error" | "cancelled";
 export interface JobEventDetail<T = unknown> {
   job_id: string;

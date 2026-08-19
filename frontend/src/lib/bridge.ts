@@ -3,6 +3,7 @@ import type {
   ExchangeRates,
   FitResult,
   HardwareTarget,
+  LogEntry,
   ModelArchitecture,
   ModelComparison,
   ModelInfo,
@@ -87,6 +88,9 @@ export const bridge = {
   // -- currency ---------------------------------------------------------------
   getExchangeRates: () => call<ExchangeRates>("get_exchange_rates"),
   refreshExchangeRates: () => call<ExchangeRates>("refresh_exchange_rates"),
+
+  // -- logs -------------------------------------------------------------------
+  getLogs: (limit = 500) => call<LogEntry[]>("get_logs", limit),
 
   // -- native dialogs -------------------------------------------------------
   pickFiles: () => call<string[]>("pick_files"),

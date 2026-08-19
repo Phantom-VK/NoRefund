@@ -126,6 +126,62 @@ def test_save_file_returns_none_when_dialog_is_cancelled():
     assert out["data"] is None
 
 
+def test_pick_files_filters_to_supported_extensions():
+    api = Api()
+    api._window = _FakeWindow(dialog_result=("/tmp/a.pdf",))
+    out = api.pick_files()
+    assert out["ok"] is True
+    assert out["data"] == ["/tmp/a.pdf"]
+    dialog_type, kwargs = api._window.calls[0]
+    assert kwargs["allow_multiple"] is True
+    (pattern,) = kwargs["file_types"]
+    assert "*.pdf" in pattern
+    assert "*.docx" in pattern
+
+
+def test_pick_files_returns_empty_list_when_dialog_is_cancelled():
+    api = Api()
+    api._window = _FakeWindow(dialog_result=None)
+    out = api.pick_files()
+    assert out["ok"] is True
+    assert out["data"] == []
+
+
+def test_get_logs_returns_empty_list_when_no_log_file_exists(monkeypatch):
+    monkeypatch.setattr("norefund.desktop.api.latest_log_file", lambda: None)
+    api = Api()
+    out = api.get_logs()
+    assert out["ok"] is True
+    assert out["data"] == []
+
+
+def test_get_logs_parses_json_lines_and_survives_malformed_ones(tmp_path, monkeypatch):
+    log_path = tmp_path / "norefund-test.log"
+    log_path.write_text(
+        '{"level": "INFO", "message": "hello", "ctx": {"k": "v"}}\n'
+        "not json\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("norefund.desktop.api.latest_log_file", lambda: log_path)
+    api = Api()
+    out = api.get_logs()
+    assert out["ok"] is True
+    assert out["data"] == [
+        {"level": "INFO", "message": "hello", "ctx": {"k": "v"}},
+        {"level": "INFO", "message": "not json", "ctx": {}},
+    ]
+
+
+def test_get_logs_respects_limit(tmp_path, monkeypatch):
+    log_path = tmp_path / "norefund-test.log"
+    lines = [f'{{"level": "INFO", "message": "line{i}"}}' for i in range(10)]
+    log_path.write_text("\n".join(lines), encoding="utf-8")
+    monkeypatch.setattr("norefund.desktop.api.latest_log_file", lambda: log_path)
+    api = Api()
+    out = api.get_logs(limit=3)
+    assert [e["message"] for e in out["data"]] == ["line7", "line8", "line9"]
+
+
 # -- dataclass <-> TS interface contract --------------------------------
 
 
