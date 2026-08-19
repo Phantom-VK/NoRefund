@@ -1,20 +1,12 @@
+import { KNOWN_PROVIDERS } from "./provider-logos";
+
 export interface ProviderBadgeProps {
   provider: string;
 }
 
-const KNOWN_PROVIDERS = new Set([
-  "openai",
-  "anthropic",
-  "google",
-  "deepseek",
-  "meta",
-  "mistral",
-]);
-
 export function ProviderBadge({ provider }: ProviderBadgeProps) {
-  const key = KNOWN_PROVIDERS.has(provider.toLowerCase())
-    ? provider.toLowerCase()
-    : "default";
+  const lower = provider.toLowerCase();
+  const key = (KNOWN_PROVIDERS as readonly string[]).includes(lower) ? lower : "default";
 
   return (
     <span

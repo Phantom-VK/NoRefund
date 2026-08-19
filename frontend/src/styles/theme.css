@@ -99,6 +99,7 @@
   --provider-deepseek-bg: #eaeaf3;  --provider-deepseek-fg: #5b5ea6;
   --provider-meta-bg: #dfebfb;      --provider-meta-fg: #0663d6;
   --provider-mistral-bg: #feede7;   --provider-mistral-fg: #af502f;
+  --provider-qwen-bg: #efeafe;      --provider-qwen-fg: #6336e7;
   --provider-default-bg: #f0f1f2;   --provider-default-fg: #686f76;
 
   --warning: #f59e0b;
@@ -112,6 +113,7 @@
   --provider-deepseek-bg: #272b40;  --provider-deepseek-fg: #9496c5;
   --provider-meta-bg: #182d4a;      --provider-meta-fg: #5195ea;
   --provider-mistral-bg: #442f2e;   --provider-mistral-fg: #fa7a4c;
+  --provider-qwen-bg: #2b2350;      --provider-qwen-fg: #9f8cf5;
   --provider-default-bg: #30353e;   --provider-default-fg: #979fa8;
 
   --warning: #f59e0b;
