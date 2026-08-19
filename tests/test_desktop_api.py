@@ -25,6 +25,17 @@ from norefund.core.service import AnalysisResult
 from norefund.core.settings import Settings
 from norefund.desktop.api import Api
 
+_TEST_MODEL = ModelInfo(
+    id="test:model",
+    display_name="Test Model",
+    provider="Test",
+    tokenizer_backend="tiktoken",
+    tokenizer_name="cl100k_base",
+    context_window=1000,
+    input_price_per_million=1.0,
+    output_price_per_million=2.0,
+)
+
 _TYPES_TS = (
     Path(__file__).resolve().parents[1] / "frontend" / "src" / "lib" / "types.ts"
 )
@@ -170,6 +181,105 @@ def test_get_logs_parses_json_lines_and_survives_malformed_ones(tmp_path, monkey
         {"level": "INFO", "message": "hello", "ctx": {"k": "v"}},
         {"level": "INFO", "message": "not json", "ctx": {}},
     ]
+
+
+def test_export_analysis_writes_a_real_file_at_the_returned_path(tmp_path):
+    api = Api()
+    dest = tmp_path / "analysis.csv"
+    api._window = _FakeWindow(dialog_result=(str(dest),))
+    result = AnalysisResult(
+        file_path="a.txt",
+        model_id="test:model",
+        char_count=10,
+        word_count=2,
+        token_count=5,
+        context_window=1000,
+        context_usage_pct=0.5,
+        fits_in_context=True,
+        min_chunks_needed=1,
+        estimated_input_cost=0.001,
+        error=None,
+    )
+    out = api.export_analysis([dataclasses.asdict(result)], "csv")
+    # The bug this guards: save_file is @_guard-wrapped, so a naive
+    # self.save_file(...) call from export_analysis would hand back an
+    # {"ok", "data"} envelope instead of a path, and Path(envelope) would
+    # blow up -- caught by export_analysis's own @_guard and reported as
+    # ok: False instead of ever writing anything.
+    assert out["ok"] is True
+    assert out["data"] == str(dest)
+    assert dest.exists()
+    assert "a.txt" in dest.read_text(encoding="utf-8")
+
+
+def test_export_analysis_returns_none_when_dialog_is_cancelled():
+    api = Api()
+    api._window = _FakeWindow(dialog_result=None)
+    out = api.export_analysis([], "csv")
+    assert out["ok"] is True
+    assert out["data"] is None
+
+
+def test_export_comparison_writes_a_real_file_at_the_returned_path(tmp_path):
+    api = Api()
+    dest = tmp_path / "comparison.csv"
+    api._window = _FakeWindow(dialog_result=(str(dest),))
+    comparison = ModelComparison(
+        model=_TEST_MODEL,
+        token_count=100,
+        context_usage_pct=10.0,
+        fits_in_context=True,
+        min_chunks_needed=1,
+        output_tokens=50,
+        input_cost=0.0001,
+        output_cost=0.0001,
+        total_cost=0.0002,
+        tokenizer_is_approximate=False,
+        error=None,
+    )
+    report = {
+        "source_label": "test",
+        "results": [
+            {**dataclasses.asdict(comparison), "model": dataclasses.asdict(_TEST_MODEL)}
+        ],
+    }
+    out = api.export_comparison(report, None, None, "csv")
+    assert out["ok"] is True
+    assert out["data"] == str(dest)
+    assert dest.exists()
+    assert "Test Model" in dest.read_text(encoding="utf-8")
+
+
+def test_export_fit_writes_a_real_file_at_the_returned_path(tmp_path):
+    api = Api()
+    dest = tmp_path / "fit-check.html"
+    api._window = _FakeWindow(dialog_result=(str(dest),))
+    estimate = MemoryEstimate(
+        weights_bytes=500_000,
+        kv_cache_bytes_per_sequence=1_000,
+        kv_cache_bytes=1_000,
+        activation_bytes=1_000,
+        framework_overhead_bytes=1_000,
+        total_bytes=503_000,
+    )
+    fit = FitResult(
+        architecture_id="test-arch",
+        hardware_id="test-hw",
+        quantization="fp16",
+        kv_cache_dtype="fp16",
+        context_length=4096,
+        concurrency=1,
+        usable_memory_bytes=1_000_000,
+        estimate=estimate,
+        fits=True,
+        headroom_bytes=100,
+        utilization_pct=10.0,
+        max_concurrent_requests=1,
+    )
+    out = api.export_fit(dataclasses.asdict(fit), {}, "html")
+    assert out["ok"] is True
+    assert out["data"] == str(dest)
+    assert dest.exists()
 
 
 def test_get_logs_respects_limit(tmp_path, monkeypatch):

@@ -287,8 +287,12 @@ class Api:
             return None
         return result if isinstance(result, str) else result[0]
 
-    @_guard
-    def save_file(self, suggested_name: str, extension: str, label: str) -> str | None:
+    def _pick_save_path(
+        self, suggested_name: str, extension: str, label: str
+    ) -> str | None:
+        """Unguarded core of save_file -- export_* call this directly rather
+        than self.save_file(), which is @_guard-wrapped and would hand them
+        back an {"ok", "data"} envelope instead of a path."""
         assert self._window is not None
         result = self._window.create_file_dialog(
             webview.FileDialog.SAVE,
@@ -303,6 +307,10 @@ class Api:
         if not path.lower().endswith(f".{extension}"):
             path = f"{path}.{extension}"
         return path
+
+    @_guard
+    def save_file(self, suggested_name: str, extension: str, label: str) -> str | None:
+        return self._pick_save_path(suggested_name, extension, label)
 
     # -- jobs -----------------------------------------------------------------
 
@@ -444,7 +452,7 @@ class Api:
 
     @_guard
     def export_analysis(self, results: list[dict], fmt: str) -> str | None:
-        path = self.save_file("analysis", fmt, "Analysis report")
+        path = self._pick_save_path("analysis", fmt, "Analysis report")
         if path is None:
             return None
         analysis = [_analysis_result(r) for r in results]
@@ -461,7 +469,7 @@ class Api:
         frequency_label: str | None,
         fmt: str,
     ) -> str | None:
-        path = self.save_file("comparison", fmt, "Comparison report")
+        path = self._pick_save_path("comparison", fmt, "Comparison report")
         if path is None:
             return None
         compare_report = _compare_report(report)
@@ -488,7 +496,7 @@ class Api:
 
     @_guard
     def export_fit(self, fit: dict, names: dict, fmt: str) -> str | None:
-        path = self.save_file("fit-check", fmt, "Fit check report")
+        path = self._pick_save_path("fit-check", fmt, "Fit check report")
         if path is None:
             return None
         self._write_export(
