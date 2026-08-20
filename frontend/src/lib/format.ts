@@ -52,6 +52,12 @@ export function fmtBytes(n: number | null): string {
   return `${value.toFixed(1)} GB`;
 }
 
+export function fmtHeadroom(headroomBytes: number | null): string {
+  if (headroomBytes === null) return "—";
+  if (headroomBytes < 0) return `-${fmtBytes(-headroomBytes)} over`;
+  return fmtBytes(headroomBytes);
+}
+
 /** null means "not a usable number" — callers must show an error, not fall
  *  back to 0. The Python original silently defaulted, which hid bad input. */
 export function parseIntSafe(value: string): number | null {
