@@ -7,7 +7,6 @@ policy while still giving CI something to run when a display exists.
 
 from __future__ import annotations
 
-import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,14 +15,13 @@ import pytest
 ctk = pytest.importorskip("customtkinter")
 
 import norefund.gui.native_dialog as native_dialog_module  # noqa: E402
-import norefund.gui.parser_view as parser_view_module  # noqa: E402
 from norefund.core.models_registry import ModelInfo  # noqa: E402
 from norefund.core.service import AnalysisResult  # noqa: E402
 from norefund.core.settings import Settings  # noqa: E402
 from norefund.gui.parser_view import LogsPanel, ParserView, ResultsTable  # noqa: E402
 from norefund.gui.theme import COLORS  # noqa: E402
 
-from .conftest import _pump, _pump_until  # noqa: E402
+from .conftest import _pump  # noqa: E402
 
 
 @dataclass
@@ -64,33 +62,6 @@ def _result(model: ModelInfo) -> AnalysisResult:
         min_chunks_needed=1,
         estimated_input_cost=0.00003,
     )
-
-
-def test_processing_modal_shown_during_analysis_and_closed_after(
-    root, monkeypatch, tmp_path
-):
-    model = _model()
-    proceed = threading.Event()
-
-    def slow_analyze_file(path, model_id):
-        proceed.wait(2)
-        return _result(model)
-
-    monkeypatch.setattr(parser_view_module, "analyze_file", slow_analyze_file)
-
-    view = ParserView(root, _FakeShell(models=[model], settings=Settings()))
-    f = tmp_path / "a.txt"
-    f.write_text("hello")
-    view._add_paths([f])
-
-    view._run_analysis()
-    _pump(root, 100)
-    assert view._processing_modal is not None
-    assert view._processing_modal.winfo_exists()
-
-    proceed.set()
-    _pump_until(root, lambda: not view.analyzing)
-    assert view._processing_modal is None
 
 
 def test_export_pdf_and_html_write_expected_content(root, monkeypatch, tmp_path):

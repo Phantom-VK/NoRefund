@@ -25,7 +25,6 @@ from norefund.gui.widgets import (
     EmptyState,
     IconButton,
     ModelDropdownButton,
-    ProcessingModal,
     StatPill,
     TabBar,
     ThreadSafeSchedulerMixin,
@@ -277,7 +276,6 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         self._results: list[AnalysisResult] = []
         self.analyzing = False
         self.cancel_event: threading.Event | None = None
-        self._processing_modal: ProcessingModal | None = None
         self._active_tab = "results"
 
         self._build_toolbar()
@@ -641,9 +639,6 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             command=self._cancel_analysis,
             state="normal",
         )
-        self._processing_modal = ProcessingModal(
-            self.winfo_toplevel(), "Analyzing files…", on_cancel=self._cancel_analysis
-        )
 
         model = self._model_dropdown.selected_model()
         paths = list(self._paths)
@@ -680,23 +675,9 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             return
         self._schedule(self._analysis_complete, results, model, cancel_event.is_set())
 
-    def destroy(self) -> None:
-        # ProcessingModal is a separate CTkToplevel (parented on the app's
-        # root window, not this frame), so it would otherwise outlive this
-        # view if destroyed mid-run -- the background worker's completion
-        # callback would never fire to close it (ThreadSafeSchedulerMixin's
-        # _schedule no-ops once winfo_exists() is False).
-        if self._processing_modal is not None:
-            self._processing_modal.close()
-            self._processing_modal = None
-        super().destroy()
-
     def _reset_busy_state(self) -> None:
         self.analyzing = False
         self.cancel_event = None
-        if self._processing_modal is not None:
-            self._processing_modal.close()
-            self._processing_modal = None
         if not self.winfo_exists():
             return
         self._analyze_btn.configure(
