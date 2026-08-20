@@ -55,13 +55,14 @@ export function InputCard({
 
   // A drop here replaces the current selection, matching Pick File/Pick
   // Folder -- Compare tokenizes one input at a time, unlike Parser's
-  // accumulating file list. Guarded the same as the pick buttons, since a
-  // drop bypasses their disabled state.
+  // accumulating file list. `disabled` stops the highlight and the drop
+  // itself while text is present, not just the resulting onPaths call --
+  // otherwise a drop looks accepted (the ring lights up) and then silently
+  // does nothing.
   const { dropping, bind } = useFileDrop({
-    onPaths: (p) => {
-      if (!filesDisabled) onPaths(p);
-    },
+    onPaths,
     extensions: SUPPORTED_EXTENSIONS,
+    disabled: filesDisabled,
   });
 
   return (
@@ -73,37 +74,49 @@ export function InputCard({
       )}
     >
       <p className="type-label mb-2 text-foreground">Input</p>
-      <textarea
-        value={text}
-        onChange={(e) => onTextChange(e.target.value)}
-        placeholder="Paste text to compare…"
-        rows={6}
-        disabled={textDisabled}
-        title={hasFiles ? "Clear the selected files first to paste text instead" : undefined}
-        className="type-small w-full resize-none rounded-md border border-input bg-input-background px-3 py-2 font-mono outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-      />
+      {/* Browsers don't dispatch hover/pointer events to disabled form
+          controls, so a title on the control itself never shows a tooltip
+          -- put it on a plain (non-disabled) wrapper instead. */}
+      <div title={hasFiles ? "Clear the selected files first to paste text instead" : undefined}>
+        <textarea
+          value={text}
+          onChange={(e) => onTextChange(e.target.value)}
+          placeholder="Paste text to compare…"
+          rows={6}
+          disabled={textDisabled}
+          className="type-small w-full resize-none rounded-md border border-input bg-input-background px-3 py-2 font-mono outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+        />
+      </div>
 
       <div className="mt-2 flex gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          icon={FileText}
-          disabled={filesDisabled}
+        <span
+          className="inline-flex"
           title={hasText ? "Clear the pasted text first to pick files instead" : undefined}
-          onClick={onPickFile}
         >
-          Pick File
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          icon={FolderOpen}
-          disabled={filesDisabled}
+          <Button
+            type="button"
+            variant="secondary"
+            icon={FileText}
+            disabled={filesDisabled}
+            onClick={onPickFile}
+          >
+            Pick File
+          </Button>
+        </span>
+        <span
+          className="inline-flex"
           title={hasText ? "Clear the pasted text first to pick files instead" : undefined}
-          onClick={onPickFolder}
         >
-          Pick Folder
-        </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            icon={FolderOpen}
+            disabled={filesDisabled}
+            onClick={onPickFolder}
+          >
+            Pick Folder
+          </Button>
+        </span>
       </div>
 
       {hasFiles && (

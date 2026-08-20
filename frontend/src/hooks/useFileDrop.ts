@@ -4,6 +4,10 @@ import type { DragEvent, HTMLAttributes } from "react";
 export interface UseFileDropOptions {
   onPaths: (paths: string[]) => void;
   extensions: string[];
+  /** No-ops every handler, including skipping dragover's preventDefault
+   *  (so the browser shows its own "not a drop target" cursor instead of
+   *  the highlight lighting up for a drop that will be silently discarded). */
+  disabled?: boolean;
 }
 
 export interface UseFileDropResult {
@@ -22,28 +26,45 @@ function hasExtension(name: string, extensions: string[]): boolean {
  *  standard File API never exposes a path in a browser. Verify per-platform
  *  in Phase 12 per the plan; falls back to doing nothing where `.path` is
  *  absent (a plain browser during dev) rather than guessing. */
-export function useFileDrop({ onPaths, extensions }: UseFileDropOptions): UseFileDropResult {
+export function useFileDrop({
+  onPaths,
+  extensions,
+  disabled = false,
+}: UseFileDropOptions): UseFileDropResult {
   const [dropping, setDropping] = useState(false);
   const dragDepth = useRef(0);
 
-  const onDragOver = useCallback((e: DragEvent) => {
-    e.preventDefault();
-  }, []);
+  const onDragOver = useCallback(
+    (e: DragEvent) => {
+      if (disabled) return;
+      e.preventDefault();
+    },
+    [disabled],
+  );
 
-  const onDragEnter = useCallback((e: DragEvent) => {
-    e.preventDefault();
-    dragDepth.current += 1;
-    setDropping(true);
-  }, []);
+  const onDragEnter = useCallback(
+    (e: DragEvent) => {
+      if (disabled) return;
+      e.preventDefault();
+      dragDepth.current += 1;
+      setDropping(true);
+    },
+    [disabled],
+  );
 
-  const onDragLeave = useCallback((e: DragEvent) => {
-    e.preventDefault();
-    dragDepth.current = Math.max(0, dragDepth.current - 1);
-    if (dragDepth.current === 0) setDropping(false);
-  }, []);
+  const onDragLeave = useCallback(
+    (e: DragEvent) => {
+      if (disabled) return;
+      e.preventDefault();
+      dragDepth.current = Math.max(0, dragDepth.current - 1);
+      if (dragDepth.current === 0) setDropping(false);
+    },
+    [disabled],
+  );
 
   const onDrop = useCallback(
     (e: DragEvent) => {
+      if (disabled) return;
       e.preventDefault();
       dragDepth.current = 0;
       setDropping(false);
@@ -83,7 +104,7 @@ export function useFileDrop({ onPaths, extensions }: UseFileDropOptions): UseFil
 
       if (paths.length > 0) onPaths(paths);
     },
-    [extensions, onPaths],
+    [disabled, extensions, onPaths],
   );
 
   return { dropping, bind: { onDragOver, onDragEnter, onDragLeave, onDrop } };
