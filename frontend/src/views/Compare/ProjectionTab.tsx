@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ProjectionRow } from "./ProjectionRow";
+import { sortProjections } from "./sort";
 import type { PortfolioProjection } from "@/lib/types";
 
 export type Frequency = "daily" | "weekly" | "monthly";
@@ -52,13 +53,7 @@ export function ProjectionTab({
   cheapestId,
   onExport,
 }: ProjectionTabProps) {
-  // fits-in-context first, then by monthly cost ascending -- matches
-  // cheapest_that_fits(), which never picks a non-fitting model regardless
-  // of how cheap it is.
-  const sorted = [...projections].sort((a, b) => {
-    if (a.fits_in_context !== b.fits_in_context) return a.fits_in_context ? -1 : 1;
-    return a.monthly_cost - b.monthly_cost;
-  });
+  const sorted = sortProjections(projections);
   const cheapest = projections.find((p) => p.model.id === cheapestId) ?? null;
 
   return (

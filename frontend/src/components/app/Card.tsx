@@ -26,7 +26,7 @@ export function Card({ art, artColor, accent, className, children, ...props }: C
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl bg-card text-card-foreground",
+        "relative overflow-hidden rounded-xl bg-card p-6 text-card-foreground",
         className,
       )}
       {...props}
@@ -39,7 +39,7 @@ export function Card({ art, artColor, accent, className, children, ...props }: C
         />
       )}
       {accent && <div className="absolute inset-y-0 left-0 z-10 w-1 bg-primary" aria-hidden="true" />}
-      <div className="relative z-10 flex h-full flex-col p-6">{children}</div>
+      <div className="relative z-10 flex h-full flex-col">{children}</div>
     </div>
   );
 }

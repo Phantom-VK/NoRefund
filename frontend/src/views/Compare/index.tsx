@@ -14,6 +14,7 @@ import { ModelChecklist } from "./ModelChecklist";
 import { ResultRow } from "./ResultRow";
 import { ProjectionTab } from "./ProjectionTab";
 import type { ExportFormat, Frequency } from "./ProjectionTab";
+import { cheapestResult, sortResults } from "./sort";
 
 type TabId = "results" | "projection";
 
@@ -37,6 +38,13 @@ export default function Compare() {
   const [outputTokens, setOutputTokens] = useState(String(settings.default_output_tokens));
   const [runs, setRuns] = useState("100");
   const [frequency, setFrequency] = useState<Frequency>("daily");
+  // baseReport is exactly what the compare job returned (tokenized once);
+  // report is baseReport with what_if's cost recompute applied for the
+  // current outputTokens. Keeping them separate means the recompute effect
+  // depends on baseReport (set only on job completion), never on report
+  // itself -- report is derived, not fed back into its own effect, so a
+  // stale recompute can never overwrite a newer job's results.
+  const [baseReport, setBaseReport] = useState<CompareReport | null>(null);
   const [report, setReport] = useState<CompareReport | null>(null);
   const [projection, setProjection] = useState<ProjectCostsResult | null>(null);
   const [cancelling, setCancelling] = useState(false);
@@ -90,7 +98,7 @@ export default function Compare() {
 
   useEffect(() => {
     if (job.result === null) return;
-    setReport(job.result);
+    setBaseReport(job.result);
     setCancelling(false);
   }, [job.result]);
 
@@ -107,25 +115,32 @@ export default function Compare() {
 
   // what_if: recompute cost fields for the new output-token assumption
   // without re-tokenizing -- a cheap synchronous call per model, no job.
+  // Depends on baseReport (not report, which this effect itself derives)
+  // so a job that completes mid-recompute can never be overwritten by a
+  // stale what_if resolving late against the wrong report's source_label.
   useEffect(() => {
+    if (baseReport === null) {
+      setReport(null);
+      return;
+    }
     const tokens = parseIntSafe(outputTokens);
-    if (tokens === null || report === null) return;
+    if (tokens === null) {
+      setReport(baseReport);
+      return;
+    }
     let cancelled = false;
     void (async () => {
       try {
-        const updated = await Promise.all(report.results.map((r) => bridge.whatIf(r, tokens)));
-        if (!cancelled) {
-          setReport((prev) => (prev ? { source_label: prev.source_label, results: updated } : prev));
-        }
+        const updated = await Promise.all(baseReport.results.map((r) => bridge.whatIf(r, tokens)));
+        if (!cancelled) setReport({ source_label: baseReport.source_label, results: updated });
       } catch {
-        // Best-effort recompute; keep the existing report on failure.
+        if (!cancelled) setReport(baseReport);
       }
     })();
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [outputTokens]);
+  }, [baseReport, outputTokens]);
 
   // Projection extends the last comparison's per-model token counts across
   // a run frequency -- re-derives whenever the report, output tokens, runs,
@@ -173,15 +188,8 @@ export default function Compare() {
     }
   }
 
-  const successful = report ? report.results.filter((r) => r.error === null) : [];
-  const cheapest =
-    successful.length > 0 ? successful.reduce((a, b) => (a.total_cost <= b.total_cost ? a : b)) : null;
-  const sortedResults = report
-    ? [...report.results].sort((a, b) => {
-        if ((a.error !== null) !== (b.error !== null)) return a.error !== null ? 1 : -1;
-        return a.total_cost - b.total_cost;
-      })
-    : [];
+  const cheapest = report ? cheapestResult(report.results) : null;
+  const sortedResults = report ? sortResults(report.results) : [];
 
   return (
     <div className="flex h-full gap-4 p-4">
