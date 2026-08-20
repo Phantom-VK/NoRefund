@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
+import { Button } from "@/components/app/Button";
 import { Header } from "@/components/app/Header";
 import { Sidebar } from "@/components/app/Sidebar";
 import { SettingsModal } from "@/components/app/SettingsModal";
@@ -148,8 +150,13 @@ export default function App() {
 
   if (bridgeErr) {
     return (
-      <div className="flex h-full items-center justify-center bg-background p-6 text-center">
-        <p className="type-body text-destructive">{bridgeErr}</p>
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-background p-6 text-center">
+        <AlertTriangle size={32} className="text-destructive" aria-hidden="true" />
+        <p className="type-title text-foreground">Couldn't start NoRefund</p>
+        <p className="type-body max-w-sm text-muted-foreground">{bridgeErr}</p>
+        <Button type="button" variant="secondary" icon={RefreshCw} onClick={() => window.location.reload()}>
+          Retry
+        </Button>
       </div>
     );
   }

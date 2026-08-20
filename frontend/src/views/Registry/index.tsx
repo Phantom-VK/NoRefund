@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { Layers } from "lucide-react";
+import { EmptyState } from "@/components/app/EmptyState";
 import { useApp } from "@/lib/appContext";
 import { ModelCard } from "./ModelCard";
 import { ProviderFilter } from "./ProviderFilter";
@@ -46,22 +48,34 @@ export default function Registry() {
         />
       </div>
 
-      <div
-        className={
-          hasEnteredOnce
-            ? "grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-3"
-            : "stagger grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-3"
-        }
-      >
-        {visible.map((model) => (
-          <ModelCard
-            key={model.id}
-            model={model}
-            currency={settings.currency}
-            rates={exchangeRates}
-          />
-        ))}
-      </div>
+      {visible.length === 0 ? (
+        <EmptyState
+          icon={Layers}
+          title="No models to show"
+          description={
+            models.length === 0
+              ? "The model registry is empty."
+              : "No models match this provider filter. Pick another one."
+          }
+        />
+      ) : (
+        <div
+          className={
+            hasEnteredOnce
+              ? "grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-3"
+              : "stagger grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-3"
+          }
+        >
+          {visible.map((model) => (
+            <ModelCard
+              key={model.id}
+              model={model}
+              currency={settings.currency}
+              rates={exchangeRates}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

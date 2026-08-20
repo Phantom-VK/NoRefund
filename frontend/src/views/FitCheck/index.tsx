@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { RefreshCw } from "lucide-react";
+import { Button } from "@/components/app/Button";
 import { Card } from "@/components/app/Card";
 import { Spinner } from "@/components/app/Spinner";
 import { StatPill } from "@/components/app/StatPill";
 import { useApp } from "@/lib/appContext";
+import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { bridge, BridgeError } from "@/lib/bridge";
 import { fmtNum, parseIntSafe } from "@/lib/format";
 import type { FitResult, HardwareTarget, ModelArchitecture } from "@/lib/types";
@@ -61,9 +64,12 @@ export default function FitCheck() {
 
   const [fit, setFit] = useState<FitResult | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
+  const showInitialSpinner = useDelayedFlag(!architectures && !loadError);
 
   useEffect(() => {
     let cancelled = false;
+    setLoadError(null);
     Promise.all([
       bridge.getArchitectures(),
       bridge.getHardware(),
@@ -83,7 +89,7 @@ export default function FitCheck() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [retryTick]);
 
   useEffect(() => {
     if (architectures && architectures.length > 0 && architectureId === "") {
@@ -180,18 +186,21 @@ export default function FitCheck() {
 
   if (loadError) {
     return (
-      <div className="flex h-full items-center justify-center p-6 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
         <p className="type-body text-destructive">{loadError}</p>
+        <Button type="button" variant="secondary" icon={RefreshCw} onClick={() => setRetryTick((n) => n + 1)}>
+          Retry
+        </Button>
       </div>
     );
   }
 
   if (!architectures || !hardware || !quantLevels || !kvDtypes) {
-    return (
+    return showInitialSpinner ? (
       <div className="flex h-full items-center justify-center">
         <Spinner size={32} />
       </div>
-    );
+    ) : null;
   }
 
   return (
