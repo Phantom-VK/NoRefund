@@ -167,6 +167,47 @@ def test_download_hf_passes_stored_token(monkeypatch):
     assert captured["token"] == "hf_secrettoken"
 
 
+def test_download_hf_cancel_mid_download_raises_promptly(monkeypatch):
+    # hf_hub_download is a single blocking call with no chunked
+    # progress/cancel hook -- this proves cancellation is noticed while it
+    # is still in flight, not only after it eventually returns.
+    download_started = threading.Event()
+    release_download = threading.Event()
+
+    def slow_fake_download(**kwargs):
+        download_started.set()
+        release_download.wait(2)
+        return "irrelevant"
+
+    monkeypatch.setattr("huggingface_hub.hf_hub_download", slow_fake_download)
+    monkeypatch.setattr("norefund.core.secrets.get_hf_token", lambda: None)
+
+    resource = resources.TokenizerResource(
+        key="hf:fake/repo",
+        backend="hf",
+        name="fake/repo",
+        model_ids=(),
+        is_cached=False,
+        cache_path=None,
+        size_bytes=None,
+        source_url="https://huggingface.co/fake/repo",
+    )
+    cancel_event = threading.Event()
+
+    def canceller():
+        assert download_started.wait(2)
+        cancel_event.set()
+
+    canceller_thread = threading.Thread(target=canceller)
+    canceller_thread.start()
+    try:
+        with pytest.raises(resources.DownloadCancelled):
+            resources.download_tokenizer(resource, cancel_event=cancel_event)
+    finally:
+        canceller_thread.join()
+        release_download.set()
+
+
 # ---------------------------------------------------------------------------
 # dir_stats
 # ---------------------------------------------------------------------------

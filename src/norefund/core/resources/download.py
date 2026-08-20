@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import threading
 
 from norefund.core import paths
 from norefund.core.resources.types import (
@@ -91,27 +92,54 @@ def _download_hf(
     from norefund.core import resources as _resources
     from norefund.core import secrets
 
+    if cancel_event is not None and cancel_event.is_set():
+        raise DownloadCancelled()
+
     if on_progress is not None:
         on_progress(0, None)
-    try:
-        hf_hub_download(
-            repo_id=resource.name,
-            filename="tokenizer.json",
-            token=secrets.get_hf_token(),
-        )
-    except GatedRepoError as exc:
+
+    outcome: dict[str, BaseException] = {}
+
+    def _fetch() -> None:
+        try:
+            hf_hub_download(
+                repo_id=resource.name,
+                filename="tokenizer.json",
+                token=secrets.get_hf_token(),
+            )
+        except BaseException as exc:  # noqa: BLE001
+            outcome["error"] = exc
+
+    # hf_hub_download is a single opaque blocking call -- unlike the
+    # tiktoken path above, it exposes no chunked read loop to check
+    # cancel_event against mid-transfer. Run it on its own thread and poll
+    # cancel_event here so a cancel is noticed promptly instead of only
+    # after the whole download finishes. The background thread is left to
+    # run to completion on its own (into huggingface_hub's own atomically-
+    # renamed cache), which is harmless and self-heals the cache for the
+    # next scan rather than leaving a truncated file.
+    thread = threading.Thread(target=_fetch, daemon=True)
+    thread.start()
+    while thread.is_alive():
+        if cancel_event is not None and cancel_event.is_set():
+            raise DownloadCancelled()
+        thread.join(timeout=0.1)
+
+    error = outcome.get("error")
+    if isinstance(error, GatedRepoError):
         raise ResourceDownloadError(
             f"'{resource.name}' is a gated repo — request access at "
             f"https://huggingface.co/{resource.name} and try again."
-        ) from exc
-    except HfHubHTTPError as exc:
+        ) from error
+    if isinstance(error, HfHubHTTPError):
         raise ResourceDownloadError(
-            f"Failed to download '{resource.name}': {exc}"
-        ) from exc
-    except Exception as exc:
+            f"Failed to download '{resource.name}': {error}"
+        ) from error
+    if error is not None:
         raise ResourceDownloadError(
-            f"Failed to download '{resource.name}': {exc}"
-        ) from exc
+            f"Failed to download '{resource.name}': {error}"
+        ) from error
+
     if on_progress is not None:
         on_progress(1, 1)
 
