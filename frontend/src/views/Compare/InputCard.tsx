@@ -1,4 +1,4 @@
-import { FileText, FolderOpen, X, Zap } from "lucide-react";
+import { FileText, FolderOpen, X, XCircle, Zap } from "lucide-react";
 import { Button } from "@/components/app/Button";
 import { Card } from "@/components/app/Card";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ export interface InputCardProps {
   onTextChange: (text: string) => void;
   paths: string[];
   onPaths: (paths: string[]) => void;
+  onClearPaths: () => void;
   onPickFile: () => void;
   onPickFolder: () => void;
   outputTokens: string;
@@ -32,6 +33,7 @@ export function InputCard({
   onTextChange,
   paths,
   onPaths,
+  onClearPaths,
   onPickFile,
   onPickFolder,
   outputTokens,
@@ -43,10 +45,24 @@ export function InputCard({
   onCancel,
   runDisabledReason,
 }: InputCardProps) {
+  // Only one input source at a time: picking/dropping files disables the
+  // textarea, and typed text disables file picking -- clearing whichever
+  // one is active hands control back to the other.
+  const hasFiles = paths.length > 0;
+  const hasText = text.trim().length > 0;
+  const textDisabled = running || hasFiles;
+  const filesDisabled = running || hasText;
+
   // A drop here replaces the current selection, matching Pick File/Pick
   // Folder -- Compare tokenizes one input at a time, unlike Parser's
-  // accumulating file list.
-  const { dropping, bind } = useFileDrop({ onPaths, extensions: SUPPORTED_EXTENSIONS });
+  // accumulating file list. Guarded the same as the pick buttons, since a
+  // drop bypasses their disabled state.
+  const { dropping, bind } = useFileDrop({
+    onPaths: (p) => {
+      if (!filesDisabled) onPaths(p);
+    },
+    extensions: SUPPORTED_EXTENSIONS,
+  });
 
   return (
     <Card
@@ -62,26 +78,56 @@ export function InputCard({
         onChange={(e) => onTextChange(e.target.value)}
         placeholder="Paste text to compare…"
         rows={6}
-        className="type-small w-full resize-none rounded-md border border-input bg-input-background px-3 py-2 font-mono outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        disabled={textDisabled}
+        title={hasFiles ? "Clear the selected files first to paste text instead" : undefined}
+        className="type-small w-full resize-none rounded-md border border-input bg-input-background px-3 py-2 font-mono outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
       />
 
       <div className="mt-2 flex gap-2">
-        <Button type="button" variant="secondary" icon={FileText} onClick={onPickFile}>
+        <Button
+          type="button"
+          variant="secondary"
+          icon={FileText}
+          disabled={filesDisabled}
+          title={hasText ? "Clear the pasted text first to pick files instead" : undefined}
+          onClick={onPickFile}
+        >
           Pick File
         </Button>
-        <Button type="button" variant="secondary" icon={FolderOpen} onClick={onPickFolder}>
+        <Button
+          type="button"
+          variant="secondary"
+          icon={FolderOpen}
+          disabled={filesDisabled}
+          title={hasText ? "Clear the pasted text first to pick files instead" : undefined}
+          onClick={onPickFolder}
+        >
           Pick Folder
         </Button>
       </div>
 
-      {paths.length > 0 && (
-        <ul className="mt-2 flex flex-col gap-0.5">
-          {paths.map((p) => (
-            <li key={p} className="type-small truncate font-mono text-foreground">
-              {basename(p)}
-            </li>
-          ))}
-        </ul>
+      {hasFiles && (
+        <div className="mt-2">
+          <div className="mb-1 flex items-center justify-between">
+            <p className="type-small text-muted-foreground">Selected</p>
+            <button
+              type="button"
+              disabled={running}
+              onClick={onClearPaths}
+              className="pressable type-small flex items-center gap-1 text-primary disabled:pointer-events-none disabled:opacity-50"
+            >
+              <XCircle size={12} aria-hidden="true" />
+              Clear
+            </button>
+          </div>
+          <ul className="flex flex-col gap-0.5">
+            {paths.map((p) => (
+              <li key={p} className="type-small truncate font-mono text-foreground">
+                {basename(p)}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <div className="mt-3 flex items-center gap-2">
