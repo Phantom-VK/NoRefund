@@ -67,6 +67,39 @@
   transition-duration: var(--dur-exit);
 }
 
+/* A modal's dimming backdrop -- opacity-only (no scale/origin; a full-
+   viewport dim has no meaningful anchor point), sharing .anim-modal's
+   duration tokens so the scrim and the panel it belongs to fade in step
+   instead of the panel animating while the backdrop just snaps. */
+.anim-overlay {
+  transition: opacity var(--dur-modal) var(--ease-out);
+}
+.anim-overlay[data-state="closed"] {
+  transition-duration: var(--dur-exit);
+}
+.anim-overlay[data-state="open"] {
+  opacity: 1;
+}
+.anim-overlay[data-state="closed"] {
+  opacity: 0;
+}
+
+/* The onboarding notice banner mounts/unmounts with its condition (App.tsx),
+   so it's a genuinely new element each time it appears -- @starting-style
+   fades it in without any JS mounted-state juggling. Dismissal stays an
+   instant unmount: the user just clicked its own Dismiss button, so an
+   exit animation would be softening a moment they already initiated, not
+   preventing a surprise (contrast with content appearing on its own). */
+.anim-banner {
+  opacity: 1;
+  transition: opacity var(--dur-modal) var(--ease-out);
+}
+@starting-style {
+  .anim-banner {
+    opacity: 0;
+  }
+}
+
 /* Hover is gated: touch devices fire hover on tap, causing false positives. */
 @media (hover: hover) and (pointer: fine) {
   .hoverable {

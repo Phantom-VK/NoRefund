@@ -30,11 +30,16 @@ export function ContextBar({ pct, className, forceColor }: ContextBarProps) {
       )}
     >
       <div
-        className="h-full rounded-full"
+        // transform, not width -- width triggers layout on every frame
+        // (00-OVERVIEW.md §4); scaleX + a left origin gets the same fill
+        // effect off the main thread. backgroundColor is paint-only, so
+        // transitioning it alongside costs nothing and turns the ok/warn/
+        // over colour swap into a shift instead of a snap.
+        className="h-full w-full origin-left rounded-full"
         style={{
-          width: `${clamped}%`,
+          transform: `scaleX(${clamped / 100})`,
           backgroundColor: color,
-          transition: "width var(--dur-dropdown) var(--ease-out)",
+          transition: "transform var(--dur-dropdown) var(--ease-out), background-color var(--dur-dropdown) var(--ease-out)",
         }}
       />
     </div>

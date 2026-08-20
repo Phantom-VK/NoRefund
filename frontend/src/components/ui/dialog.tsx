@@ -38,7 +38,12 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        // anim-overlay (motion.css), not the tailwindcss-animate
+        // animate-in/fade-in-0 utilities -- that plugin isn't installed in
+        // this project, so those classes were dead: the backdrop was
+        // snapping in/out instantly while .anim-modal faded+scaled the
+        // panel beside it.
+        "anim-overlay fixed inset-0 z-50 bg-black/50",
         className,
       )}
       {...props}
