@@ -999,18 +999,8 @@ class ProcessingModal(ctk.CTkToplevel):
     background, so the rest of the UI can't be touched mid-run (the Analyze/
     Compare button flipping to "Cancel" was the only feedback before this --
     everything else, including switching views, stayed clickable). Same
-    grab_set pattern as SettingsModal.
-
-    Cancel (button, or the OS window-close control) always closes this
-    modal immediately, whether or not the background job actually manages
-    to stop -- some jobs (a single huge file, a text-only Compare with no
-    cancel_event support at all) can't be interrupted mid-call, and this
-    modal must never be the one thing standing between the user and the
-    rest of the app if that call runs long or a completion event is ever
-    lost. `on_cancel` still fires so the caller's own cancel_event/button
-    state updates normally; this modal just stops being the app's only
-    door once the user has asked to leave.
-    """
+    grab_set pattern as SettingsModal, but with no close affordance besides
+    Cancel: no title-bar close button escape, no Escape-key close."""
 
     def __init__(self, parent, title: str, on_cancel: Callable[[], None]) -> None:
         super().__init__(parent)
@@ -1021,7 +1011,7 @@ class ProcessingModal(ctk.CTkToplevel):
         self.resizable(False, False)
         self.configure(fg_color=COLORS["card"])
         self.transient(parent.winfo_toplevel())
-        self.protocol("WM_DELETE_WINDOW", self._cancel)
+        self.protocol("WM_DELETE_WINDOW", lambda: None)
 
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=theme.SPACE_5, pady=theme.SPACE_5)
@@ -1057,24 +1047,23 @@ class ProcessingModal(ctk.CTkToplevel):
             if self._grab_attempts < _PROCESSING_MAX_GRAB_ATTEMPTS:
                 self.after(_PROCESSING_GRAB_RETRY_MS, self._try_grab)
 
+    def set_status(self, text: str) -> None:
+        if self.winfo_exists():
+            self._status_label.configure(text=text)
+
     def _cancel(self) -> None:
+        self._cancel_btn.configure(state="disabled", text="Cancelling…")
         self._on_cancel()
-        self.close()
 
     def close(self) -> None:
-        # Mirrors ThreadSafeSchedulerMixin._schedule's guard: winfo_exists()
-        # and destroy() can themselves raise TclError/RuntimeError once the
-        # app is tearing down, and callers (views' destroy()/
-        # _reset_busy_state()) call this unguarded -- swallow here rather
-        # than let a shutdown-time race break the caller.
+        if not self.winfo_exists():
+            return
         try:
-            if not self.winfo_exists():
-                return
             self._progress.stop()
             self.grab_release()
-            self.destroy()
-        except (TclError, RuntimeError):
+        except Exception:  # noqa: BLE001
             pass
+        self.destroy()
 
 
 class LoadingOverlay:
