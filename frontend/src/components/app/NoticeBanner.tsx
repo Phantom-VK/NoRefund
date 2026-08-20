@@ -34,7 +34,7 @@ export function NoticeBanner({
         type="button"
         aria-label="Dismiss"
         onClick={onDismiss}
-        className="pressable rounded-md p-1 hover:bg-black/10"
+        className="pressable rounded-md p-1 outline-none hover:bg-black/10 focus-visible:ring-[3px] focus-visible:ring-ring/50"
       >
         <X size={14} aria-hidden="true" />
       </button>

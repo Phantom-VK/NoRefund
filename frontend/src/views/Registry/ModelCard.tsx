@@ -139,7 +139,7 @@ export function ModelCard({ model, currency, rates }: ModelCardProps) {
           <a
             href={model.docs_url}
             onClick={handleDocsClick}
-            className="flex items-center gap-1 text-muted-foreground transition-colors hover:text-primary"
+            className="flex items-center gap-1 rounded text-muted-foreground outline-none transition-colors hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/50"
             aria-label={`Docs for ${model.display_name}`}
           >
             <span className="type-small">Docs</span>

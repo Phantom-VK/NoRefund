@@ -22,7 +22,7 @@ export function ProviderFilter({ providers, active, onChange }: ProviderFilterPr
             onClick={() => onChange(label)}
             aria-pressed={isActive}
             className={cn(
-              "pressable type-micro rounded-full px-2.5 py-1",
+              "pressable type-micro rounded-full px-2.5 py-1 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
               isActive
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover:bg-border",

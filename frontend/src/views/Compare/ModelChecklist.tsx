@@ -25,14 +25,14 @@ export function ModelChecklist({ models, selected, onChange }: ModelChecklistPro
         <div className="flex items-center gap-3">
           <button
             type="button"
-            className="pressable type-small text-primary"
+            className="pressable type-small rounded text-primary outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
             onClick={() => onChange(new Set(models.map((m) => m.id)))}
           >
             Select all
           </button>
           <button
             type="button"
-            className="pressable type-small text-primary"
+            className="pressable type-small rounded text-primary outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
             onClick={() => onChange(new Set())}
           >
             Select none

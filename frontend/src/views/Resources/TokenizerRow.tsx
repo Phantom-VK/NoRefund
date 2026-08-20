@@ -81,7 +81,7 @@ export function TokenizerRow({
                 <button
                   type="button"
                   onClick={onOpenSourceUrl}
-                  className="pressable ml-1.5 inline-flex items-center gap-1 text-primary underline"
+                  className="pressable ml-1.5 inline-flex items-center gap-1 rounded text-primary underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
                   open page <ExternalLink size={11} aria-hidden="true" />
                 </button>
