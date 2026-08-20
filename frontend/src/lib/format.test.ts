@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   contextLevel, elideMiddle, fmtBytes, fmtContextPct, fmtContextWindow,
-  fmtCost, fmtCostIn, fmtNum, parseIntSafe,
+  fmtCost, fmtCostIn, fmtHeadroom, fmtNum, parseIntSafe,
 } from "./format";
 
 describe("fmtCost", () => {
@@ -39,6 +39,14 @@ describe("fmtBytes", () => {
   it("renders larger units with one decimal", () =>
     expect(fmtBytes(1536)).toBe("1.5 KB"));
   it("renders an em dash for null", () => expect(fmtBytes(null)).toBe("—"));
+});
+
+describe("fmtHeadroom", () => {
+  it("renders positive headroom like fmtBytes", () => expect(fmtHeadroom(1536)).toBe("1.5 KB"));
+  it("renders negative headroom as '-{size} over'", () => {
+    expect(fmtHeadroom(-1536)).toBe("-1.5 KB over");
+  });
+  it("renders an em dash for null", () => expect(fmtHeadroom(null)).toBe("—"));
 });
 
 describe("parseIntSafe", () => {

@@ -12,7 +12,7 @@ export function ModelPicker({ models, value, onChange }: ModelPickerProps) {
   return (
     <div className="flex flex-col gap-2">
       <Label htmlFor="calc-model">Model</Label>
-      <ModelSelect id="calc-model" models={models} value={value} onChange={onChange} />
+      <ModelSelect id="calc-model" models={models} value={value} onChange={onChange} label="Model" />
     </div>
   );
 }

@@ -1,13 +1,6 @@
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppSelect } from "./Select";
 import { ProviderBadge } from "@/components/app/ProviderBadge";
 import { modelLabel } from "@/lib/format";
-import { cn } from "@/lib/cn";
 import type { ModelInfo } from "@/lib/types";
 
 export interface ModelSelectProps {
@@ -19,46 +12,34 @@ export interface ModelSelectProps {
   /** For associating an external <Label htmlFor>. */
   id?: string;
   disabled?: boolean;
+  /** Accessible name. AppSelect sets this as aria-label, which wins over
+   *  an associated <label htmlFor> in the accessible-name computation --
+   *  pass the same text as that external label (e.g. "Model") so the
+   *  announced name matches what's on screen. Defaults to a sensible name
+   *  for callers with no visible label of their own (e.g. Parser's toolbar). */
+  label?: string;
 }
 
-/** Radix-based replacement for gui/widgets.py's DropdownButton/DropdownPopover
- *  (~300 lines of hand-rolled popover). Shared by Calculator, Parser, and
- *  Compare -- built once here. */
-export function ModelSelect({ models, value, onChange, className, id, disabled }: ModelSelectProps) {
-  const selected = models.find((m) => m.id === value) ?? null;
-
+/** Thin wrapper over AppSelect: every row gets a leading ProviderBadge,
+ *  including providers with no brand colour (ProviderBadge falls back to a
+ *  neutral one), so rows stay aligned instead of a mixed icon/no-icon look. */
+export function ModelSelect({ models, value, onChange, className, id, disabled, label = "Select a model" }: ModelSelectProps) {
   return (
-    <Select
+    <AppSelect
+      options={models.map((m) => ({
+        value: m.id,
+        label: modelLabel(m),
+        badge: <ProviderBadge provider={m.provider} />,
+      }))}
       value={value}
-      disabled={disabled}
-      onValueChange={(newId) => {
+      onChange={(newId) => {
         const model = models.find((m) => m.id === newId);
         if (model) onChange(model);
       }}
-    >
-      <SelectTrigger id={id} className={cn("w-full", className)}>
-        <SelectValue placeholder="Select a model">
-          {selected && (
-            <span className="flex min-w-0 items-center gap-2">
-              <ProviderBadge provider={selected.provider} />
-              <span className="truncate">{modelLabel(selected)}</span>
-            </span>
-          )}
-        </SelectValue>
-      </SelectTrigger>
-      {/* Every row gets a leading badge, including providers with no brand
-          colour (ProviderBadge falls back to a neutral one), so rows stay
-          aligned instead of the mixed icon/no-icon look this replaces. */}
-      <SelectContent className="max-h-[min(320px,var(--radix-select-content-available-height))]">
-        {models.map((m) => (
-          <SelectItem key={m.id} value={m.id}>
-            <span className="flex min-w-0 items-center gap-2">
-              <ProviderBadge provider={m.provider} />
-              <span className="truncate">{modelLabel(m)}</span>
-            </span>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+      label={label}
+      className={className}
+      id={id}
+      disabled={disabled}
+    />
   );
 }

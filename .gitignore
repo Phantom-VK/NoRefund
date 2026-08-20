@@ -226,6 +226,8 @@ PLAN.md
 docs/packaging.md
 docs/PLAN_WALKTHROUGH.md
 backend_changes.md
+GUI_REBUILD/
+docs/superpowers/
 .idea
 
 # Built frontend assets — produced by `cd frontend && npm run build`
