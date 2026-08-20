@@ -141,7 +141,7 @@ def probe_hf(repo_id: str) -> TokenizerResource:
 
     notes = None
     if repo_id.startswith(_GATED_HF_PREFIXES):
-        notes = "Gated repo — requires a HuggingFace account/token to download."
+        notes = "Gated repo. Set your HuggingFace token in the app's Settings to download this."
 
     try:
         resolved = hf_hub_download(

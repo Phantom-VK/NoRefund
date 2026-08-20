@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  contextLevel, elideMiddle, fmtBytes, fmtContextPct, fmtContextWindow,
+  contextLevel, dirname, elideMiddle, fmtBytes, fmtContextPct, fmtContextWindow,
   fmtCost, fmtCostIn, fmtHeadroom, fmtNum, parseIntSafe,
 } from "./format";
 
@@ -39,6 +39,18 @@ describe("fmtBytes", () => {
   it("renders larger units with one decimal", () =>
     expect(fmtBytes(1536)).toBe("1.5 KB"));
   it("renders an em dash for null", () => expect(fmtBytes(null)).toBe("—"));
+});
+
+describe("dirname", () => {
+  it("strips the file name on posix paths", () => expect(dirname("/foo/bar/baz.txt")).toBe("/foo/bar"));
+  it("strips the file name on windows paths", () => expect(dirname("C:\\foo\\bar.txt")).toBe("C:\\foo"));
+  it("returns the root for a root-level file", () => expect(dirname("/baz.txt")).toBe("/"));
+  it("returns the drive root, not a drive-relative path, for a windows drive root", () => {
+    expect(dirname("C:\\baz.txt")).toBe("C:\\");
+  });
+  it("returns empty for a bare name with no directory info", () => {
+    expect(dirname("baz.txt")).toBe("");
+  });
 });
 
 describe("fmtHeadroom", () => {

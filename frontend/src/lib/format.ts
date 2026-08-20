@@ -72,6 +72,17 @@ export function basename(path: string): string {
   return path.split(/[/\\]/).pop() || path;
 }
 
+/** A cached tokenizer's path points at the cache file itself -- Open folder
+ *  needs its containing directory. */
+export function dirname(path: string): string {
+  const idx = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  if (idx === -1) return ""; // no directory info in the string at all
+  if (idx === 0) return path[0]; // POSIX root: "/file" -> "/"
+  // Windows drive root: "C:\file" -> "C:\", not the drive-relative "C:".
+  if (idx === 2 && path[1] === ":") return path.slice(0, 3);
+  return path.slice(0, idx);
+}
+
 export function elideMiddle(text: string, maxChars: number): string {
   if (text.length <= maxChars || maxChars <= 1) return text;
   const tail = Math.max(1, Math.floor(maxChars / 3));

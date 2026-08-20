@@ -20,6 +20,14 @@ body {
   font-family:
     "Bricolage Grotesque Variable", "Segoe UI", -apple-system,
     BlinkMacSystemFont, Helvetica, Arial, sans-serif;
+  /* Without this, dark-on-light text (light theme) renders visibly heavier
+     and softer at its edges than the same nominal weight light-on-dark
+     (dark theme) -- a standard subpixel-AA asymmetry, not a font or colour
+     bug. Normalizing keeps small/muted text looking like the same weight
+     in both themes instead of reading as blurred only in light mode. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   /* The window chrome is native; the page must never scroll as a whole.
      Individual panes own their own overflow. */
   overflow: hidden;
