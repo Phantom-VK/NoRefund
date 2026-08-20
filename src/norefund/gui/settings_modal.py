@@ -1,4 +1,5 @@
-"""Settings modal — the one true modal dialog in the app (needs grab_set)."""
+"""Settings modal (needs grab_set). See widgets.ProcessingModal for the
+other modal in the app, shown while a tokenization job is running."""
 
 from __future__ import annotations
 

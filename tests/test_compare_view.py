@@ -93,6 +93,31 @@ def _images(widget) -> list:
     return images
 
 
+def test_processing_modal_shown_during_compare_and_closed_after(root, monkeypatch):
+    model = _model("test:only")
+    proceed = threading.Event()
+
+    def slow_compare(text, models, output_tokens):
+        proceed.wait(2)
+        return CompareReport(source_label="x", results=[_comparison(model)])
+
+    monkeypatch.setattr(compare_view_module, "compare_text", slow_compare)
+
+    view = CompareView(root, _shell([model]))
+    view._text_box.insert("1.0", "hello")
+
+    view._run_compare()
+    _pump(root, 100)
+    assert view._processing_modal is not None
+    assert view._processing_modal.winfo_exists()
+
+    proceed.set()
+    _pump_until(root, lambda: not view._running)
+    assert view._processing_modal is None
+
+    view.destroy()
+
+
 def test_run_compare_renders_sorted_results_cheapest_highlighted(root, monkeypatch):
     cheap = _model("test:cheap")
     pricey = _model("test:pricey")

@@ -35,6 +35,7 @@ from norefund.gui.widgets import (
     EmptyState,
     IconButton,
     ModelCheckList,
+    ProcessingModal,
     StatPill,
     TabBar,
     ThreadSafeSchedulerMixin,
@@ -65,6 +66,7 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         self._last_projection_frequency: str | None = None
         self._running = False
         self.cancel_event: threading.Event | None = None
+        self._processing_modal: ProcessingModal | None = None
         self._active_tab = "results"
 
         self._build_layout()
@@ -330,6 +332,9 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             command=self._cancel_compare,
             state="normal",
         )
+        self._processing_modal = ProcessingModal(
+            self.winfo_toplevel(), "Comparing models…", on_cancel=self._cancel_compare
+        )
         output_tokens = formatting.parse_int(self._output_var.get())
         paths = list(self._paths)
         cancel_event = self.cancel_event
@@ -376,9 +381,23 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         self._reset_busy_state()
         self._show_empty_state(message=message)
 
+    def destroy(self) -> None:
+        # ProcessingModal is a separate CTkToplevel (parented on the app's
+        # root window, not this frame), so it would otherwise outlive this
+        # view if destroyed mid-run -- the background worker's completion
+        # callback would never fire to close it (ThreadSafeSchedulerMixin's
+        # _schedule no-ops once winfo_exists() is False).
+        if self._processing_modal is not None:
+            self._processing_modal.close()
+            self._processing_modal = None
+        super().destroy()
+
     def _reset_busy_state(self) -> None:
         self._running = False
         self.cancel_event = None
+        if self._processing_modal is not None:
+            self._processing_modal.close()
+            self._processing_modal = None
         if not self.winfo_exists():
             return
         self._run_btn.configure(
