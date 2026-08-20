@@ -75,3 +75,13 @@ def test_analyze_folder_ignores_unsupported(sample_folder: Path):
 def test_analyze_folder_all_results_valid(sample_folder: Path):
     results = analyze_folder(sample_folder, "openai:gpt-4o")
     assert all(isinstance(r, AnalysisResult) for r in results)
+
+
+def test_analyze_folder_does_not_descend_into_subfolders(sample_folder: Path):
+    nested = sample_folder / "nested"
+    nested.mkdir()
+    (nested / "c.txt").write_text("File C content, inside a subfolder")
+
+    results = analyze_folder(sample_folder, "openai:gpt-4o")
+
+    assert {Path(r.file_path).name for r in results} == {"a.txt", "b.md"}
