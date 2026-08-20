@@ -15,14 +15,18 @@ export interface CardProps extends Omit<React.ComponentProps<"div">, "children">
   art?: CardArt;
   /** CSS color for the illustration. Defaults to --primary. */
   artColor?: string;
+  /** Left edge strip in --primary, e.g. to mark a "cheapest" row. Signals
+   *  the state without recoloring the card surface, so no child needs an
+   *  isAccent branch on its own color (GUI_REVIEW.md §4.1). */
+  accent?: boolean;
   children: React.ReactNode;
 }
 
-export function Card({ art, artColor, className, children, ...props }: CardProps) {
+export function Card({ art, artColor, accent, className, children, ...props }: CardProps) {
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl bg-card text-card-foreground",
+        "relative overflow-hidden rounded-xl bg-card p-6 text-card-foreground",
         className,
       )}
       {...props}
@@ -34,7 +38,8 @@ export function Card({ art, artColor, className, children, ...props }: CardProps
           aria-hidden="true"
         />
       )}
-      <div className="relative z-10 flex h-full flex-col p-6">{children}</div>
+      {accent && <div className="absolute inset-y-0 left-0 z-10 w-1 bg-primary" aria-hidden="true" />}
+      <div className="relative z-10 flex h-full flex-col">{children}</div>
     </div>
   );
 }
