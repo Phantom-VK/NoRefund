@@ -110,10 +110,11 @@ def analyze_folder(
     on_progress: Callable[[AnalysisResult], None] | None = None,
     cancel_event: threading.Event | None = None,
 ) -> list[AnalysisResult]:
-    """Analyse every supported file under *folder*.
+    """Analyse every supported file directly inside *folder*.
 
     Args:
-        folder:       Root directory to scan recursively.
+        folder:       Directory to scan -- its immediate contents only,
+                      subfolders are not descended into.
         model_id:     Model to use for tokenisation and cost estimation.
         on_progress:  Optional callback invoked after each file completes
                       (result passed as argument). Used by the GUI to update
@@ -128,7 +129,7 @@ def analyze_folder(
     """
     results: list[AnalysisResult] = []
 
-    for f in sorted(folder.rglob("*")):
+    for f in sorted(folder.glob("*")):
         if cancel_event is not None and cancel_event.is_set():
             _LOG.info(
                 "analyse_folder_cancelled",

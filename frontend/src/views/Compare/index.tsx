@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BarChart2, FileText } from "lucide-react";
 import { Button } from "@/components/app/Button";
 import { EmptyState } from "@/components/app/EmptyState";
+import { ProcessingDialog } from "@/components/app/ProcessingDialog";
 import { StatPill } from "@/components/app/StatPill";
 import { TabBar } from "@/components/app/TabBar";
 import { useApp } from "@/lib/appContext";
@@ -199,6 +200,7 @@ export default function Compare() {
           onTextChange={setText}
           paths={paths}
           onPaths={setPaths}
+          onClearPaths={() => setPaths([])}
           onPickFile={pickFile}
           onPickFolder={pickFolder}
           outputTokens={outputTokens}
@@ -283,6 +285,13 @@ export default function Compare() {
         />
         {status && <p className="type-small px-3 py-2 text-muted-foreground">{status}</p>}
       </div>
+      <ProcessingDialog
+        open={job.running}
+        title="Comparing models…"
+        description={`Tokenizing against ${selectedModels.length} model(s)`}
+        cancelling={cancelling}
+        onCancel={handleCancel}
+      />
     </div>
   );
 }

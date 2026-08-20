@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { FolderOpen } from "lucide-react";
 import { EmptyState } from "@/components/app/EmptyState";
+import { ProcessingDialog } from "@/components/app/ProcessingDialog";
 import { TabBar } from "@/components/app/TabBar";
 import { useApp } from "@/lib/appContext";
 import { useJob } from "@/hooks/useJob";
@@ -237,6 +238,17 @@ export default function Parser() {
         onChange={handleTabChange}
       />
       <StatusBar left={status?.left ?? null} right={status?.right ?? null} />
+      <ProcessingDialog
+        open={job.running}
+        title="Analyzing files…"
+        description={
+          analysisTotal !== null
+            ? `${fmtNum(results.length)} of ${fmtNum(analysisTotal)} files analyzed`
+            : `${fmtNum(results.length)} file(s) analyzed`
+        }
+        cancelling={cancelling}
+        onCancel={handleCancel}
+      />
     </div>
   );
 }

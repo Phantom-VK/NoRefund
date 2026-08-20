@@ -129,3 +129,16 @@ def test_compare_paths_aggregates_files_per_tokenizer(monkeypatch, tmp_path):
     assert report.results[0].token_count == 42
     assert sum(_FakeTokenizer.call_count.values()) == 1
     assert "2 files" in report.source_label
+
+
+def test_compare_paths_does_not_descend_into_subfolders(monkeypatch, tmp_path):
+    _patch_tokenizers(monkeypatch, tokens_per_call=42)
+    (tmp_path / "a.txt").write_text("hello")
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    (nested / "b.txt").write_text("world")
+
+    model = _model("test:model")
+    report = compare_paths([tmp_path], [model], output_tokens=0)
+
+    assert "1 file" in report.source_label

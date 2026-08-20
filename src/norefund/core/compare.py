@@ -133,11 +133,12 @@ def compare_paths(
     cancel_event: threading.Event | None = None,
 ) -> CompareReport:
     """Extract every file once, then tokenize the aggregated text once per
-    unique tokenizer, then fan out costs per model."""
+    unique tokenizer, then fan out costs per model. A directory's immediate
+    contents only -- subfolders are not descended into."""
     files: list[Path] = []
     for p in paths:
         if p.is_dir():
-            files.extend(sorted(f for f in p.rglob("*") if f.is_file()))
+            files.extend(sorted(f for f in p.glob("*") if f.is_file()))
         else:
             files.append(p)
 
