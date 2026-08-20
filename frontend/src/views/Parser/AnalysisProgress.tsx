@@ -43,9 +43,14 @@ export function AnalysisProgress({
           className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted"
         >
           <div
+            // rounded-full only for the indeterminate sliding pill, whose
+            // scaleX is fixed (0.4) -- for the determinate fill, a rounded
+            // corner scales with it and flattens into an ellipse at low
+            // percentages, so that variant relies on the track's own
+            // rounded-full + overflow-hidden to draw both caps instead.
             className={cn(
-              "h-full w-full origin-left rounded-full bg-primary",
-              !determinate && "animate-indeterminate",
+              "h-full w-full origin-left bg-primary",
+              !determinate && "animate-indeterminate rounded-full",
             )}
             style={
               determinate

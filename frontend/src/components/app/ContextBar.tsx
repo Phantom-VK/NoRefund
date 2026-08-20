@@ -34,8 +34,14 @@ export function ContextBar({ pct, className, forceColor }: ContextBarProps) {
         // (00-OVERVIEW.md §4); scaleX + a left origin gets the same fill
         // effect off the main thread. backgroundColor is paint-only, so
         // transitioning it alongside costs nothing and turns the ok/warn/
-        // over colour swap into a shift instead of a snap.
-        className="h-full w-full origin-left rounded-full"
+        // over colour swap into a shift instead of a snap. No rounded-full
+        // here -- scaling a rounded corner scales its radius too, flattening
+        // the right cap into a visible ellipse at low fill; the outer
+        // track's own rounded-full + overflow-hidden already draws both
+        // caps correctly (a full track shows the fill's right edge exactly
+        // at the track's own right corner; a partial one shows a flat
+        // leading edge, the same shape every native progress bar uses).
+        className="h-full w-full origin-left"
         style={{
           transform: `scaleX(${clamped / 100})`,
           backgroundColor: color,

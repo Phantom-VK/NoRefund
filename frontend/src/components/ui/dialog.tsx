@@ -40,9 +40,10 @@ function DialogOverlay({
       className={cn(
         // anim-overlay (motion.css), not the tailwindcss-animate
         // animate-in/fade-in-0 utilities -- that plugin isn't installed in
-        // this project, so those classes were dead: the backdrop was
-        // snapping in/out instantly while .anim-modal faded+scaled the
-        // panel beside it.
+        // this project, so those classes were dead. See motion.css's
+        // comment on .anim-overlay for why this element uses forceMount +
+        // a delayed-visibility transition rather than the @keyframes +
+        // Presence pattern .anim-modal uses successfully.
         "anim-overlay fixed inset-0 z-50 bg-black/50",
         className,
       )}
@@ -63,31 +64,44 @@ function DialogContent({
   showCloseButton?: boolean;
 }) {
   return (
-    <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay />
-      <DialogPrimitive.Content
-        data-slot="dialog-content"
-        className={cn(
-          // anim-modal (motion.css): centre-origin scale/fade with the
-          // app's custom easing curves, not Tailwind's generic zoom utility
-          // -- modals are the one documented exception to origin-aware motion.
-          // Centering translate lives in .anim-modal (motion.css), not a
-          // separate Tailwind utility -- it has to share `transform` with
-          // the entrance/exit scale.
-          "anim-modal bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg",
-          className,
-        )}
-        {...props}
-      >
-        {children}
-        {showCloseButton && (
-          <DialogPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4">
-            <XIcon />
-            <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
-        )}
-      </DialogPrimitive.Content>
-    </DialogPortal>
+    <>
+      {/* Its own DialogPortal, separate from Content's below: DialogPortal
+          wraps *each child* in its own outer Presence in addition to
+          whatever Presence that child sets up internally, and forceMount
+          has to be set at both layers for it to actually take -- setting
+          it only on DialogOverlay left the outer layer still unmounting
+          the node immediately. Content's portal is untouched (no
+          forceMount) since its Presence already works correctly on its
+          own; see the comment on .anim-overlay in motion.css for why the
+          two need different treatment. */}
+      <DialogPortal forceMount data-slot="dialog-portal-overlay">
+        <DialogOverlay forceMount />
+      </DialogPortal>
+      <DialogPortal data-slot="dialog-portal">
+        <DialogPrimitive.Content
+          data-slot="dialog-content"
+          className={cn(
+            // anim-modal (motion.css): centre-origin scale/fade with the
+            // app's custom easing curves, not Tailwind's generic zoom utility
+            // -- modals are the one documented exception to origin-aware motion.
+            // Centering translate lives in .anim-modal (motion.css), not a
+            // separate Tailwind utility -- it has to share `transform` with
+            // the entrance/exit scale.
+            "anim-modal bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg",
+            className,
+          )}
+          {...props}
+        >
+          {children}
+          {showCloseButton && (
+            <DialogPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4">
+              <XIcon />
+              <span className="sr-only">Close</span>
+            </DialogPrimitive.Close>
+          )}
+        </DialogPrimitive.Content>
+      </DialogPortal>
+    </>
   );
 }
 
