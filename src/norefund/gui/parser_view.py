@@ -660,6 +660,13 @@ class ParserView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         self._analyze_btn.configure(
             text="Cancelling…", image=theme.blank_icon(size=16), state="disabled"
         )
+        # cancel_event is only checked between files -- a single large file
+        # already in progress can't be interrupted mid-parse/tokenize.
+        # ProcessingModal.close() (called by the modal itself when its own
+        # Cancel is clicked) releases the grab regardless; this just keeps
+        # the view's own reference in sync so _reset_busy_state doesn't try
+        # to close it again.
+        self._processing_modal = None
 
     def _analysis_worker(
         self, paths: list[Path], model: ModelInfo, cancel_event: threading.Event

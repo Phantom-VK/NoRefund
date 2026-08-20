@@ -119,17 +119,36 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
             font=theme.font(theme.FONT_LABEL),
         )
         self._text_box.pack(fill="x", pady=(0, theme.SPACE_2))
+        self._text_box.bind(
+            "<KeyRelease>", lambda _e: self._sync_input_exclusivity()
+        )
         enable_file_drop(inner, self._on_files_dropped, suffixes=SUPPORTED_EXTENSIONS)
 
         picker_row = ctk.CTkFrame(inner, fg_color="transparent")
         picker_row.pack(fill="x", pady=(0, theme.SPACE_2))
-        IconButton(
+        self._pick_file_btn = IconButton(
             picker_row, "Pick File", icon="file_text", command=self._pick_file
-        ).pack(side="left", padx=(0, theme.SPACE_2))
-        IconButton(
+        )
+        self._pick_file_btn.pack(side="left", padx=(0, theme.SPACE_2))
+        self._pick_folder_btn = IconButton(
             picker_row, "Pick Folder", icon="folder_open", command=self._pick_folder
-        ).pack(side="left")
+        )
+        self._pick_folder_btn.pack(side="left")
 
+        self._paths_header = ctk.CTkFrame(inner, fg_color="transparent")
+        ctk.CTkLabel(
+            self._paths_header,
+            text="Selected",
+            font=theme.font(theme.FONT_SMALL),
+            text_color=COLORS["muted_fg"],
+        ).pack(side="left")
+        IconButton(
+            self._paths_header,
+            "Clear",
+            icon="x_circle",
+            variant="muted",
+            command=self._clear_paths,
+        ).pack(side="right")
         self._paths_container = ctk.CTkFrame(inner, fg_color="transparent")
         self._paths_container.pack(fill="x")
 
@@ -277,23 +296,54 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
     # Input selection
     # ------------------------------------------------------------------
 
+    def _text_has_content(self) -> bool:
+        return bool(self._text_box.get("1.0", "end").strip())
+
     def _pick_file(self) -> None:
+        # Buttons are disabled while text is present, but a drop bypasses
+        # button state entirely -- guard here too so text and files can
+        # never both end up populated at once.
+        if self._text_has_content():
+            return
         paths = native_dialog.ask_open_files(SUPPORTED_FILETYPES)
         if paths:
             self._set_selected_paths([Path(p) for p in paths])
 
     def _pick_folder(self) -> None:
+        if self._text_has_content():
+            return
         folder = native_dialog.ask_directory()
         if folder:
             self._set_selected_paths([Path(folder)])
 
     def _on_files_dropped(self, paths: list[Path]) -> None:
+        if self._text_has_content():
+            return
         self._set_selected_paths(paths)
+
+    def _clear_paths(self) -> None:
+        self._set_selected_paths([])
+
+    def _sync_input_exclusivity(self) -> None:
+        """Only one input source at a time: files disable the text box,
+        typed text disables file picking. Clearing whichever is active
+        hands control back to the other."""
+        has_files = bool(self._paths)
+        self._text_box.configure(state="disabled" if has_files else "normal")
+        pick_state = "disabled" if self._text_has_content() else "normal"
+        self._pick_file_btn.configure(state=pick_state)
+        self._pick_folder_btn.configure(state=pick_state)
 
     def _set_selected_paths(self, paths: list[Path]) -> None:
         self._paths = paths
         for child in self._paths_container.winfo_children():
             child.destroy()
+        if paths:
+            self._paths_header.pack(
+                fill="x", pady=(0, theme.SPACE_1), before=self._paths_container
+            )
+        else:
+            self._paths_header.pack_forget()
         for path in paths:
             row = ctk.CTkFrame(self._paths_container, fg_color="transparent")
             row.pack(fill="x", pady=(0, theme.SPACE_1))
@@ -309,6 +359,7 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
                 text_color=COLORS["fg"],
                 anchor="w",
             ).pack(side="left", fill="x", expand=True)
+        self._sync_input_exclusivity()
 
     # ------------------------------------------------------------------
     # Run / cancel
@@ -351,6 +402,13 @@ class CompareView(ThreadSafeSchedulerMixin, ctk.CTkFrame):
         self._run_btn.configure(
             text="Cancelling…", image=theme.blank_icon(size=16), state="disabled"
         )
+        # compare_text has no cancel_event support at all -- it's one
+        # blocking call with no polling point -- so Cancel can't actually
+        # interrupt a text-only compare. ProcessingModal.close() (called
+        # by the modal itself when its own Cancel is clicked) releases the
+        # grab regardless; this just keeps the view's own reference in
+        # sync so _reset_busy_state doesn't try to close it again.
+        self._processing_modal = None
 
     def _compare_worker(
         self, text, paths, models, output_tokens, cancel_event
