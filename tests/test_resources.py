@@ -148,7 +148,18 @@ def test_download_hf_passes_stored_token(monkeypatch):
         "norefund.core.secrets.get_hf_token", lambda: "hf_secrettoken"
     )
     monkeypatch.setattr(
-        resources, "probe_hf", lambda name: object()
+        resources,
+        "probe_hf",
+        lambda name: resources.TokenizerResource(
+            key=f"hf:{name}",
+            backend="hf",
+            name=name,
+            model_ids=(),
+            is_cached=True,
+            cache_path=None,
+            size_bytes=None,
+            source_url=None,
+        ),
     )
     monkeypatch.setattr(
         "norefund.core.tokenization.invalidate_tokenizer_cache", lambda: None
@@ -261,7 +272,7 @@ def test_download_tiktoken_happy_path_writes_cache_file(tmp_path, monkeypatch):
         key="tiktoken:cl100k_base",
         backend="tiktoken",
         name="cl100k_base",
-        model_ids=(),
+        model_ids=("openai:gpt-4o", "openai:gpt-4o-mini"),
         is_cached=False,
         cache_path=None,
         size_bytes=None,
@@ -284,6 +295,12 @@ def test_download_tiktoken_happy_path_writes_cache_file(tmp_path, monkeypatch):
     cache_key = hashlib.sha1(blob_url.encode()).hexdigest()
     assert (tmp_path / cache_key).read_bytes() == data
     assert result.is_cached is True
+    # probe_tiktoken (which builds `result` internally) always returns
+    # model_ids=() -- download_tokenizer must re-attach the caller's
+    # model_ids rather than passing that placeholder through, or a
+    # completed download would make a resource's "used by N models" count
+    # drop to zero in the UI.
+    assert result.model_ids == resource.model_ids
 
 
 def test_download_tiktoken_hash_mismatch_raises_and_cleans_up(tmp_path, monkeypatch):

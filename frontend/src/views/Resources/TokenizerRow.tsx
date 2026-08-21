@@ -100,7 +100,7 @@ export function TokenizerRow({
             </Button>
           ) : downloading ? (
             <div className="flex items-center gap-2">
-              <DownloadProgressBar progress={progress} />
+              <DownloadProgressBar progress={progress} resourceName={resource.name} />
               <Button
                 type="button"
                 variant="danger"
@@ -140,7 +140,13 @@ export function TokenizerRow({
   );
 }
 
-function DownloadProgressBar({ progress }: { progress: DownloadProgress | null }) {
+function DownloadProgressBar({
+  progress,
+  resourceName,
+}: {
+  progress: DownloadProgress | null;
+  resourceName: string;
+}) {
   const determinate = progress?.total != null;
   const pct = determinate ? Math.min(1, progress.downloaded / Math.max(progress.total ?? 1, 1)) : 0;
 
@@ -150,6 +156,7 @@ function DownloadProgressBar({ progress }: { progress: DownloadProgress | null }
       aria-valuenow={determinate ? progress.downloaded : undefined}
       aria-valuemin={0}
       aria-valuemax={determinate ? (progress.total ?? undefined) : undefined}
+      aria-label={`Downloading ${resourceName}`}
       className="h-1.5 w-28 overflow-hidden rounded-full bg-muted"
     >
       <div

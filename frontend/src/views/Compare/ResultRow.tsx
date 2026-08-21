@@ -44,7 +44,11 @@ export function ResultRow({ result, isCheapest }: ResultRowProps) {
               {result.tokenizer_is_approximate ? " (approx.)" : ""}
             </span>
             <div className="flex items-center gap-2">
-              <ContextBar pct={result.context_usage_pct} className="w-24" />
+              <ContextBar
+                pct={result.context_usage_pct}
+                className="w-24"
+                label={`Context window usage for ${result.model.display_name}`}
+              />
               <span className="type-small tabular font-mono text-muted-foreground">
                 {fmtContextPct(result.context_usage_pct)}
               </span>

@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import os
 import threading
+from dataclasses import replace
 
 from norefund.core import paths
 from norefund.core.resources.types import (
@@ -164,4 +165,9 @@ def download_tokenizer(
     from norefund.core.tokenization import invalidate_tokenizer_cache
 
     invalidate_tokenizer_cache()
-    return result
+    # probe_tiktoken/probe_hf don't know which models use this tokenizer --
+    # that's only known by the caller's model list -- so they always return
+    # model_ids=(). Re-attach it from the resource we were asked to
+    # download, otherwise the "used by N models" count a caller displays
+    # would drop to zero the moment a download completes.
+    return replace(result, model_ids=resource.model_ids)

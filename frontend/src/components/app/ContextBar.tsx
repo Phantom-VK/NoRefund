@@ -1,13 +1,14 @@
-import { contextLevel } from "@/lib/format";
+import { contextLevel, fmtContextPct } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
 export interface ContextBarProps {
   pct: number | null;
   className?: string;
   forceColor?: string;
+  label?: string;
 }
 
-export function ContextBar({ pct, className, forceColor }: ContextBarProps) {
+export function ContextBar({ pct, className, forceColor, label }: ContextBarProps) {
   const level = contextLevel(pct);
   const color =
     forceColor ??
@@ -21,9 +22,11 @@ export function ContextBar({ pct, className, forceColor }: ContextBarProps) {
   return (
     <div
       role="progressbar"
-      aria-valuenow={pct ?? undefined}
+      aria-valuenow={pct === null ? undefined : clamped}
       aria-valuemin={0}
       aria-valuemax={100}
+      aria-valuetext={pct === null ? undefined : fmtContextPct(pct)}
+      aria-label={label}
       className={cn(
         "relative h-2 w-full overflow-hidden rounded-full bg-muted",
         className,

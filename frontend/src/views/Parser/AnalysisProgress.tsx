@@ -40,6 +40,7 @@ export function AnalysisProgress({
           aria-valuenow={determinate ? done : undefined}
           aria-valuemin={0}
           aria-valuemax={determinate ? total : undefined}
+          aria-label="Analysis progress"
           className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted"
         >
           <div
