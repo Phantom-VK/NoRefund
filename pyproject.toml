@@ -48,6 +48,9 @@ dnd = [
 linux = [
     "pygobject>=3.50",
 ]
+macos = [
+    "py2app>=0.28",
+]
 
 [project.scripts]
 norefund = "norefund.main:main"
