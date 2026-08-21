@@ -54,21 +54,31 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install project
-        run: pip install -e .[dev]
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: Build with PyInstaller
-        run: pyinstaller packaging/norefund.spec --distpath dist --workpath build --noconfirm
+      - name: Install Linux GTK/WebKit dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 update -y
+          sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 xvfb
+
+      - name: Install project
+        run: pip install -e ".[dev,linux]"
+
+      - name: Build
+        run: python packaging/build.py
 
       - name: Smoke test the binary actually launches
         run: |
           # There's no --version flag; with no args the app opens the GUI
-          # and blocks in mainloop(), so give it 5s under a virtual display
-          # and kill it. A clean launch exits 124 (timeout killed it); any
-          # other code means it crashed on startup (this is exactly how the
-          # PIL._tkinter_finder packaging bug was first caught).
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 update -y
-          sudo apt-get install -y xvfb
+          # and blocks, so give it 5s under a virtual display and kill it.
+          # A clean launch exits 124 (timeout killed it); any other code
+          # means it crashed on startup -- this is exactly the class of bug
+          # (Gdk.Display.get_default() returning None; see docs/packaging.md)
+          # that compiles fine and only shows up when the frozen build runs.
           set +e
           xvfb-run --auto-servernum timeout 5 ./dist/NoRefund/NoRefund
           code=$?
@@ -99,14 +109,20 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
       - name: Install project
         run: pip install -e .[dev]
 
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
 
-      - name: Build with PyInstaller
-        run: pyinstaller packaging\norefund.spec --distpath dist --workpath build --noconfirm
+      - name: Build
+        run: python packaging\build.py
 
       - name: Smoke test the binary actually launches
         shell: pwsh
