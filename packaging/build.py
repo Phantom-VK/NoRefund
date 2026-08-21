@@ -54,7 +54,15 @@ def verify_frontend_fresh() -> None:
 
 def build_pyinstaller() -> Path:
     _run(
-        ["pyinstaller", str(SPEC_PATH), "--distpath", "dist", "--workpath", "build"],
+        [
+            "pyinstaller",
+            str(SPEC_PATH),
+            "--distpath",
+            "dist",
+            "--workpath",
+            "build",
+            "--noconfirm",
+        ],
         cwd=PROJECT_ROOT,
     )
     return PROJECT_ROOT / "dist" / "NoRefund"
