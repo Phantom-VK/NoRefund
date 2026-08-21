@@ -120,36 +120,45 @@
    duration tokens so the scrim and the panel it belongs to fade in step
    instead of the panel animating while the backdrop just snaps.
 
-   This one deliberately does NOT use the @keyframes + animation approach
-   above. Radix's DialogOverlay wraps its node in react-remove-scroll,
-   and empirically (frame-sampled through real open/close cycles) that
-   wrapper makes Presence's getComputedStyle(node).animationName check
-   unreliable specifically for this element: the entrance animation plays,
-   but on close Presence sometimes unmounts the node in the same tick
-   data-state flips, before animationstart even fires, and it never gets
-   the chance to fade at all. The panel (.anim-modal, no such wrapper)
-   does not have this problem, confirmed by the same frame sampling.
-
-   Instead: `forceMount` (set on the caller, dialog.tsx) keeps this node
-   permanently in the DOM so Presence never gets to prematurely remove
-   it, and a plain CSS transition -- not dependent on Presence's
-   animation-detection at all -- handles the fade. `visibility` (not
-   display) is what actually makes it non-interactive once hidden, with
-   its own transition delayed to the end of the opacity fade so it
-   doesn't cut the fade short. */
-.anim-overlay {
-  transition: opacity var(--dur-modal) var(--ease-out);
+   An earlier version of this rule used `forceMount` (dialog.tsx) plus a
+   plain CSS transition instead of @keyframes, on the theory that Radix's
+   DialogOverlay (which wraps its node in react-remove-scroll) made
+   Presence's getComputedStyle(node).animationName exit-check unreliable
+   for this element specifically. That theory was never actually verified
+   against the library source and was wrong: react-remove-scroll's
+   `as={Slot}` merges its ref onto the same DOM node Presence reads (no
+   extra wrapper element), so the animationName check works fine. The real
+   bug was in this codebase's own DialogOverlay wrapper (dialog.tsx): it
+   was a plain function component, not React.forwardRef, so the ref that
+   DialogPortal's outer Presence layer needs to find the actual DOM node
+   never reached it -- that Presence instance always saw `node` as
+   undefined and unmounted the overlay instantly instead of waiting for
+   the exit animation. See the comment on DialogOverlay in dialog.tsx.
+   `forceMount`'s side effect masked the symptom by keeping the node (and
+   therefore its react-remove-scroll instance, which has no `enabled` prop
+   wired through Radix's API) permanently mounted -- silently arming a
+   document-level `wheel` listener for the app's entire lifetime, blocking
+   scroll on the real scroll container even while every dialog was closed.
+   Fixed at the actual cause (forwardRef) instead: back to plain
+   @keyframes + animation like .anim-modal, confirmed via frame sampling
+   to fade correctly in both directions, and confirmed the scroll lock is
+   now only live while a dialog is actually open (or mid exit-animation),
+   never permanently. */
+@keyframes anim-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes anim-overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
 }
 .anim-overlay[data-state="open"] {
   opacity: 1;
-  visibility: visible;
+  animation: anim-overlay-in var(--dur-modal) var(--ease-out);
 }
 .anim-overlay[data-state="closed"] {
   opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity var(--dur-exit) var(--ease-out),
-    visibility 0s linear var(--dur-exit);
+  animation: anim-overlay-out var(--dur-exit) var(--ease-out);
 }
 
 /* The onboarding notice banner mounts/unmounts with its condition (App.tsx),

@@ -30,27 +30,39 @@ function DialogClose({
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
-function DialogOverlay({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
+const DialogOverlay = React.forwardRef<
+  React.ComponentRef<typeof DialogPrimitive.Overlay>,
+  React.ComponentProps<typeof DialogPrimitive.Overlay>
+>(function DialogOverlay({ className, ...props }, ref) {
   return (
     <DialogPrimitive.Overlay
+      ref={ref}
       data-slot="dialog-overlay"
       className={cn(
         // anim-overlay (motion.css), not the tailwindcss-animate
         // animate-in/fade-in-0 utilities -- that plugin isn't installed in
-        // this project, so those classes were dead. See motion.css's
-        // comment on .anim-overlay for why this element uses forceMount +
-        // a delayed-visibility transition rather than the @keyframes +
-        // Presence pattern .anim-modal uses successfully.
+        // this project, so those classes were dead. Same @keyframes +
+        // Presence pattern as .anim-modal. This MUST be React.forwardRef,
+        // not a plain function component: DialogPortal wraps each of its
+        // children (this one included) in its own outer Presence, and that
+        // outer Presence needs a real ref down to the actual DOM node to
+        // read getComputedStyle(node).animationName when deciding whether
+        // to hold the node mounted for an exit animation. A plain function
+        // component here silently breaks that ref chain (React drops a ref
+        // passed to a non-forwardRef component), so the outer Presence
+        // never gets a node, always sees `node` as undefined, and unmounts
+        // immediately instead of waiting -- exit animation never plays.
+        // DialogPrimitive.Content doesn't have this problem because it's
+        // rendered directly (Radix's own forwardRef component, not wrapped
+        // in one of ours) as DialogPortal's child.
         "anim-overlay fixed inset-0 z-50 bg-black/50",
         className,
       )}
       {...props}
     />
   );
-}
+});
+DialogOverlay.displayName = "DialogOverlay";
 
 function DialogContent({
   className,
@@ -64,44 +76,31 @@ function DialogContent({
   showCloseButton?: boolean;
 }) {
   return (
-    <>
-      {/* Its own DialogPortal, separate from Content's below: DialogPortal
-          wraps *each child* in its own outer Presence in addition to
-          whatever Presence that child sets up internally, and forceMount
-          has to be set at both layers for it to actually take -- setting
-          it only on DialogOverlay left the outer layer still unmounting
-          the node immediately. Content's portal is untouched (no
-          forceMount) since its Presence already works correctly on its
-          own; see the comment on .anim-overlay in motion.css for why the
-          two need different treatment. */}
-      <DialogPortal forceMount data-slot="dialog-portal-overlay">
-        <DialogOverlay forceMount />
-      </DialogPortal>
-      <DialogPortal data-slot="dialog-portal">
-        <DialogPrimitive.Content
-          data-slot="dialog-content"
-          className={cn(
-            // anim-modal (motion.css): centre-origin scale/fade with the
-            // app's custom easing curves, not Tailwind's generic zoom utility
-            // -- modals are the one documented exception to origin-aware motion.
-            // Centering translate lives in .anim-modal (motion.css), not a
-            // separate Tailwind utility -- it has to share `transform` with
-            // the entrance/exit scale.
-            "anim-modal bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg",
-            className,
-          )}
-          {...props}
-        >
-          {children}
-          {showCloseButton && (
-            <DialogPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4">
-              <XIcon />
-              <span className="sr-only">Close</span>
-            </DialogPrimitive.Close>
-          )}
-        </DialogPrimitive.Content>
-      </DialogPortal>
-    </>
+    <DialogPortal data-slot="dialog-portal">
+      <DialogOverlay />
+      <DialogPrimitive.Content
+        data-slot="dialog-content"
+        className={cn(
+          // anim-modal (motion.css): centre-origin scale/fade with the
+          // app's custom easing curves, not Tailwind's generic zoom utility
+          // -- modals are the one documented exception to origin-aware motion.
+          // Centering translate lives in .anim-modal (motion.css), not a
+          // separate Tailwind utility -- it has to share `transform` with
+          // the entrance/exit scale.
+          "anim-modal bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg",
+          className,
+        )}
+        {...props}
+      >
+        {children}
+        {showCloseButton && (
+          <DialogPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4">
+            <XIcon />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        )}
+      </DialogPrimitive.Content>
+    </DialogPortal>
   );
 }
 
