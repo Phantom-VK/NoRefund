@@ -18,7 +18,7 @@ export function UtilizationCard({ pct }: UtilizationCardProps) {
         <p className="type-label font-bold text-foreground">VRAM utilization</p>
         <p className={cn("type-label tabular font-bold", colorClass)}>{fmtContextPct(pct)}</p>
       </div>
-      <ContextBar pct={pct} />
+      <ContextBar pct={pct} label="VRAM utilization" />
     </Card>
   );
 }

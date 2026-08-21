@@ -5,9 +5,10 @@ export interface ContextBarProps {
   pct: number | null;
   className?: string;
   forceColor?: string;
+  label?: string;
 }
 
-export function ContextBar({ pct, className, forceColor }: ContextBarProps) {
+export function ContextBar({ pct, className, forceColor, label }: ContextBarProps) {
   const level = contextLevel(pct);
   const color =
     forceColor ??
@@ -24,6 +25,7 @@ export function ContextBar({ pct, className, forceColor }: ContextBarProps) {
       aria-valuenow={pct ?? undefined}
       aria-valuemin={0}
       aria-valuemax={100}
+      aria-label={label}
       className={cn(
         "relative h-2 w-full overflow-hidden rounded-full bg-muted",
         className,

@@ -33,7 +33,12 @@ export function ContextCard({
           {fmtContextPct(pct)}
         </p>
       </div>
-      <ContextBar pct={pct} forceColor={barColor} className="mt-2" />
+      <ContextBar
+        pct={pct}
+        forceColor={barColor}
+        className="mt-2"
+        label="Context window usage"
+      />
       <p className="type-body tabular mt-2 text-muted-foreground">
         {inputTokens === null ? "—" : fmtNum(inputTokens)} input tokens · of{" "}
         {fmtNum(contextWindow)} max

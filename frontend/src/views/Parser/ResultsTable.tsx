@@ -75,7 +75,11 @@ function ResultRow({ result }: { result: AnalysisResult }) {
       </td>
       <td className="px-2 py-1.5">
         <div className="flex items-center justify-end gap-2">
-          <ContextBar pct={result.context_usage_pct} className="w-14" />
+          <ContextBar
+            pct={result.context_usage_pct}
+            className="w-14"
+            label={`Context window usage for ${name}`}
+          />
           <span className={cn("type-small tabular w-11 shrink-0 text-right font-mono", contextColor(result.context_usage_pct))}>
             {fmtContextPct(result.context_usage_pct)}
           </span>
