@@ -19,6 +19,11 @@ It dispatches to PyInstaller on Windows/Linux and py2app on macOS.
 **Build prerequisites:**
 
 ```bash
+# Debian/Ubuntu -- pygobject builds pycairo from source, which needs these
+# even though they're not needed at runtime:
+sudo apt install libgirepository1.0-dev libgirepository-2.0-dev \
+  libcairo2-dev pkg-config python3-dev
+
 pip install -e ".[dev,linux]"
 ```
 

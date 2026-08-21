@@ -10,7 +10,7 @@ readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.12"
 authors = [
-    { name = "Vikramaditya Khupse", email = "" }
+    { name = "Vikramaditya Khupse" }
 ]
 keywords = ["llm", "tokens", "cost", "ai", "desktop"]
 classifiers = [

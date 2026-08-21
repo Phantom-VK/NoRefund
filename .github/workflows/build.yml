@@ -35,7 +35,10 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 update -y
-          sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 xvfb
+          sudo apt-get install -y \
+            python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 xvfb \
+            libgirepository1.0-dev libgirepository-2.0-dev libcairo2-dev \
+            pkg-config python3-dev
 
       - name: Install project
         shell: bash
@@ -58,6 +61,7 @@ jobs:
 
       - name: Python tests
         shell: bash
+        timeout-minutes: 8
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
             xvfb-run --auto-servernum pytest
