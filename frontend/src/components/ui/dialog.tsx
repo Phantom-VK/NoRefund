@@ -30,21 +30,39 @@ function DialogClose({
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
-function DialogOverlay({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
+const DialogOverlay = React.forwardRef<
+  React.ComponentRef<typeof DialogPrimitive.Overlay>,
+  React.ComponentProps<typeof DialogPrimitive.Overlay>
+>(function DialogOverlay({ className, ...props }, ref) {
   return (
     <DialogPrimitive.Overlay
+      ref={ref}
       data-slot="dialog-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        // anim-overlay (motion.css), not the tailwindcss-animate
+        // animate-in/fade-in-0 utilities -- that plugin isn't installed in
+        // this project, so those classes were dead. Same @keyframes +
+        // Presence pattern as .anim-modal. This MUST be React.forwardRef,
+        // not a plain function component: DialogPortal wraps each of its
+        // children (this one included) in its own outer Presence, and that
+        // outer Presence needs a real ref down to the actual DOM node to
+        // read getComputedStyle(node).animationName when deciding whether
+        // to hold the node mounted for an exit animation. A plain function
+        // component here silently breaks that ref chain (React drops a ref
+        // passed to a non-forwardRef component), so the outer Presence
+        // never gets a node, always sees `node` as undefined, and unmounts
+        // immediately instead of waiting -- exit animation never plays.
+        // DialogPrimitive.Content doesn't have this problem because it's
+        // rendered directly (Radix's own forwardRef component, not wrapped
+        // in one of ours) as DialogPortal's child.
+        "anim-overlay fixed inset-0 z-50 bg-black/50",
         className,
       )}
       {...props}
     />
   );
-}
+});
+DialogOverlay.displayName = "DialogOverlay";
 
 function DialogContent({
   className,

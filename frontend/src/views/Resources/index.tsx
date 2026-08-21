@@ -4,6 +4,7 @@ import { Button } from "@/components/app/Button";
 import { SectionLabel } from "@/components/app/SectionLabel";
 import { Spinner } from "@/components/app/Spinner";
 import { StatPill } from "@/components/app/StatPill";
+import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { useJob } from "@/hooks/useJob";
 import { bridge, BridgeError } from "@/lib/bridge";
 import { dirname, fmtBytes } from "@/lib/format";
@@ -35,6 +36,7 @@ export default function Resources() {
   const [downloadErrors, setDownloadErrors] = useState<Record<string, string>>({});
   const [cancelling, setCancelling] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const showInitialSpinner = useDelayedFlag(!report && !scanJob.error);
 
   useEffect(() => {
     void scanJob.start(() => bridge.startResourceScan());
@@ -180,22 +182,28 @@ export default function Resources() {
 
   if (!report && scanJob.error) {
     return (
-      <div className="flex h-full items-center justify-center p-6 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
         <p className="type-body text-destructive">{scanJob.error}</p>
+        <Button type="button" variant="secondary" icon={RefreshCw} onClick={refresh}>
+          Retry
+        </Button>
       </div>
     );
   }
 
   if (!report) {
-    return (
+    // A flash of spinner for a scan that resolves in well under 300ms
+    // reads worse than a brief blank pause -- only show it once the wait
+    // has actually gone on long enough to need explaining.
+    return showInitialSpinner ? (
       <div className="flex h-full items-center justify-center">
         <Spinner size={32} />
       </div>
-    );
+    ) : null;
   }
 
   return (
-    <div className="flex flex-col gap-4 p-6">
+    <div className="mx-auto flex max-w-5xl flex-col gap-4 p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="type-heading text-foreground">Resources</h2>

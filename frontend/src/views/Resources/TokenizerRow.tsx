@@ -81,7 +81,7 @@ export function TokenizerRow({
                 <button
                   type="button"
                   onClick={onOpenSourceUrl}
-                  className="pressable ml-1.5 inline-flex items-center gap-1 text-primary underline"
+                  className="pressable ml-1.5 inline-flex items-center gap-1 rounded text-primary underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
                   open page <ExternalLink size={11} aria-hidden="true" />
                 </button>
@@ -153,7 +153,9 @@ function DownloadProgressBar({ progress }: { progress: DownloadProgress | null }
       className="h-1.5 w-28 overflow-hidden rounded-full bg-muted"
     >
       <div
-        className={cn("h-full w-full origin-left rounded-full bg-primary", !determinate && "animate-indeterminate")}
+        // rounded-full only for the indeterminate pill (fixed scaleX) --
+        // see ContextBar.tsx for why the determinate fill omits it.
+        className={cn("h-full w-full origin-left bg-primary", !determinate && "animate-indeterminate rounded-full")}
         style={determinate ? { transform: `scaleX(${pct})`, transition: "transform var(--dur-dropdown) var(--ease-out)" } : undefined}
       />
     </div>

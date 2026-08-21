@@ -41,7 +41,7 @@ export function FileStrip({ paths, onRemove, dropping }: FileStripProps) {
                   type="button"
                   onClick={() => onRemove(path)}
                   aria-label={`Remove ${basename(path)}`}
-                  className="pressable shrink-0 text-muted-foreground hover:text-foreground"
+                  className="pressable shrink-0 rounded text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
                   <X size={12} aria-hidden="true" />
                 </button>

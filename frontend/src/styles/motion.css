@@ -25,46 +25,156 @@
   transform: scale(0.97);
 }
 
-/* Radix data-state entrances. Origin-aware: popovers scale from their
-   trigger, never from their own centre. Modals are exempt and stay centred. */
+/* Radix Presence (Dialog/Select/Tooltip's exit-animation support) decides
+   whether to keep a closing node mounted by reading
+   getComputedStyle(node).animationName -- it listens for `animationend`,
+   never `transitionend`. A `transition` alone reports animationName:
+   "none", so Presence unmounts the instant data-state flips to "closed",
+   before the transition gets a single frame to play; the "entrance" has
+   the same problem in reverse, since the node mounts already in its
+   `open` resting state with nothing to transition *from*. Every
+   Radix-presence-driven surface below therefore uses @keyframes +
+   `animation`, not `transition` -- confirmed live (frame-sampled through
+   an open/close cycle) that this actually plays now, not just that the
+   CSS parses.
+
+   Origin-aware: popovers scale from their trigger, never from their own
+   centre. Modals/the backdrop are exempt and stay centred/full-viewport. */
+@keyframes anim-popover-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes anim-popover-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.96); }
+}
 .anim-popover {
   transform-origin: var(--radix-popper-transform-origin);
-  transition:
-    opacity var(--dur-dropdown) var(--ease-out),
-    transform var(--dur-dropdown) var(--ease-out);
-}
-.anim-popover[data-state="closed"] {
-  transition-duration: var(--dur-exit);
 }
 .anim-popover[data-state="open"] {
   opacity: 1;
   transform: scale(1);
+  animation: anim-popover-in var(--dur-dropdown) var(--ease-out);
 }
 .anim-popover[data-state="closed"] {
   opacity: 0;
   /* Never scale(0) — nothing in the real world appears from nothing. */
   transform: scale(0.96);
+  animation: anim-popover-out var(--dur-exit) var(--ease-out);
+}
+
+/* Small, quick popovers (tooltips) -- same presence mechanics as
+   .anim-popover, just faster (--dur-tooltip) and a touch less travel. */
+@keyframes anim-tooltip-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes anim-tooltip-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.97); }
+}
+.anim-tooltip {
+  transform-origin: var(--radix-tooltip-content-transform-origin);
+}
+.anim-tooltip[data-state="delayed-open"],
+.anim-tooltip[data-state="instant-open"] {
+  opacity: 1;
+  transform: scale(1);
+  animation: anim-tooltip-in var(--dur-tooltip) var(--ease-out);
+}
+.anim-tooltip[data-state="closed"] {
+  opacity: 0;
+  transform: scale(0.97);
+  animation: anim-tooltip-out var(--dur-exit) var(--ease-out);
 }
 
 /* Centre-origin scale/fade for dialogs. The -50%/-50% translate is baked
-   into the transform (not left to a separate Tailwind utility) because it
+   into every keyframe (not left to a separate Tailwind utility) because it
    has to share the `transform` property with the scale -- a modal is
    already positioned at top:50%/left:50%, so this is what actually keeps
    it centred through the animation, not just at rest. */
+@keyframes anim-modal-in {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.97); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes anim-modal-out {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to   { opacity: 0; transform: translate(-50%, -50%) scale(0.97); }
+}
 .anim-modal {
   transform-origin: center;
-  transition:
-    opacity var(--dur-modal) var(--ease-out),
-    transform var(--dur-modal) var(--ease-out);
 }
 .anim-modal[data-state="open"] {
   opacity: 1;
   transform: translate(-50%, -50%) scale(1);
+  animation: anim-modal-in var(--dur-modal) var(--ease-out);
 }
 .anim-modal[data-state="closed"] {
   opacity: 0;
   transform: translate(-50%, -50%) scale(0.97);
-  transition-duration: var(--dur-exit);
+  animation: anim-modal-out var(--dur-exit) var(--ease-out);
+}
+
+/* A modal's dimming backdrop -- opacity-only (no scale/origin; a full-
+   viewport dim has no meaningful anchor point), sharing .anim-modal's
+   duration tokens so the scrim and the panel it belongs to fade in step
+   instead of the panel animating while the backdrop just snaps.
+
+   An earlier version of this rule used `forceMount` (dialog.tsx) plus a
+   plain CSS transition instead of @keyframes, on the theory that Radix's
+   DialogOverlay (which wraps its node in react-remove-scroll) made
+   Presence's getComputedStyle(node).animationName exit-check unreliable
+   for this element specifically. That theory was never actually verified
+   against the library source and was wrong: react-remove-scroll's
+   `as={Slot}` merges its ref onto the same DOM node Presence reads (no
+   extra wrapper element), so the animationName check works fine. The real
+   bug was in this codebase's own DialogOverlay wrapper (dialog.tsx): it
+   was a plain function component, not React.forwardRef, so the ref that
+   DialogPortal's outer Presence layer needs to find the actual DOM node
+   never reached it -- that Presence instance always saw `node` as
+   undefined and unmounted the overlay instantly instead of waiting for
+   the exit animation. See the comment on DialogOverlay in dialog.tsx.
+   `forceMount`'s side effect masked the symptom by keeping the node (and
+   therefore its react-remove-scroll instance, which has no `enabled` prop
+   wired through Radix's API) permanently mounted -- silently arming a
+   document-level `wheel` listener for the app's entire lifetime, blocking
+   scroll on the real scroll container even while every dialog was closed.
+   Fixed at the actual cause (forwardRef) instead: back to plain
+   @keyframes + animation like .anim-modal, confirmed via frame sampling
+   to fade correctly in both directions, and confirmed the scroll lock is
+   now only live while a dialog is actually open (or mid exit-animation),
+   never permanently. */
+@keyframes anim-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes anim-overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+.anim-overlay[data-state="open"] {
+  opacity: 1;
+  animation: anim-overlay-in var(--dur-modal) var(--ease-out);
+}
+.anim-overlay[data-state="closed"] {
+  opacity: 0;
+  animation: anim-overlay-out var(--dur-exit) var(--ease-out);
+}
+
+/* The onboarding notice banner mounts/unmounts with its condition (App.tsx),
+   so it's a genuinely new element each time it appears -- @starting-style
+   fades it in without any JS mounted-state juggling. Dismissal stays an
+   instant unmount: the user just clicked its own Dismiss button, so an
+   exit animation would be softening a moment they already initiated, not
+   preventing a surprise (contrast with content appearing on its own). */
+.anim-banner {
+  opacity: 1;
+  transition: opacity var(--dur-modal) var(--ease-out);
+}
+@starting-style {
+  .anim-banner {
+    opacity: 0;
+  }
 }
 
 /* Hover is gated: touch devices fire hover on tap, causing false positives. */
@@ -103,11 +213,29 @@
     transition-duration: 120ms !important;
   }
   .pressable:active { transform: none; }
-  .anim-popover[data-state="closed"] { transform: none; }
-  /* Not transform: none -- the modal's centering translate must survive
-     reduced motion, only the scale should drop. */
-  .anim-modal[data-state="closed"] { transform: translate(-50%, -50%); }
+  /* No per-class transform overrides needed here any more -- the blanket
+     animation-duration: 0.01ms above already collapses every
+     @keyframes-based entrance/exit above to near-instant, and each one's
+     resting [data-state] style (declared outside the animation shorthand)
+     already lands on the correct final transform, modal centering
+     included, once the near-zero-duration animation finishes. */
   .stagger > * { animation: none; }
+}
+
+/* box-shadow (the ring focus-visible: relies on everywhere) is stripped
+   under forced-colors, and outline-none removes the one thing that would
+   otherwise still show -- so every focus-visible control needs a real
+   outline restored here, using a system colour keyword that already
+   matches the user's chosen high-contrast theme. This is not specific to
+   the controls this PR touched: every focus-visible:ring-* control in the
+   app relies on box-shadow, so this one rule is what makes all of them
+   (not just the ones edited here) show a focus indicator under Windows
+   High Contrast Mode. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
 }
 
 /* Indeterminate progress: transform only (translateX + scaleX), never width

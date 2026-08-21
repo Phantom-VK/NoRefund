@@ -127,7 +127,7 @@ export function InputCard({
               type="button"
               disabled={running}
               onClick={onClearPaths}
-              className="pressable type-small flex items-center gap-1 text-primary disabled:pointer-events-none disabled:opacity-50"
+              className="pressable type-small flex items-center gap-1 rounded text-primary outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
             >
               <XCircle size={12} aria-hidden="true" />
               Clear

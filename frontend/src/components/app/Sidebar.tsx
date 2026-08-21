@@ -48,7 +48,7 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
                   aria-current={isActive ? "page" : undefined}
                   onClick={() => onNavigate(item.id)}
                   className={cn(
-                    "pressable hoverable type-label flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left",
+                    "pressable hoverable type-label flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
                     isActive
                       ? "bg-sidebar-accent text-sidebar-accent-foreground"
                       : "text-sidebar-foreground hover:bg-sidebar-accent/60",
