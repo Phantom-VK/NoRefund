@@ -17,6 +17,19 @@ from norefund.core.paths import tiktoken_cache_dir
 if "TIKTOKEN_CACHE_DIR" not in os.environ:
     os.environ["TIKTOKEN_CACHE_DIR"] = str(tiktoken_cache_dir())
 
+# PyInstaller's own gi runtime hook points GI_TYPELIB_PATH at the frozen
+# bundle's gi_typelibs/ dir unconditionally, even when its build-time hook
+# found nothing to put there (a PyInstaller/PyGObject version mismatch can
+# make that introspection silently fail). That then hides the system's
+# real typelibs instead of falling back to them, and GTK/WebKitGTK can't
+# find a display at all. WebKitGTK is a system dependency by design (see
+# missing_runtime_message() below) and was never meant to be bundled, so
+# undo the override before `gi` reads it -- but only when it's genuinely
+# empty, so a build where the hook did succeed is left alone.
+_typelib_dir = os.environ.get("GI_TYPELIB_PATH")
+if _typelib_dir and not (os.path.isdir(_typelib_dir) and os.listdir(_typelib_dir)):
+    os.environ.pop("GI_TYPELIB_PATH")
+
 import webview  # noqa: E402
 
 from norefund.core.paths import bundled_resource  # noqa: E402
