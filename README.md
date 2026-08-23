@@ -31,6 +31,20 @@ used only when you explicitly download a tokenizer, from the app's Resources vie
 
 ---
 
+## Download
+
+Prebuilt Windows, macOS, and Linux builds are on the
+[Releases page](https://github.com/Phantom-VK/NoRefund/releases) — no Python install
+required.
+
+**Windows SmartScreen:** NoRefund isn't code-signed (a signing certificate costs money
+this free project doesn't have), so Windows shows a "Windows protected your PC" warning
+the first time you run it. Click **More info → Run anyway** to continue. This warning
+means the publisher isn't verified, not that the app is unsafe — the source is right
+here in this repo.
+
+---
+
 ## Quick Start
 
 ```bash
