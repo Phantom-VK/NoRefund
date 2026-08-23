@@ -30,6 +30,30 @@ _typelib_dir = os.environ.get("GI_TYPELIB_PATH")
 if _typelib_dir and not (os.path.isdir(_typelib_dir) and os.listdir(_typelib_dir)):
     os.environ.pop("GI_TYPELIB_PATH")
 
+
+def _unblock_frozen_bundle() -> None:
+    """Remove Windows' "downloaded from the internet" tag from our files.
+
+    Extracting a build downloaded from GitHub tags every file with a
+    Zone.Identifier stream. .NET Framework then refuses to load pythonnet's
+    DLL from a tagged file, crashing before the app can even start (a
+    locally built .exe never gets tagged, so this only bites downloaded
+    builds). Clearing the tag here, before pythonnet loads, avoids that.
+    """
+    if not getattr(sys, "frozen", False):
+        return
+    bundle_dir = Path(sys.executable).parent
+    for file_path in bundle_dir.rglob("*"):
+        if file_path.is_file():
+            try:
+                os.remove(f"{file_path}:Zone.Identifier")
+            except OSError:
+                pass  # not tagged, or couldn't remove it -- either way, move on
+
+
+if sys.platform == "win32":
+    _unblock_frozen_bundle()
+
 import webview  # noqa: E402
 
 from norefund.core.paths import bundled_resource  # noqa: E402
@@ -101,11 +125,19 @@ def missing_runtime_message() -> str | None:
     if sys.platform == "win32":
         try:
             import clr  # noqa: F401
-        except ImportError:
+        except Exception:
+            # Broad on purpose -- missing WebView2 raises ImportError, but
+            # pythonnet failing to load its .NET host raises other types
+            # too. Either way the app can't start; show a message instead
+            # of a raw traceback.
             return (
                 "NoRefund needs the Microsoft Edge WebView2 runtime.\n\n"
                 "Download it from:\n"
-                "  https://developer.microsoft.com/microsoft-edge/webview2/"
+                "  https://developer.microsoft.com/microsoft-edge/webview2/\n\n"
+                "If that's already installed, this build's files may be "
+                "blocked as downloaded from the internet -- right-click the "
+                "extracted folder, choose Properties, and click Unblock "
+                "(or re-download and extract again)."
             )
     return None
 
