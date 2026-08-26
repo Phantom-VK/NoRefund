@@ -279,31 +279,6 @@
   </div>
 </section>
 
-<section id="cli">
-  <div class="wrap">
-    <h2>Also scriptable, via pip</h2>
-    <p class="lead-p">The desktop download is a GUI with no command line in it. If you <code class="inline mono">pip install</code> instead, you get a thin CLI too: one file at a time, input cost only, good for a quick check or a shell script.</p>
-    <div class="term reveal">
-      <!-- Real output, not a mockup: `norefund docs/MATHEMATICS.md --model openai:gpt-5.6-sol`
-           run against this repo's own docs/MATHEMATICS.md on 2026-08-26. See
-           docs/MATHEMATICS.md and core/costing.py for how the numbers are derived. -->
-      <div class="term-bar"><span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span><span class="term-title">zsh</span></div>
-      <div class="term-body">
-        <p class="term-line"><span class="term-prompt">$</span> pip install norefund</p>
-        <p class="term-line"><span class="term-prompt">$</span> norefund docs/MATHEMATICS.md --model openai:gpt-5.6-sol</p>
-        <p class="term-line term-muted">File      : docs/MATHEMATICS.md</p>
-        <p class="term-line tabular">Tokens    : 2,145</p>
-        <p class="term-line tabular">Context   : 0.2% of 1,050,000</p>
-        <div class="term-bar-track"><div class="term-bar-fill" style="width: 3%;"></div></div>
-        <p class="term-line">Fits      : Yes</p>
-        <p class="term-line">Min chunks: 1</p>
-        <p class="term-line tabular">Est. cost : $0.008580 USD (input only)</p>
-      </div>
-    </div>
-    <p style="font-size: 14.5px; color: var(--muted); margin-top: 14px;">The GUI is the full product: folders, compare, fit check, export. The CLI is a shortcut for one file when a window is more than you need.</p>
-  </div>
-</section>
-
 <section id="download">
   <div class="wrap">
     <h2>Download</h2>

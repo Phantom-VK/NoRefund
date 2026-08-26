@@ -305,47 +305,14 @@ nav.jump a:hover { color: var(--accent-strong); }
   .hero-grid { grid-template-columns: 1.05fr 0.95fr; gap: 64px; }
 }
 
-/* Terminal panel: real `norefund` CLI output (see the comment in
-   index.html for the exact command). Used only where the CLI itself is
-   the subject, since the packaged desktop downloads don't include it. */
-.term {
-  background: var(--code-bg);
-  color: var(--code-fg);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
-  overflow: hidden;
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 14px;
-  line-height: 1.7;
-}
-.term-bar {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 11px 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
+/* Terminal-style dots: used on every screenshot's window-frame chrome
+   (.screen-frame) as a brand-consistent decorative touch, not a claim that
+   the app has a terminal. Classic three-colour traffic lights, desaturated
+   a touch to sit quietly in the chrome instead of shouting. */
 .term-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255, 255, 255, 0.16); }
-/* Classic three-colour traffic lights, desaturated a touch to sit quietly
-   in the dark chrome instead of shouting. Used on every terminal-adjacent
-   window frame on the site (the CLI panel and the screenshot chrome). */
 .term-dot.red { background: #e0564d; }
 .term-dot.yellow { background: #dba63b; }
 .term-dot.green { background: #2fa855; }
-.term-title { margin-left: 8px; font-size: 12px; color: rgba(255, 255, 255, 0.4); }
-.term-body { padding: 20px 22px 24px; }
-.term-line { margin: 0 0 9px; white-space: pre-wrap; }
-.term-prompt { color: var(--accent); }
-.term-muted { color: rgba(255, 255, 255, 0.42); }
-.term-bar-track {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-  height: 8px;
-  margin: 4px 0 12px;
-  overflow: hidden;
-}
-.term-bar-fill { height: 100%; background: var(--accent); border-radius: 4px; }
 
 /* ---------- Bento feature grid ---------- */
 .bento {
