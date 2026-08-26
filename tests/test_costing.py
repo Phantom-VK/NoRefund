@@ -84,3 +84,64 @@ def test_output_cost_calculation():
 def test_total_cost_sum():
     cost = total_cost(1_000_000, 1_000_000, _MODEL)
     assert cost == 10.0  # $2.0 input + $8.0 output
+
+
+_TIERED_MODEL = ModelInfo(
+    id="test:tiered-model",
+    display_name="Test Tiered Model",
+    provider="Test",
+    tokenizer_backend="tiktoken",
+    tokenizer_name="cl100k_base",
+    context_window=1_000_000,
+    input_price_per_million=2.0,
+    output_price_per_million=8.0,
+    long_context_threshold=200_000,
+    long_context_input_price_per_million=4.0,
+    long_context_output_price_per_million=16.0,
+)
+
+
+def test_input_cost_at_threshold_uses_short_rate():
+    # Boundary is "above the threshold", not "at or above" -- exactly
+    # long_context_threshold tokens still bills at the short-context rate.
+    assert input_cost(200_000, _TIERED_MODEL) == (200_000 / 1_000_000) * 2.0
+
+
+def test_input_cost_below_threshold_uses_short_rate():
+    assert input_cost(199_999, _TIERED_MODEL) == (199_999 / 1_000_000) * 2.0
+
+
+def test_input_cost_above_threshold_uses_long_rate():
+    assert input_cost(200_001, _TIERED_MODEL) == (200_001 / 1_000_000) * 4.0
+
+
+def test_output_cost_tier_follows_prompt_size_not_output_size():
+    # A short prompt with a huge completion stays on the short-context
+    # output rate -- the tier is decided by the prompt, not the output.
+    cost = output_cost(500_000, _TIERED_MODEL, prompt_token_count=1_000)
+    assert cost == (500_000 / 1_000_000) * 8.0
+
+
+def test_output_cost_above_threshold_uses_long_rate():
+    cost = output_cost(1_000, _TIERED_MODEL, prompt_token_count=200_001)
+    assert cost == (1_000 / 1_000_000) * 16.0
+
+
+def test_output_cost_defaults_prompt_size_to_own_token_count():
+    # No prompt_token_count given: falls back to the output's own count.
+    # Only correct for flat models, but must not crash for a tiered one.
+    cost = output_cost(200_001, _TIERED_MODEL)
+    assert cost == (200_001 / 1_000_000) * 16.0
+
+
+def test_total_cost_tiers_output_by_input_size():
+    # 300k input (above threshold) + 1k output must bill output at the
+    # long-context rate, driven by the input size, not the output size.
+    cost = total_cost(300_000, 1_000, _TIERED_MODEL)
+    expected = (300_000 / 1_000_000) * 4.0 + (1_000 / 1_000_000) * 16.0
+    assert cost == expected
+
+
+def test_flat_model_ignores_missing_tier_fields():
+    # _MODEL has no long_context_threshold -- tiering must be a no-op.
+    assert input_cost(10_000_000, _MODEL) == (10_000_000 / 1_000_000) * 2.0

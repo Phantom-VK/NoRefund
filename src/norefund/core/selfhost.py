@@ -87,30 +87,65 @@ def weight_bytes(architecture: ModelArchitecture, quantization: str) -> int | No
     return round(architecture.total_params * bpw / 8)
 
 
-def kv_cache_bytes_per_token(
-    architecture: ModelArchitecture, kv_cache_dtype: str = "fp16"
-) -> int | None:
-    """KV-cache memory for one token, one sequence."""
+def _kv_cache_bytes_per_layer_per_token(
+    architecture: ModelArchitecture, kv_cache_dtype: str
+) -> float | None:
+    """Unrounded KV-cache bytes for one layer, one token, one sequence.
+
+    Shared by kv_cache_bytes_per_token and kv_cache_bytes so both round
+    only once, at the end, rather than compounding rounding error by
+    dividing an already-rounded per-token total by n_layers.
+    """
     bytes_per_element = bytes_per_kv_element(kv_cache_dtype)
     if bytes_per_element is None:
         return None
     if architecture.attention_type == "gqa":
-        return round(
-            2
-            * architecture.n_layers
-            * architecture.n_kv_heads
-            * architecture.head_dim
-            * bytes_per_element
-        )
+        return 2 * architecture.n_kv_heads * architecture.head_dim * bytes_per_element
     if architecture.attention_type == "mla":
         if architecture.kv_lora_rank <= 0:
             return None
-        return round(
-            architecture.n_layers
-            * (architecture.kv_lora_rank + architecture.qk_rope_head_dim)
-            * bytes_per_element
-        )
+        return (
+            architecture.kv_lora_rank + architecture.qk_rope_head_dim
+        ) * bytes_per_element
     return None
+
+
+def kv_cache_bytes_per_token(
+    architecture: ModelArchitecture, kv_cache_dtype: str = "fp16"
+) -> int | None:
+    """KV-cache memory for one token, one sequence, as if every layer were
+    full attention. Ignores sliding-window; see kv_cache_bytes for
+    context-length-aware sizing that accounts for it."""
+    per_layer = _kv_cache_bytes_per_layer_per_token(architecture, kv_cache_dtype)
+    if per_layer is None:
+        return None
+    return round(architecture.n_layers * per_layer)
+
+
+def kv_cache_bytes(
+    architecture: ModelArchitecture, context_length: int, kv_cache_dtype: str = "fp16"
+) -> int | None:
+    """KV-cache memory for one sequence at context_length.
+
+    Sliding-window KV cost is not linear in context length the way full
+    attention's is: a windowed layer caches only min(context_length,
+    sliding_window) tokens, while a full-attention layer caches the whole
+    context_length. architecture.sliding_window == 0 (every architecture
+    except Gemma 2 today) means every layer is full attention, which
+    reduces this to kv_cache_bytes_per_token(...) * context_length.
+    """
+    per_layer = _kv_cache_bytes_per_layer_per_token(architecture, kv_cache_dtype)
+    if per_layer is None or architecture.n_layers <= 0:
+        return None
+    if architecture.sliding_window <= 0 or architecture.sliding_window_pattern <= 0:
+        return round(architecture.n_layers * per_layer * context_length)
+
+    full_layers = architecture.n_layers // architecture.sliding_window_pattern
+    windowed_layers = architecture.n_layers - full_layers
+    windowed_context = min(context_length, architecture.sliding_window)
+    return round(
+        per_layer * (full_layers * context_length + windowed_layers * windowed_context)
+    )
 
 
 def activation_bytes(architecture: ModelArchitecture, context_length: int) -> int:
@@ -135,11 +170,10 @@ def estimate_memory(
     kv_cache_dtype: str = "fp16",
 ) -> MemoryEstimate | None:
     weights = weight_bytes(architecture, quantization)
-    kv_per_token = kv_cache_bytes_per_token(architecture, kv_cache_dtype)
-    if weights is None or kv_per_token is None or context_length <= 0:
+    kv_per_sequence = kv_cache_bytes(architecture, context_length, kv_cache_dtype)
+    if weights is None or kv_per_sequence is None or context_length <= 0:
         return None
 
-    kv_per_sequence = kv_per_token * context_length
     kv_total = kv_per_sequence * max(concurrency, 0)
     activation = activation_bytes(architecture, context_length)
     overhead = framework_overhead_bytes(hardware)
@@ -165,8 +199,8 @@ def max_concurrent_requests(
     """How many concurrent full-context sequences could fit, independent of
     the requested concurrency."""
     weights = weight_bytes(architecture, quantization)
-    kv_per_token = kv_cache_bytes_per_token(architecture, kv_cache_dtype)
-    if weights is None or kv_per_token is None or context_length <= 0:
+    kv_per_sequence = kv_cache_bytes(architecture, context_length, kv_cache_dtype)
+    if weights is None or kv_per_sequence is None or context_length <= 0:
         return None
 
     activation = activation_bytes(architecture, context_length)
@@ -175,7 +209,6 @@ def max_concurrent_requests(
     if available_for_kv <= 0:
         return 0
 
-    kv_per_sequence = kv_per_token * context_length
     if kv_per_sequence <= 0:
         return None
     return available_for_kv // kv_per_sequence

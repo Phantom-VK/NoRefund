@@ -53,7 +53,7 @@ def test_tiktoken_fallback_unknown_model():
 
 def test_get_tokenizer_returns_tiktoken_for_gpt4o():
     _skip_unless_cached("o200k_base")
-    model = get_model("openai:gpt-4o")
+    model = get_model("openai:gpt-5.6-sol")
     backend = get_tokenizer(model)
     assert isinstance(backend, TikTokenBackend)
 

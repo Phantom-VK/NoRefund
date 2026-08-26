@@ -50,7 +50,10 @@ export default function Calculator() {
   const pct = inputTokens === null ? null : contextUsagePct(inputTokens, model.context_window);
   const fits = inputTokens === null ? null : fitsInContext(inputTokens, model.context_window);
   const inCost = inputTokens === null ? null : inputCost(inputTokens, model);
-  const outCost = outputTokens === null ? null : outputCost(outputTokens, model);
+  const outCost =
+    outputTokens === null
+      ? null
+      : outputCost(outputTokens, model, inputTokens ?? undefined);
   const total = inCost === null || outCost === null ? null : inCost + outCost;
 
   return (

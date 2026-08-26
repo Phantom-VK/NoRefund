@@ -14,6 +14,7 @@ from norefund.core.selfhost import (
     estimate_memory,
     evaluate_fit,
     framework_overhead_bytes,
+    kv_cache_bytes,
     kv_cache_bytes_per_token,
     max_concurrent_requests,
     usable_memory_bytes,
@@ -98,6 +99,24 @@ _MIXTRAL = ModelArchitecture(
     hidden_size=4096,
     max_context_length=32768,
     attention_type="gqa",
+)
+
+_GEMMA_2_9B = ModelArchitecture(
+    id="google:gemma-2-9b",
+    display_name="Gemma 2 9B",
+    family="Gemma 2",
+    vendor="Google",
+    total_params=9_240_000_000,
+    active_params=9_240_000_000,
+    n_layers=42,
+    n_attention_heads=16,
+    n_kv_heads=8,
+    head_dim=256,
+    hidden_size=3584,
+    max_context_length=8192,
+    attention_type="gqa",
+    sliding_window=4096,
+    sliding_window_pattern=2,  # alternates local/global 1:1
 )
 
 _DEEPSEEK_V3 = ModelArchitecture(
@@ -282,6 +301,46 @@ def test_llama_70b_kv_cache_uses_kv_heads_not_attention_heads():
     # n_attention_heads=64 vs n_kv_heads=8 -- using 64 would give 2_621_440
     # (exactly 8x this value).
     assert kv_cache_bytes_per_token(_LLAMA_70B) == 327_680
+
+
+# --- Gemma 2 sliding-window KV cache (Task 4, Phase 14) ---
+
+
+def test_gemma2_9b_sliding_window_below_full_figure_at_2x_window():
+    # 42 layers alternate 1:1 (21 full, 21 windowed to 4096). At 8192
+    # (2x the window), the windowed half only pays for 4096 tokens each,
+    # giving exactly 75% of the naive all-layers-full figure -- a real
+    # ~25% reduction, not just "some" reduction.
+    full_figure = kv_cache_bytes_per_token(_GEMMA_2_9B) * 8192
+    windowed = kv_cache_bytes(_GEMMA_2_9B, 8192)
+    assert windowed == round(full_figure * 0.75)
+    assert windowed < full_figure
+
+
+def test_gemma2_9b_sliding_window_equals_full_figure_at_or_under_window():
+    # At exactly the window size, every layer -- windowed or not -- caches
+    # the whole context, so this must equal the naive figure exactly.
+    assert kv_cache_bytes(_GEMMA_2_9B, 4096) == kv_cache_bytes_per_token(
+        _GEMMA_2_9B
+    ) * 4096
+
+
+def test_gqa_model_with_no_sliding_window_matches_per_token_figure():
+    # _LLAMA_70B has sliding_window=0 (the default) -- kv_cache_bytes must
+    # return exactly what multiplying the existing per-token figure by
+    # context_length already gave, for every architecture written before
+    # this phase.
+    context_length = 32_768
+    assert kv_cache_bytes(_LLAMA_70B, context_length) == (
+        kv_cache_bytes_per_token(_LLAMA_70B) * context_length
+    )
+
+
+def test_deepseek_v3_mla_path_unchanged_by_sliding_window_support():
+    context_length = 65_536
+    assert kv_cache_bytes(_DEEPSEEK_V3, context_length) == (
+        kv_cache_bytes_per_token(_DEEPSEEK_V3) * context_length
+    )
 
 
 # --- Hand-computed scenarios ---

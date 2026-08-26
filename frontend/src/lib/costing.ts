@@ -28,26 +28,58 @@ export function minChunks(tokens: number, window: number): number {
   return Math.ceil(tokens / usable);
 }
 
-export function inputCost(
-  tokens: number,
-  model: Pick<ModelInfo, "input_price_per_million">,
-): number {
-  return (tokens / 1_000_000) * model.input_price_per_million;
+type TieredPricingFields = Pick<
+  ModelInfo,
+  | "long_context_threshold"
+  | "long_context_input_price_per_million"
+  | "long_context_output_price_per_million"
+>;
+
+/** Whether promptTokens crosses this model's long-context tier -- decided by
+ *  the prompt (input) size, per every provider that offers one, not by the
+ *  completion size even when pricing output. */
+function longContextActive(promptTokens: number, model: TieredPricingFields): boolean {
+  return (
+    model.long_context_threshold !== null && promptTokens > model.long_context_threshold
+  );
 }
 
+export function inputCost(
+  tokens: number,
+  model: Pick<ModelInfo, "input_price_per_million"> & TieredPricingFields,
+): number {
+  const rate =
+    longContextActive(tokens, model) && model.long_context_input_price_per_million !== null
+      ? model.long_context_input_price_per_million
+      : model.input_price_per_million;
+  return (tokens / 1_000_000) * rate;
+}
+
+/** promptTokens is the input size that decides which price tier applies.
+ *  Defaults to tokens itself when omitted, which is only correct for
+ *  flat-priced models (long_context_threshold null) -- callers pricing a
+ *  tiered model must pass the real prompt size. */
 export function outputCost(
   tokens: number,
-  model: Pick<ModelInfo, "output_price_per_million">,
+  model: Pick<ModelInfo, "output_price_per_million"> & TieredPricingFields,
+  promptTokens?: number,
 ): number {
-  return (tokens / 1_000_000) * model.output_price_per_million;
+  const promptSize = promptTokens ?? tokens;
+  const rate =
+    longContextActive(promptSize, model) &&
+    model.long_context_output_price_per_million !== null
+      ? model.long_context_output_price_per_million
+      : model.output_price_per_million;
+  return (tokens / 1_000_000) * rate;
 }
 
 export function totalCost(
   inputTokens: number,
   outputTokens: number,
-  model: Pick<ModelInfo, "input_price_per_million" | "output_price_per_million">,
+  model: Pick<ModelInfo, "input_price_per_million" | "output_price_per_million"> &
+    TieredPricingFields,
 ): number {
-  return inputCost(inputTokens, model) + outputCost(outputTokens, model);
+  return inputCost(inputTokens, model) + outputCost(outputTokens, model, inputTokens);
 }
 
 /** Convert a USD amount into toCurrency using the given rates -- mirrors

@@ -14,15 +14,15 @@ def test_all_models_are_model_info():
         assert isinstance(model, ModelInfo)
 
 
-def test_gpt4o_present():
+def test_gpt_sol_present():
     models = load_models()
-    assert "openai:gpt-4o" in models
+    assert "openai:gpt-5.6-sol" in models
 
 
-def test_gpt4o_fields():
-    model = get_model("openai:gpt-4o")
-    assert model.context_window == 128_000
-    assert model.input_price_per_million == 2.50
+def test_gpt_sol_fields():
+    model = get_model("openai:gpt-5.6-sol")
+    assert model.context_window == 1_050_000
+    assert model.input_price_per_million == 4.00
     assert model.tokenizer_backend == "tiktoken"
 
 
@@ -67,10 +67,10 @@ def test_models_with_no_public_tokenizer_are_flagged_approximate():
     """Claude and Gemini have no publicly cacheable local tokenizer, so their
     counts come from a tiktoken approximation and must say so."""
     approximate_ids = [
-        "anthropic:claude-3-5-sonnet",
-        "anthropic:claude-3-haiku",
-        "google:gemini-2.0-flash",
-        "google:gemini-1.5-pro",
+        "anthropic:claude-sonnet-5",
+        "anthropic:claude-haiku-4.5",
+        "google:gemini-3.5-flash",
+        "google:gemini-3.1-pro-preview",
     ]
     for model_id in approximate_ids:
         assert get_model(model_id).tokenizer_is_approximate is True
@@ -78,7 +78,7 @@ def test_models_with_no_public_tokenizer_are_flagged_approximate():
 
 def test_models_with_real_hf_tokenizer_are_not_flagged_approximate():
     real_tokenizer_ids = [
-        "deepseek:deepseek-v3",
+        "deepseek:deepseek-v4-flash",
         "meta:llama-3-8b",
         "mistral:mistral-7b",
     ]
