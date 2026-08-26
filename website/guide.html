@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NoRefund User Guide: Screens, Tokenizers, and Setup</title>
+<meta name="description" content="A screen-by-screen walkthrough of NoRefund: the Token Calculator, File Parser, Compare Models and Self-Host Fit Check screens, and how to download the tokenizer files each model needs.">
+<link rel="canonical" href="https://phantom-vk.github.io/NoRefund/guide.html">
+<meta name="robots" content="index, follow, max-image-preview:large">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="NoRefund">
+<meta property="og:title" content="NoRefund User Guide: Screens, Tokenizers, and Setup">
+<meta property="og:description" content="A screen-by-screen walkthrough of NoRefund, and how to download the tokenizer files each model needs.">
+<meta property="og:url" content="https://phantom-vk.github.io/NoRefund/guide.html">
+<meta property="og:image" content="https://phantom-vk.github.io/NoRefund/img/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="NoRefund User Guide: Screens, Tokenizers, and Setup">
+<meta name="twitter:image" content="https://phantom-vk.github.io/NoRefund/img/og-image.png">
+
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<meta name="theme-color" content="#00b894">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="topbar-brand" href="index.html"><span class="brandmark">$</span>NoRefund</a>
+    <div class="topbar-links">
+      <a class="plain" href="index.html">Home</a>
+      <a class="plain" aria-current="page" href="guide.html">Guide</a>
+      <a class="plain" href="https://github.com/Phantom-VK/NoRefund" target="_blank" rel="noopener">GitHub</a>
+      <a class="btn pressable" href="https://github.com/Phantom-VK/NoRefund/releases" target="_blank" rel="noopener">Download free</a>
+    </div>
+  </div>
+</div>
+
+<main id="main">
+<header class="hero" style="padding-bottom: 24px;">
+  <div class="wrap">
+    <p class="breadcrumb"><a href="index.html">NoRefund</a> / Guide</p>
+    <p class="eyebrow">User guide</p>
+    <h1 class="title" style="font-size: 38px;">The NoRefund user guide</h1>
+    <p class="lede">A plain walkthrough of what this app does, the screens inside it, and how to download the tokenizer files it needs.</p>
+    <nav class="jump">
+      <a href="#what">What it is</a>
+      <a href="#screens">The screens</a>
+      <a href="#tokenizers">Tokenizers and downloads</a>
+    </nav>
+  </div>
+</header>
+
+<section id="what">
+  <div class="wrap">
+    <h2>What NoRefund actually is</h2>
+    <p>NoRefund is a small desktop application you run on your own computer. Give it a PDF, a Word file, a PowerPoint deck, or a plain text file, and it tells you three things against a real AI model of your choice: exactly how many tokens that file contains, whether the file fits inside that model's context window, and roughly what it would cost to send through that model's API.</p>
+    <p>Every model counts tokens in its own way. GPT counts differently from Claude, which counts differently from Gemini. NoRefund uses each model's real tokenizer, or the closest public equivalent when a company keeps its exact one private, so the numbers you see are close to what you would actually be billed for, not a rough guess typed into a spreadsheet.</p>
+    <div class="callout">
+      <p class="label">About privacy</p>
+      <p>Your files are read and counted entirely on your own machine. Nothing is uploaded, ever, while you are analyzing a document. The only time NoRefund talks to the internet is when you choose to download a tokenizer file, and that is covered later in this guide.</p>
+    </div>
+  </div>
+</section>
+
+<section id="screens">
+  <div class="wrap-xl">
+    <h2>A tour of the screens</h2>
+    <p class="lead-p">The left sidebar has six screens split into two groups, Tools and Data, plus a Settings screen opened from the gear icon in the top right corner of the window.</p>
+
+    <div class="grid-screens reveal">
+      <div class="screen-card">
+        <div class="screen-frame"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span></div>
+        <img class="screen-shot" src="img/token-calculator.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Token Calculator screen showing a model picker, input and output token fields, a context window usage bar, and a cost breakdown">
+        <div class="screen-body">
+          <span class="screen-tag">Tools</span>
+          <h3>Token Calculator</h3>
+          <p>The quickest screen for a "what if" question. No real file is needed here. Type in a token count by hand, pick a model from the dropdown, and NoRefund instantly shows the context window usage as a bar, whether it fits in one call, and the input, output, and total cost. Good for a fast estimate when you already roughly know how big your text is.</p>
+        </div>
+      </div>
+
+      <div class="screen-card">
+        <div class="screen-frame"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span></div>
+        <img class="screen-shot" src="img/file-parser.webp" width="1440" height="900" loading="lazy" decoding="async" alt="File Parser screen with Add File, Add Folder, Clear, model picker, and Analyze buttons, and an empty results table below">
+        <div class="screen-body">
+          <span class="screen-tag">Tools</span>
+          <h3>File Parser</h3>
+          <p>The main screen for real files. Click Add File or Add Folder to bring in one or more documents (PDF, Word, PowerPoint, plain text, Markdown, Python, and JSON files are all supported), pick a model, and click Analyze. NoRefund reads every file and fills a table with the token count, how much of the context window it uses, whether it fits, how many separate API calls it would take if it does not fit in one, the estimated cost, and basic word and character counts. Results export to CSV or Markdown, and a Logs tab shows what happened if anything went wrong.</p>
+        </div>
+      </div>
+
+      <div class="screen-card">
+        <div class="screen-frame"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span></div>
+        <img class="screen-shot" src="img/compare-models.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Compare Models screen showing a source file, a cheapest model highlighted in teal, and a second model's results underneath">
+        <div class="screen-body">
+          <span class="screen-tag">Tools</span>
+          <h3>Compare Models</h3>
+          <p>Paste text directly, or pick a file or folder the same way as in the Parser screen. Tick as many models as needed in the Models list, click Compare, and NoRefund runs the same document through every one of them and lines the results up, cheapest first, with the winner highlighted. This is the screen for choosing between providers, not just checking one.</p>
+        </div>
+      </div>
+
+      <div class="screen-card">
+        <div class="screen-frame"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span></div>
+        <img class="screen-shot" src="img/self-host-fit-check.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Self-Host Fit Check screen estimating whether an open-weight model's weights, KV cache and activations fit in a selected GPU's VRAM">
+        <div class="screen-body">
+          <span class="screen-tag">Tools</span>
+          <h3>Self-Host Fit Check</h3>
+          <p>For open-weight models you would run yourself rather than call over an API. Pick a model architecture and a piece of hardware (a GPU, an Apple Silicon Mac, or a cloud instance), set the quantization, KV cache precision, context length, and concurrency, and NoRefund estimates whether it actually fits: a memory breakdown of weights, KV cache, activations, and framework overhead, plus how many concurrent requests the hardware can realistically serve.</p>
+        </div>
+      </div>
+
+      <div class="screen-card">
+        <div class="screen-frame"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span></div>
+        <img class="screen-shot" src="img/model-registry.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Model Registry screen showing a grid of model cards with context window size, input and output price, and a Docs link, filterable by provider">
+        <div class="screen-body">
+          <span class="screen-tag">Data</span>
+          <h3>Model Registry</h3>
+          <p>A read only reference list of every model NoRefund knows about, across seven providers at the moment (OpenAI, Anthropic, Google, DeepSeek, Meta, Mistral, and Qwen), including open-weight models you would self-host rather than call over an API. Each card shows the context window size, the input and output price per million tokens, and a link to that provider's own pricing page to double check the numbers. Use the pills at the top to filter by provider.</p>
+        </div>
+      </div>
+
+      <div class="screen-card">
+        <div class="screen-frame"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span></div>
+        <img class="screen-shot" src="img/resources.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Resources screen listing tokenizer files, their download status, size, and file path, with Download and Open folder buttons">
+        <div class="screen-body">
+          <span class="screen-tag">Data</span>
+          <h3>Resources</h3>
+          <p>This is where the actual tokenizer files live on disk, and the only screen where NoRefund is ever allowed to reach the internet. It gets a full walkthrough in the next section, since it is the part every new tester should understand first.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-row reveal">
+      <img src="img/settings.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Settings dialog with default currency, default output token estimate, an API token field, and a chunk warnings toggle">
+      <div class="text">
+        <span class="screen-tag">Anywhere</span>
+        <h3>Settings</h3>
+        <p>Click the gear icon in the top right corner from any screen to open this. Here you can set your default currency (USD, EUR, GBP, or INR), the default output token estimate the Calculator starts from, turn chunk warnings on or off, and paste a HuggingFace access token, which some tokenizer downloads need. More on that token in the next section.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="tokenizers">
+  <div class="wrap">
+    <h2>Tokenizers, and how to download them</h2>
+    <p class="lead-p">This is the part every new tester should read once before clicking around, because it explains a message you will very likely see the first time you try to analyze a file.</p>
+
+    <p>A tokenizer is the small piece of logic that turns your text into the exact list of numbers a model reads and gets billed for. Every model family has its own, and NoRefund uses two kinds of them.</p>
+
+    <table class="kv-table">
+      <tr><th>tiktoken</th><td>OpenAI's own tokenizer library, used directly for GPT models. Small and fast.</td></tr>
+      <tr><th>HuggingFace</th><td>Used as a close public stand in for Anthropic and Google models, since those companies do not publish their exact tokenizer (you will see "approx." next to those model names for this reason). DeepSeek, Meta, Mistral, and Qwen publish real ones, so those are exact, not approximated.</td></tr>
+    </table>
+
+    <p>Here is the part that matters most. The first time you analyze a file against a model, NoRefund needs that model's tokenizer file to already be sitting on your computer. If it is not there yet, NoRefund will never silently reach out and fetch it on its own. Instead it stops and tells you exactly what to do:</p>
+
+    <figure>
+      <img src="img/download-prompt.webp" width="1440" height="900" loading="lazy" decoding="async" alt="File Parser results table showing a red message: tiktoken encoding for gpt-4o is not downloaded yet, open the Resources view to download it">
+      <figcaption>This is not an error to worry about. It means one thing only: go to Resources and download that tokenizer, once.</figcaption>
+    </figure>
+
+    <p>Once that is done, the same model works instantly every time after, even with no internet connection at all.</p>
+
+    <h3 style="margin-top: 36px;">Downloading a tokenizer, step by step</h3>
+    <ol class="steps">
+      <li>Click <strong>Resources</strong> in the left sidebar, under Data.</li>
+      <li>Each row is one tokenizer. The small dot on the left tells you its status. <span class="status-dot on"></span>filled means it is already downloaded. <span class="status-dot off"></span>grey means it is not, yet.</li>
+      <li>Find the row you need and click <strong>Download</strong> on the right. A progress bar appears while it downloads, and you can click Cancel at any point if you change your mind.</li>
+      <li>Once it finishes, the dot turns filled, the file size and the folder it was saved to appear under the name, and the button changes to <strong>Open folder</strong> if you want to look at the file yourself.</li>
+      <li>In a hurry? Click <strong>Download all</strong> near the top of the screen and NoRefund fetches everything that is missing in one go.</li>
+    </ol>
+
+    <div class="warn-box">
+      <p class="label">A gated model you may run into</p>
+      <p>One row you may notice, <code class="inline mono">meta-llama/Meta-Llama-3-8B</code>, is marked "Gated repo, requires a HuggingFace account or token to download." Meta requires a free HuggingFace account and their terms accepted before anyone can download that particular tokenizer. Here is how to get past it.</p>
+    </div>
+    <ol class="steps">
+      <li>Create a free account at <span class="mono">huggingface.co</span> if needed, and generate an access token from your account settings there.</li>
+      <li>In NoRefund, click the gear icon in the top right corner to open <strong>Settings</strong>.</li>
+      <li>Paste the token into the API tokens and secrets box and click Save. It is stored in your operating system's own secure keychain, never written to disk as plain text, and used only for this purpose.</li>
+      <li>Go back to Resources and click Download again. It works now.</li>
+    </ol>
+
+    <p>Worth remembering: this Download button, and this button alone, is the only place in the whole app where NoRefund reaches out to the internet. Opening a file, counting its tokens, working out the cost, and comparing models all happen entirely on your own machine, every time.</p>
+  </div>
+</section>
+
+<footer class="close">
+  <div class="wrap">
+    <p>The best way to get a feel for it is to grab a document you already have lying around, drop it into the File Parser screen, and see what comes back. If a tokenizer is not downloaded yet, the app will tell you exactly what to click next, so there is nothing to get stuck on.</p>
+    <div class="hero-ctas">
+      <a class="btn pressable" href="https://github.com/Phantom-VK/NoRefund/releases" target="_blank" rel="noopener">Download NoRefund, free</a>
+      <a class="btn-ghost pressable" href="index.html">Back to the overview</a>
+    </div>
+  </div>
+</footer>
+</main>
+
+<footer class="site">
+  <div class="wrap-xl">
+    <span>&copy; NoRefund. MIT licensed.</span>
+    <a href="https://github.com/Phantom-VK/NoRefund" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://github.com/Phantom-VK/NoRefund/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture</a>
+    <a href="https://github.com/Phantom-VK/NoRefund/releases" target="_blank" rel="noopener">Releases</a>
+  </div>
+</footer>
+
+<script src="js/reveal.js"></script>
+</body>
+</html>

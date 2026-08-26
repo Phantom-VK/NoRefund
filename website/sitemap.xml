@@ -1,7 +1,40 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://phantom-vk.github.io/NoRefund/</loc>
+    <lastmod>2026-08-26</lastmod>
+    <image:image>
+      <image:loc>https://phantom-vk.github.io/NoRefund/img/file-parser.webp</image:loc>
+      <image:title>NoRefund File Parser, counting tokens in local documents</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://phantom-vk.github.io/NoRefund/img/token-calculator.webp</image:loc>
+      <image:title>NoRefund Token Calculator</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://phantom-vk.github.io/NoRefund/guide.html</loc>
+    <lastmod>2026-08-26</lastmod>
+    <image:image>
+      <image:loc>https://phantom-vk.github.io/NoRefund/img/compare-models.webp</image:loc>
+      <image:title>NoRefund Compare Models, LLM cost side by side</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://phantom-vk.github.io/NoRefund/img/self-host-fit-check.webp</image:loc>
+      <image:title>NoRefund Self-Host Fit Check, GPU VRAM estimate</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://phantom-vk.github.io/NoRefund/how-many-tokens-is-my-pdf.html</loc>
+    <lastmod>2026-08-26</lastmod>
+  </url>
+  <url>
+    <loc>https://phantom-vk.github.io/NoRefund/claude-vs-gpt-token-count.html</loc>
+    <lastmod>2026-08-26</lastmod>
+  </url>
+  <url>
+    <loc>https://phantom-vk.github.io/NoRefund/llm-cost-calculator.html</loc>
     <lastmod>2026-08-26</lastmod>
   </url>
 </urlset>

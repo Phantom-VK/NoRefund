@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Many Tokens Is My PDF? A Real Method, Not a Rule of Thumb</title>
+<meta name="description" content="How to find the exact token count of a PDF before sending it to an LLM API, why per-page estimates are unreliable, and the free, offline tool that gives you the real number.">
+<link rel="canonical" href="https://phantom-vk.github.io/NoRefund/how-many-tokens-is-my-pdf.html">
+<meta name="robots" content="index, follow, max-image-preview:large">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="NoRefund">
+<meta property="og:title" content="How Many Tokens Is My PDF?">
+<meta property="og:description" content="Why per-page token estimates for PDFs are unreliable, and how to get the exact count for free, offline.">
+<meta property="og:url" content="https://phantom-vk.github.io/NoRefund/how-many-tokens-is-my-pdf.html">
+<meta property="og:image" content="https://phantom-vk.github.io/NoRefund/img/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="How Many Tokens Is My PDF?">
+<meta name="twitter:image" content="https://phantom-vk.github.io/NoRefund/img/og-image.png">
+
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<meta name="theme-color" content="#00b894">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How many tokens is a typical PDF page?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "For English prose, a commonly cited rule of thumb is that one token is roughly 4 characters, or about 0.75 words. A single-spaced text page of around 500 words works out to roughly 650-700 tokens on that basis. This is a starting estimate, not a real count: tables, headers, footnotes, and PDF layout artifacts (repeated whitespace, column breaks, page numbers) all push the real number around, sometimes by a lot."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why is a per-page token estimate not reliable?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "A PDF is a layout format, not a text format. The same page count can hide very different amounts of actual text depending on font size, margins, images, and whether the page is dense prose or a mostly-empty title slide. Two 10-page PDFs from different sources can differ in token count by 2 to 3 times. The only way to know the real number is to extract the actual text and run it through the tokenizer the target model uses."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I get the exact token count of my PDF for free?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Install NoRefund, open the File Parser screen, add the PDF, pick the model you plan to call, and click Analyze. It extracts the real text and counts it with that model's actual tokenizer (tiktoken for GPT, or the closest public equivalent for models that keep their tokenizer private), entirely on your own machine. It also tells you whether the document fits the model's context window and what it would cost to send."
+      }
+    }
+  ]
+}
+</script>
+
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="topbar-brand" href="index.html"><span class="brandmark">$</span>NoRefund</a>
+    <div class="topbar-links">
+      <a class="plain" href="index.html">Home</a>
+      <a class="plain" href="guide.html">Guide</a>
+      <a class="plain" href="https://github.com/Phantom-VK/NoRefund" target="_blank" rel="noopener">GitHub</a>
+      <a class="btn pressable" href="https://github.com/Phantom-VK/NoRefund/releases" target="_blank" rel="noopener">Download free</a>
+    </div>
+  </div>
+</div>
+
+<main id="main">
+<header class="hero" style="padding-bottom: 8px;">
+  <div class="wrap">
+    <p class="breadcrumb"><a href="index.html">NoRefund</a> / How many tokens is my PDF?</p>
+    <h1 class="title" style="font-size: 34px;">How many tokens is my PDF?</h1>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <p class="article-answer">Short answer: there is no reliable per-page or per-file-size estimate. A PDF's token count depends on how much actual text is on the page, and that varies too much to guess. Extract the real text and run it through the target model's real tokenizer, which is exactly what a tool like NoRefund does in a few seconds, on your own machine.</p>
+
+    <h2>Why "tokens per page" doesn't work</h2>
+    <p>People often reach for a rule like "a page is about 500 tokens." It is not a bad starting point, but a PDF is a layout format, not a text format. The same page count can hide very different amounts of real text:</p>
+    <ol class="cases">
+      <li><strong>Dense contracts and reports.</strong> Small font, narrow margins, few images: often 700-900+ tokens per page.</li>
+      <li><strong>Slide decks exported to PDF.</strong> Mostly whitespace and images with a handful of bullet points: sometimes under 100 tokens per page.</li>
+      <li><strong>Scanned documents.</strong> If the PDF is an image of a page rather than real text, a text extractor gets nothing at all, and you need OCR first.</li>
+      <li><strong>Tables and forms.</strong> Repeated short cells and column structure tokenize very differently from prose, usually less efficiently per visible character.</li>
+    </ol>
+    <p>A 10-page PDF from a slide deck and a 10-page PDF of a legal contract can differ in real token count by 2 to 3 times. Any single "tokens per page" number is a guess that gets worse the more documents you throw at it.</p>
+
+    <h2>The rule of thumb, if you need a rough number right now</h2>
+    <p>For plain English prose specifically (not PDFs generally), OpenAI's own guidance is that one token is roughly 4 characters, or about 0.75 words. So 500 words of body text is roughly 650-700 tokens. Use this only as a sanity check before you have the real file in hand, not as something to plan a budget around.</p>
+
+    <h2>How to get the real number</h2>
+    <ol class="steps">
+      <li>Install NoRefund (free, <a href="https://github.com/Phantom-VK/NoRefund/releases" target="_blank" rel="noopener">Windows, macOS, or Linux</a>).</li>
+      <li>Open the File Parser screen and add your PDF.</li>
+      <li>Pick the model you actually plan to call, since every model's tokenizer counts differently.</li>
+      <li>Click Analyze. NoRefund extracts the real text and counts it with that model's real tokenizer, tells you if it fits the context window, and estimates the cost.</li>
+    </ol>
+    <p>As a real example: this project's own 882-word architecture guide comes out to 1,951 tokens against GPT's tiktoken tokenizer and 1,948 against the tokenizer used to approximate Claude and Gemini, a spread of well under 1%, because it is fairly plain prose. A PDF with heavy tables or unusual formatting can spread much further apart. See the <a href="claude-vs-gpt-token-count.html">Claude vs GPT token count comparison</a> for the full breakdown.</p>
+
+    <div class="hero-ctas" style="margin-top: 8px;">
+      <a class="btn pressable" href="https://github.com/Phantom-VK/NoRefund/releases" target="_blank" rel="noopener">Download NoRefund, free</a>
+      <a class="btn-ghost pressable" href="guide.html">See how the File Parser works</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="site">
+  <div class="wrap-xl">
+    <span>&copy; NoRefund. MIT licensed.</span>
+    <a href="index.html">Home</a>
+    <a href="guide.html">Guide</a>
+    <a href="claude-vs-gpt-token-count.html">Claude vs GPT tokens</a>
+    <a href="llm-cost-calculator.html">Cost calculator</a>
+    <a href="https://github.com/Phantom-VK/NoRefund" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</footer>
+</body>
+</html>

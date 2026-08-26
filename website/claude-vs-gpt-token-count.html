@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude vs GPT Token Count: A Real Side-by-Side Comparison</title>
+<meta name="description" content="A real document run through six tokenizers: OpenAI's tiktoken, the public stand-in used to approximate Claude and Gemini, and the real HuggingFace tokenizers for DeepSeek, Qwen and Mistral. Real token counts, not estimates.">
+<link rel="canonical" href="https://phantom-vk.github.io/NoRefund/claude-vs-gpt-token-count.html">
+<meta name="robots" content="index, follow, max-image-preview:large">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="NoRefund">
+<meta property="og:title" content="Claude vs GPT Token Count: A Real Comparison">
+<meta property="og:description" content="One real document, six real tokenizers. See how OpenAI, Anthropic, Google, DeepSeek, Qwen and Mistral actually compare.">
+<meta property="og:url" content="https://phantom-vk.github.io/NoRefund/claude-vs-gpt-token-count.html">
+<meta property="og:image" content="https://phantom-vk.github.io/NoRefund/img/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Claude vs GPT Token Count: A Real Comparison">
+<meta name="twitter:image" content="https://phantom-vk.github.io/NoRefund/img/og-image.png">
+
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<meta name="theme-color" content="#00b894">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Does Claude count tokens the same way as GPT?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No, and Anthropic does not publish Claude's real tokenizer at all. Tools that count Claude tokens, NoRefund included, use the closest public equivalent (OpenAI's cl100k_base) as a labeled approximation. On a real 882-word technical document, that approximation landed within 0.2% of GPT's own tiktoken count, but the gap can be larger on text with unusual formatting or non-English content."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why do Claude and Gemini show the exact same token count in some tools?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Because neither Anthropic nor Google publishes their model's real tokenizer, tools that estimate their token counts often fall back to the same public stand-in tokenizer for both. When that happens, a Claude estimate and a Gemini estimate for the identical document will come out identical, since it is really the same tokenizer running twice under two different labels."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which providers publish their real tokenizer?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "OpenAI publishes tiktoken, so GPT counts are exact. DeepSeek, Meta Llama, Mistral and Qwen all publish real tokenizer files for their open-weight models on HuggingFace, so those counts are exact too. Anthropic (Claude) and Google (Gemini) do not publish theirs, so any tool measuring those two, including NoRefund, is working from an approximation."
+      }
+    }
+  ]
+}
+</script>
+
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="topbar-brand" href="index.html"><span class="brandmark">$</span>NoRefund</a>
+    <div class="topbar-links">
+      <a class="plain" href="index.html">Home</a>
+      <a class="plain" href="guide.html">Guide</a>
+      <a class="plain" href="https://github.com/Phantom-VK/NoRefund" target="_blank" rel="noopener">GitHub</a>
+      <a class="btn pressable" href="https://github.com/Phantom-VK/NoRefund/releases" target="_blank" rel="noopener">Download free</a>
+    </div>
+  </div>
+</div>
+
+<main id="main">
+<header class="hero" style="padding-bottom: 8px;">
+  <div class="wrap">
+    <p class="breadcrumb"><a href="index.html">NoRefund</a> / Claude vs GPT token count</p>
+    <h1 class="title" style="font-size: 34px;">Claude vs GPT token count: a real comparison</h1>
+  </div>
+</header>
+
+<section>
+  <div class="wrap-xl">
+    <p class="article-answer">On a real 882-word technical document, GPT's own tokenizer counted 1,951 tokens. The tokenizer used to approximate Claude and Gemini counted 1,948, a difference of 0.15%. DeepSeek's real tokenizer counted 2,040. The full breakdown, and why two of these six numbers are approximations rather than facts, is below.</p>
+
+    <h2>The test document</h2>
+    <p>To avoid making up numbers, we ran this project's own <a href="https://github.com/Phantom-VK/NoRefund/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener">architecture guide</a> (882 words, 7,694 characters of real technical prose, not marketing copy) through NoRefund's CLI against six models from six different providers. Here is exactly what came back.</p>
+
+    <div class="wrap" style="padding: 0; max-width: none;">
+      <table class="data-table">
+        <thead>
+          <tr><th>Model</th><th>Provider</th><th>Tokenizer used</th><th class="num">Tokens</th><th>Exact or approximate</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>GPT-5.6 Sol</td><td>OpenAI</td><td class="mono">tiktoken, gpt-4o encoding</td><td class="num tabular">1,951</td><td>Exact</td></tr>
+          <tr><td>Claude Sonnet 5</td><td>Anthropic</td><td class="mono">cl100k_base (stand-in)</td><td class="num tabular">1,948</td><td>Approximate</td></tr>
+          <tr><td>Gemini 3.1 Pro Preview</td><td>Google</td><td class="mono">cl100k_base (stand-in)</td><td class="num tabular">1,948</td><td>Approximate</td></tr>
+          <tr><td>DeepSeek V3</td><td>DeepSeek</td><td class="mono">HuggingFace, real</td><td class="num tabular">2,040</td><td>Exact</td></tr>
+          <tr><td>Qwen2.5 72B</td><td>Qwen</td><td class="mono">HuggingFace, real</td><td class="num tabular">1,948</td><td>Exact</td></tr>
+          <tr><td>Mistral Small 24B</td><td>Mistral</td><td class="mono">HuggingFace, real</td><td class="num tabular">1,999</td><td>Exact</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size: 14.5px; color: var(--muted);">Generated with <span class="mono">norefund &lt;file&gt; --model &lt;id&gt;</span> against each model, on 2026-08-26. Re-derivable at any time; see <a href="https://github.com/Phantom-VK/NoRefund/blob/main/docs/DATA_SOURCES.md" target="_blank" rel="noopener">Data Sources</a> for the verification method behind each tokenizer mapping.</p>
+
+    <h2>Why Claude and Gemini tie exactly</h2>
+    <p>That is not a coincidence or a bug. Anthropic and Google are both among the handful of providers that keep their production tokenizer private. NoRefund, like most tools in this space, falls back to <code class="inline mono">cl100k_base</code> as the closest public equivalent for both, and labels both "approx." in the Model Registry. When two models share the same fallback tokenizer, they will always produce the identical count for a given document, because it genuinely is the same tokenizer running twice.</p>
+    <p>The gap between that approximation and GPT's real count was 0.15% on this document. That is a fairly plain, English-language technical guide. Documents with heavy code blocks, tables, non-English text, or unusual Unicode can widen that gap further, since tokenizers diverge more on content their training data saw less of.</p>
+
+    <h2>What this means for choosing a model</h2>
+    <p>If you are optimizing cost across providers, the token count is only half the equation, since Claude, Gemini and GPT also charge different per-token prices. See the <a href="llm-cost-calculator.html">LLM cost calculator</a> for how the same document turns into different dollar amounts once pricing is factored in, or run your own document through NoRefund's Compare Models screen to get a ranked, cheapest-first answer for your specific file.</p>
+
+    <div class="hero-ctas" style="margin-top: 8px;">
+      <a class="btn pressable" href="https://github.com/Phantom-VK/NoRefund/releases" target="_blank" rel="noopener">Download NoRefund, free</a>
+      <a class="btn-ghost pressable" href="guide.html">See the Compare Models screen</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="site">
+  <div class="wrap-xl">
+    <span>&copy; NoRefund. MIT licensed.</span>
+    <a href="index.html">Home</a>
+    <a href="guide.html">Guide</a>
+    <a href="how-many-tokens-is-my-pdf.html">Tokens in a PDF</a>
+    <a href="llm-cost-calculator.html">Cost calculator</a>
+    <a href="https://github.com/Phantom-VK/NoRefund" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</footer>
+</body>
+</html>
