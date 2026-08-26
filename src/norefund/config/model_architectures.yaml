@@ -208,6 +208,10 @@
   hidden_size: 3584
   max_context_length: 8192
   attention_type: "gqa"
+  # Alternates local sliding-window (4096) and global full attention 1:1
+  # every other layer -- see core/selfhost.py's kv_cache_bytes.
+  sliding_window: 4096
+  sliding_window_pattern: 2
   docs_url: "https://huggingface.co/google/gemma-2-9b-it"
 
 - id: google:gemma-2-27b
@@ -223,6 +227,9 @@
   hidden_size: 4608
   max_context_length: 8192
   attention_type: "gqa"
+  # See google:gemma-2-9b above -- same 1:1 local/global alternation.
+  sliding_window: 4096
+  sliding_window_pattern: 2
   docs_url: "https://huggingface.co/google/gemma-2-27b-it"
 
 - id: deepseek:deepseek-v3

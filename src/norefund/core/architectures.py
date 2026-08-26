@@ -40,6 +40,8 @@ class ModelArchitecture:
     attention_type: AttentionType
     kv_lora_rank: int = 0          # MLA only (e.g. DeepSeek V3)
     qk_rope_head_dim: int = 0      # MLA only (e.g. DeepSeek V3)
+    sliding_window: int = 0          # 0 = full attention on every layer
+    sliding_window_pattern: int = 0  # every Nth layer is full attention (Gemma 2: 2)
     docs_url: str | None = None
 
 

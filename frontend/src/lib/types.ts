@@ -107,6 +107,8 @@ export interface ModelArchitecture {
   attention_type: string;
   kv_lora_rank: number;
   qk_rope_head_dim: number;
+  sliding_window: number;
+  sliding_window_pattern: number;
   docs_url: string | null;
 }
 
