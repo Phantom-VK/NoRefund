@@ -127,7 +127,13 @@
   display_name: "Llama 3 8B (self-hosted)"
   provider: "Meta"
   tokenizer_backend: "hf"
-  tokenizer_name: "meta-llama/Meta-Llama-3-8B"
+  # meta-llama/Meta-Llama-3-8B is licence-gated (manual approval); this
+  # download would fail for any user without an accepted licence + HF
+  # token. NousResearch/Meta-Llama-3-8B carries a byte-identical
+  # tokenizer.json (verified via the HF tree API's git blob oid, since
+  # the gated repo's own content isn't fetchable without auth: both are
+  # b197f72effb9d5ed16ee0f5663e11e4cfac2ba62).
+  tokenizer_name: "NousResearch/Meta-Llama-3-8B"
   context_window: 8192
   input_price_per_million: 0.00
   output_price_per_million: 0.00
@@ -152,7 +158,10 @@
   display_name: "Llama 3.1 8B (self-hosted)"
   provider: "Meta"
   tokenizer_backend: "hf"
-  tokenizer_name: "meta-llama/Llama-3.1-8B-Instruct"
+  # meta-llama/Llama-3.1-8B-Instruct is licence-gated. NousResearch's
+  # mirror is byte-identical (git blob oid 5cc5f00a5b203e90a27a3bd60d1ec393b07971e8
+  # on both, verified via the HF tree API without needing gated-repo auth).
+  tokenizer_name: "NousResearch/Meta-Llama-3.1-8B-Instruct"
   context_window: 131072
   input_price_per_million: 0.00
   output_price_per_million: 0.00
@@ -163,7 +172,10 @@
   display_name: "Llama 3.1 70B (self-hosted)"
   provider: "Meta"
   tokenizer_backend: "hf"
-  tokenizer_name: "meta-llama/Llama-3.1-70B-Instruct"
+  # meta-llama/Llama-3.1-70B-Instruct is licence-gated. Same tokenizer as
+  # the 8B/405B Instruct models in this family (identical git blob oid
+  # 5cc5f00a5b203e90a27a3bd60d1ec393b07971e8), mirrored ungated here.
+  tokenizer_name: "NousResearch/Meta-Llama-3.1-70B-Instruct"
   context_window: 131072
   input_price_per_million: 0.00
   output_price_per_million: 0.00
@@ -174,7 +186,10 @@
   display_name: "Llama 3.3 70B (self-hosted)"
   provider: "Meta"
   tokenizer_backend: "hf"
-  tokenizer_name: "meta-llama/Llama-3.3-70B-Instruct"
+  # meta-llama/Llama-3.3-70B-Instruct is licence-gated. unsloth's mirror
+  # is byte-identical (git blob oid 1c1d8d5c9024994f1d3b00f9662b8dd89ca13cf2
+  # on both).
+  tokenizer_name: "unsloth/Llama-3.3-70B-Instruct"
   context_window: 131072
   input_price_per_million: 0.00
   output_price_per_million: 0.00
@@ -185,7 +200,11 @@
   display_name: "Llama 3.1 405B (self-hosted)"
   provider: "Meta"
   tokenizer_backend: "hf"
-  tokenizer_name: "meta-llama/Llama-3.1-405B-Instruct"
+  # meta-llama/Llama-3.1-405B-Instruct is licence-gated. Same tokenizer as
+  # the 8B/70B Instruct models in this family (identical git blob oid
+  # 5cc5f00a5b203e90a27a3bd60d1ec393b07971e8); unsloth's 4-bit mirror
+  # keeps the original, unmodified tokenizer.
+  tokenizer_name: "unsloth/Meta-Llama-3.1-405B-Instruct-bnb-4bit"
   context_window: 131072
   input_price_per_million: 0.00
   output_price_per_million: 0.00
@@ -251,7 +270,10 @@
   display_name: "Gemma 2 9B (self-hosted)"
   provider: "Google"
   tokenizer_backend: "hf"
-  tokenizer_name: "google/gemma-2-9b-it"
+  # google/gemma-2-9b-it is licence-gated. unsloth's mirror is
+  # byte-identical (git blob oid af0eac5c0056f83b8f3fcdb79165f8847111c305
+  # on both -- same tokenizer as gemma-2-27b-it too).
+  tokenizer_name: "unsloth/gemma-2-9b-it"
   context_window: 8192
   input_price_per_million: 0.00
   output_price_per_million: 0.00
@@ -262,7 +284,10 @@
   display_name: "Gemma 2 27B (self-hosted)"
   provider: "Google"
   tokenizer_backend: "hf"
-  tokenizer_name: "google/gemma-2-27b-it"
+  # google/gemma-2-27b-it is licence-gated. unsloth's mirror is
+  # byte-identical (git blob oid af0eac5c0056f83b8f3fcdb79165f8847111c305
+  # on both -- same tokenizer as gemma-2-9b-it too).
+  tokenizer_name: "unsloth/gemma-2-27b-it"
   context_window: 8192
   input_price_per_million: 0.00
   output_price_per_million: 0.00
