@@ -63,7 +63,6 @@ hiddenimports += collect_submodules("gi.overrides")
 # edgechromium on Windows; macOS has no choice of backend).
 excludes = [
     "tkinter",
-    "customtkinter",
     "PyQt5",
     "PyQt6",
     "PySide2",

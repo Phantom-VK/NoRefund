@@ -307,28 +307,6 @@ wheels = [
 ]
 
 [[package]]
-name = "customtkinter"
-version = "5.2.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "darkdetect" },
-    { name = "packaging" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/cf/48/c5a9d44188c44702e1e3db493c741e9c779596835a761b819fe15431d163/customtkinter-5.2.2.tar.gz", hash = "sha256:fd8db3bafa961c982ee6030dba80b4c2e25858630756b513986db19113d8d207", size = 261999, upload-time = "2024-01-10T02:24:36.314Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3b/b1/b43b33001a77256b335511e75f257d001082350b8506c8807f30c98db052/customtkinter-5.2.2-py3-none-any.whl", hash = "sha256:14ad3e7cd3cb3b9eb642b9d4e8711ae80d3f79fb82545ad11258eeffb2e6b37c", size = 296062, upload-time = "2024-01-10T02:24:33.53Z" },
-]
-
-[[package]]
-name = "darkdetect"
-version = "0.8.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/45/77/7575be73bf12dee231d0c6e60ce7fb7a7be4fcd58823374fc59a6e48262e/darkdetect-0.8.0.tar.gz", hash = "sha256:b5428e1170263eb5dea44c25dc3895edd75e6f52300986353cd63533fe7df8b1", size = 7681, upload-time = "2022-12-16T14:14:42.113Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f2/f2/728f041460f1b9739b85ee23b45fa5a505962ea11fd85bdbe2a02b021373/darkdetect-0.8.0-py3-none-any.whl", hash = "sha256:a7509ccf517eaad92b31c214f593dbcf138ea8a43b2935406bbd565e15527a85", size = 8955, upload-time = "2022-12-16T14:14:40.92Z" },
-]
-
-[[package]]
 name = "filelock"
 version = "3.29.4"
 source = { registry = "https://pypi.org/simple" }
@@ -627,6 +605,19 @@ wheels = [
 ]
 
 [[package]]
+name = "modulegraph"
+version = "0.19.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "altgraph" },
+    { name = "setuptools" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/20/fa/c471f46fa1696309b806d6c663d599525925a5c13cf1371a02587a265109/modulegraph-0.19.7.tar.gz", hash = "sha256:9ad8a81148ba1d90ade66617a153786f7d7cf6a88de83ee28e251183122c2a57", size = 88618, upload-time = "2025-11-22T08:22:43.858Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f1/c1/3eff0be83439f0408866eaacd4106c9d19b762cba66bcf0d0a523a6f6620/modulegraph-0.19.7-py2.py3-none-any.whl", hash = "sha256:139f89042c9912777ba4bbf1d5496591c6ad780110ea3082c11e8737cf82cacc", size = 35151, upload-time = "2025-11-22T08:22:42.239Z" },
+]
+
+[[package]]
 name = "more-itertools"
 version = "11.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -649,10 +640,8 @@ name = "norefund"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "customtkinter" },
     { name = "huggingface-hub" },
     { name = "keyring" },
-    { name = "pillow" },
     { name = "platformdirs" },
     { name = "pypdf" },
     { name = "python-docx" },
@@ -671,11 +660,12 @@ dev = [
     { name = "pytest" },
     { name = "ruff" },
 ]
-dnd = [
-    { name = "tkinterdnd2" },
-]
 linux = [
     { name = "pygobject" },
+]
+macos = [
+    { name = "py2app" },
+    { name = "setuptools" },
 ]
 
 [package.dev-dependencies]
@@ -689,11 +679,10 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = ">=26.5.1" },
-    { name = "customtkinter", specifier = ">=5.2.2" },
     { name = "huggingface-hub", specifier = ">=0.25.0" },
     { name = "keyring", specifier = ">=25.0" },
-    { name = "pillow", specifier = ">=10.0" },
     { name = "platformdirs", specifier = ">=4.0" },
+    { name = "py2app", marker = "extra == 'macos'", specifier = ">=0.28,<0.28.9" },
     { name = "pygobject", marker = "extra == 'linux'", specifier = ">=3.50" },
     { name = "pyinstaller", marker = "extra == 'dev'", specifier = ">=6.21.0" },
     { name = "pypdf", specifier = ">=4.3.1" },
@@ -704,11 +693,11 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "reportlab", specifier = ">=4.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.19" },
+    { name = "setuptools", marker = "extra == 'macos'", specifier = "<81" },
     { name = "tiktoken", specifier = ">=0.7.0" },
-    { name = "tkinterdnd2", marker = "extra == 'dnd'", specifier = ">=0.4.2" },
     { name = "tokenizers", specifier = ">=0.23.1" },
 ]
-provides-extras = ["dev", "dnd", "linux"]
+provides-extras = ["dev", "linux", "macos"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -837,6 +826,21 @@ name = "proxy-tools"
 version = "0.1.0"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f2/cf/77d3e19b7fabd03895caca7857ef51e4c409e0ca6b37ee6e9f7daa50b642/proxy_tools-0.1.0.tar.gz", hash = "sha256:ccb3751f529c047e2d8a58440d86b205303cf0fe8146f784d1cbcd94f0a28010", size = 2978, upload-time = "2014-05-05T21:02:24.606Z" }
+
+[[package]]
+name = "py2app"
+version = "0.28.8"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "altgraph" },
+    { name = "macholib" },
+    { name = "modulegraph" },
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d1/d8/a81d296560df958e496a03e4373615db5157dacb388945110404cbd0879b/py2app-0.28.8.tar.gz", hash = "sha256:cab7aec752a8b83e7c6cef7c15271dc720155275e44cbf610e3162e0807313ec", size = 1173004, upload-time = "2024-05-25T16:39:52.409Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/83/12/a0932851fe222d9cf9193e192f01d7f62c89d9690b17d731ef5385df4360/py2app-0.28.8-py2.py3-none-any.whl", hash = "sha256:38b80f0c91f8d2dddb6396e6bbff8a84875f073c510f4f1a307e8ae44c7d73d8", size = 835661, upload-time = "2024-05-25T16:31:50.8Z" },
+]
 
 [[package]]
 name = "pycairo"
@@ -1384,11 +1388,11 @@ wheels = [
 
 [[package]]
 name = "setuptools"
-version = "82.0.1"
+version = "80.10.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/4f/db/cfac1baf10650ab4d1c111714410d2fbb77ac5a616db26775db562c8fab2/setuptools-82.0.1.tar.gz", hash = "sha256:7d872682c5d01cfde07da7bccc7b65469d3dca203318515ada1de5eda35efbf9", size = 1152316, upload-time = "2026-03-09T12:47:17.221Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/76/95/faf61eb8363f26aa7e1d762267a8d602a1b26d4f3a1e758e92cb3cb8b054/setuptools-80.10.2.tar.gz", hash = "sha256:8b0e9d10c784bf7d262c4e5ec5d4ec94127ce206e8738f29a437945fbc219b70", size = 1200343, upload-time = "2026-01-25T22:38:17.252Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9d/76/f789f7a86709c6b087c5a2f52f911838cad707cc613162401badc665acfe/setuptools-82.0.1-py3-none-any.whl", hash = "sha256:a59e362652f08dcd477c78bb6e7bd9d80a7995bc73ce773050228a348ce2e5bb", size = 1006223, upload-time = "2026-03-09T12:47:15.026Z" },
+    { url = "https://files.pythonhosted.org/packages/94/b8/f1f62a5e3c0ad2ff1d189590bfa4c46b4f3b6e49cef6f26c6ee4e575394d/setuptools-80.10.2-py3-none-any.whl", hash = "sha256:95b30ddfb717250edb492926c92b5221f7ef3fbcc2b07579bcd4a27da21d0173", size = 1064234, upload-time = "2026-01-25T22:38:15.216Z" },
 ]
 
 [[package]]
@@ -1445,15 +1449,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/96/d9/dfd086aa2d918c563a140720e0ce296cada1634efd2783d5cf51e05f984e/tiktoken-0.13.0-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:6644c9c2b5cf3916f5a3641d7d12fdb3f006a7b3d9ff6acdaec44e29ab1ff91e", size = 1181863, upload-time = "2026-05-15T04:51:15.025Z" },
     { url = "https://files.pythonhosted.org/packages/2f/68/a18b4f307086954fdae32714cb4f85562e34f9d34ab206e61f1816aa6018/tiktoken-0.13.0-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:5cb65b60b9408563676d874a3a4ee573370066f0dc4e29d84e82e989c6517424", size = 1239218, upload-time = "2026-05-15T04:51:16.103Z" },
     { url = "https://files.pythonhosted.org/packages/16/5b/f2aa703a4fc5d2dff73460a7d46cc2f3f44aa0f3dd8eeb20d2a0ecf68862/tiktoken-0.13.0-cp314-cp314t-win_amd64.whl", hash = "sha256:85b78cc3a2c3d48723ca751fa981f1fedccd54194ca0471b957364353a898b07", size = 918110, upload-time = "2026-05-15T04:51:17.237Z" },
-]
-
-[[package]]
-name = "tkinterdnd2"
-version = "0.6.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/3b/68/a7400de3c15038522b00540480a1273809ad4680b941e9c5f82520b27f2f/tkinterdnd2-0.6.2.tar.gz", hash = "sha256:e015c2d863c9292e61d0294dea43010ff99c3cc9423e564676e04df413de9916", size = 729841, upload-time = "2026-07-05T00:05:21.316Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/33/1b/039642c212c24887a941af706b006365f3733d88aab383f0cf151768403c/tkinterdnd2-0.6.2-py3-none-any.whl", hash = "sha256:b6a8b229d26286c022bb2fbd311c2e431e4d9bbab8133be80e9c98e7bcf9fe59", size = 811654, upload-time = "2026-07-05T00:05:19.682Z" },
 ]
 
 [[package]]

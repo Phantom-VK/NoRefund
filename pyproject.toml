@@ -20,7 +20,6 @@ classifiers = [
 ]
 
 dependencies = [
-    "customtkinter>=5.2.2",
     "tiktoken>=0.7.0",
     "pypdf>=4.3.1",
     "python-pptx>=1.0.2",
@@ -30,7 +29,6 @@ dependencies = [
     "platformdirs>=4.0",
     "huggingface_hub>=0.25.0",
     "keyring>=25.0",
-    "Pillow>=10.0",
     "reportlab>=4.0",
     "pywebview>=6.2.1",
 ]
@@ -41,9 +39,6 @@ dev = [
     "black>=26.5.1",
     "pytest>=9.1.1",
     "pyinstaller>=6.21.0",
-]
-dnd = [
-    "tkinterdnd2>=0.4.2",
 ]
 linux = [
     "pygobject>=3.50",

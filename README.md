@@ -19,15 +19,23 @@ used only when you explicitly download a tokenizer, from the app's Resources vie
 
 ---
 
-## Features (v0.1)
+## Features
 
 - Parse PDF, PPTX, DOCX, TXT, MD files
-- Count tokens for 10+ LLM models (GPT-4o, Claude, Gemini, DeepSeek, Llama, Mistral)
+- Count tokens for 21 models across 7 providers (OpenAI, Anthropic, Google, DeepSeek,
+  Meta, Mistral, Qwen)
 - Context window usage percentage with fit/chunk analysis
+- Compare cost and context fit across multiple models side by side, with per-model and
+  portfolio cost projection
+- Self-Host Fit Check: estimate whether an open-weight model actually fits on your own
+  GPU, Apple Silicon Mac, or cloud instance, given quantization, KV cache precision,
+  context length, and concurrency
 - Local cost estimation per model, with no data ever sent anywhere
+- Model Registry: browse every supported model's context window, pricing, and
+  architecture details
 - Resources view: see which tokenizers are downloaded, where they live on disk, and
   their size, with a one-click download for anything missing
-- CLI and Desktop GUI (CustomTkinter)
+- CLI and a native desktop app (React + pywebview) for Windows, macOS, and Linux
 
 ---
 
@@ -43,6 +51,10 @@ the first time you run it. Click **More info → Run anyway** to continue. This 
 means the publisher isn't verified, not that the app is unsafe — the source is right
 here in this repo.
 
+**macOS Gatekeeper:** for the same reason, macOS may refuse to open the app with an
+"is damaged and can't be opened" dialog. Run `xattr -cr NoRefund.app` in Terminal after
+extracting it — see `packaging/README.md` for details.
+
 ---
 
 ## Quick Start
@@ -50,13 +62,16 @@ here in this repo.
 ```bash
 # Install
 pip install -e ".[dev]"
+cd frontend && npm install && npm run build && cd ..
 
 # CLI
 norefund path/to/file.pdf --model openai:gpt-4o
 
-# GUI
+# Desktop app
 norefund --gui
 ```
+
+For frontend development with hot reload, see `CLAUDE.md`'s Commands section.
 
 ---
 
@@ -64,8 +79,8 @@ norefund --gui
 
 ```
 src/norefund/
-  main.py              # Entry point
-  gui/                 # CustomTkinter GUI
+  main.py              # CLI entry point + GUI launch
+  desktop/             # pywebview shell and JS bridge (api.py, app.py, dto.py, jobs.py)
   core/
     parsing.py         # Document text extraction
     tokenization.py    # Tokenizer backends
@@ -74,6 +89,7 @@ src/norefund/
     service.py         # Orchestration
   config/
     default_models.yaml  # Local model registry
+frontend/               # React UI (Calculator, Parser, Compare, Fit Check, Registry, Resources)
 tests/
 ```
 
@@ -81,20 +97,13 @@ tests/
 
 ## Supported Models
 
-| Model | Provider | Context Window |
-|---|---|---|
-| GPT-4o | OpenAI | 128K |
-| GPT-4o Mini | OpenAI | 128K |
-| GPT-4.1 | OpenAI | 1M |
-| Claude 3.5 Sonnet | Anthropic | 200K |
-| Claude 3 Haiku | Anthropic | 200K |
-| Gemini 2.0 Flash | Google | 1M |
-| Gemini 1.5 Pro | Google | 2M |
-| DeepSeek V3 | DeepSeek | 128K |
-| Llama 3 8B | Meta (self-hosted) | 8K |
-| Mistral 7B | Mistral (self-hosted) | 32K |
+21 models across 7 providers — OpenAI, Anthropic, Google, DeepSeek, Meta, Mistral, and
+Qwen, spanning both hosted API models and self-hosted open-weight models. The
+in-app **Model Registry** view is the source of truth for the current list, context
+windows, and pricing (`config/default_models.yaml` backs it, so it never drifts from
+what the app actually uses).
 
-**Tokenizer accuracy:** OpenAI models, DeepSeek V3, Llama 3, and Mistral use each
+**Tokenizer accuracy:** OpenAI models, DeepSeek V3, Llama, Qwen, and Mistral use each
 provider's real tokenizer. Anthropic and Google don't publish a local tokenizer for
 Claude or Gemini, so those counts are a `cl100k_base` approximation — the app marks
 them `(approx.)` wherever they're shown.

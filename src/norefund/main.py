@@ -19,7 +19,7 @@ def _init_tiktoken_cache_dir() -> None:
 _init_tiktoken_cache_dir()
 
 from norefund.core.service import analyze_file  # noqa: E402
-from norefund.gui.app import App  # noqa: E402
+from norefund.desktop.app import main as run_desktop_app  # noqa: E402
 
 
 def main() -> None:
@@ -40,8 +40,7 @@ def main() -> None:
 
 
 def _run_gui() -> None:
-    app = App()
-    app.mainloop()
+    run_desktop_app()
 
 
 def _run_cli(file_path: str, model_id: str) -> None:
