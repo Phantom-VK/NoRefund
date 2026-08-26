@@ -71,7 +71,7 @@
         "https://phantom-vk.github.io/NoRefund/img/file-parser.webp",
         "https://phantom-vk.github.io/NoRefund/img/compare-models.webp"
       ],
-      "softwareHelp": "https://phantom-vk.github.io/NoRefund/guide.html",
+      "softwareHelp": "https://phantom-vk.github.io/NoRefund/",
       "downloadUrl": "https://github.com/Phantom-VK/NoRefund/releases",
       "installUrl": "https://github.com/Phantom-VK/NoRefund/releases",
       "codeRepository": "https://github.com/Phantom-VK/NoRefund",
@@ -160,7 +160,6 @@
     <a class="topbar-brand" href="#top"><span class="brandmark">$</span>NoRefund</a>
     <div class="topbar-links">
       <a class="plain" aria-current="page" href="index.html">Home</a>
-      <a class="plain" href="guide.html">Guide</a>
       <a class="plain" href="https://github.com/Phantom-VK/NoRefund" target="_blank" rel="noopener">GitHub</a>
       <a class="btn pressable" href="https://github.com/Phantom-VK/NoRefund/releases" target="_blank" rel="noopener">Download free</a>
     </div>
@@ -176,26 +175,12 @@
         <p class="lede">Count tokens in any document against real tokenizers, check context fit, and see API cost, before you call it. 100% local.</p>
         <div class="hero-ctas">
           <a class="btn pressable" href="https://github.com/Phantom-VK/NoRefund/releases" target="_blank" rel="noopener">Download for Windows, macOS, Linux</a>
-          <a class="btn-ghost pressable" href="guide.html">Read the guide</a>
+          <a class="btn-ghost pressable" href="https://github.com/Phantom-VK/NoRefund/blob/main/docs/CONTRIBUTING.md" target="_blank" rel="noopener">Contribute to open source</a>
         </div>
       </div>
-      <div class="reveal" aria-hidden="true">
-        <!-- Real output, not a mockup: `norefund docs/MATHEMATICS.md --model openai:gpt-5.6-sol`
-             run against this repo's own docs/MATHEMATICS.md on 2026-08-26. See
-             docs/MATHEMATICS.md and core/costing.py for how the numbers are derived. -->
-        <div class="term">
-          <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">zsh</span></div>
-          <div class="term-body">
-            <p class="term-line"><span class="term-prompt">$</span> norefund docs/MATHEMATICS.md --model openai:gpt-5.6-sol</p>
-            <p class="term-line term-muted">File      : docs/MATHEMATICS.md</p>
-            <p class="term-line tabular">Tokens    : 2,145</p>
-            <p class="term-line tabular">Context   : 0.2% of 1,050,000</p>
-            <div class="term-bar-track"><div class="term-bar-fill" style="width: 3%;"></div></div>
-            <p class="term-line">Fits      : Yes</p>
-            <p class="term-line">Min chunks: 1</p>
-            <p class="term-line tabular">Est. cost : $0.008580 USD (input only)</p>
-          </div>
-        </div>
+      <div class="screen-card reveal">
+        <div class="screen-frame"><span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span></div>
+        <img class="screen-shot" src="img/file-parser.webp" width="1440" height="900" loading="eager" fetchpriority="high" decoding="async" alt="NoRefund's File Parser screen: a folder of real files analyzed against a chosen model, with token count, context fit, chunk count and cost per file">
       </div>
     </div>
   </div>
@@ -259,15 +244,15 @@
     <h2>What it actually does</h2>
     <div class="bento reveal">
       <div class="bento-item span-4">
-        <div class="screen-frame"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span></div>
-        <img class="screen-shot" src="img/file-parser.webp" width="1440" height="900" loading="lazy" decoding="async" alt="File Parser screen analyzing a folder of documents against a chosen model">
+        <div class="screen-frame"><span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span></div>
+        <img class="screen-shot" src="img/compare-models.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Compare Models results ranked cheapest first">
         <div class="bento-body">
-          <h3>Parse a file, or a whole folder</h3>
-          <p>PDF, DOCX, PPTX, TXT and Markdown. Point it at a folder and every file gets a row: token count, context fit, chunk count if it does not fit, and estimated cost.</p>
+          <h3>Compare providers</h3>
+          <p>Same document, every model you pick, ranked cheapest first.</p>
         </div>
       </div>
       <div class="bento-item span-2">
-        <div class="screen-frame"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span></div>
+        <div class="screen-frame"><span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span></div>
         <img class="screen-shot" src="img/token-calculator.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Token Calculator context bar and cost breakdown">
         <div class="bento-body">
           <h3>Quick calculator</h3>
@@ -275,15 +260,15 @@
         </div>
       </div>
       <div class="bento-item span-2">
-        <div class="screen-frame"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span></div>
-        <img class="screen-shot" src="img/compare-models.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Compare Models results ranked cheapest first">
+        <div class="screen-frame"><span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span></div>
+        <img class="screen-shot" src="img/model-registry.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Model Registry showing every supported model's context window, price, and architecture, filterable by provider">
         <div class="bento-body">
-          <h3>Compare providers</h3>
-          <p>Same document, every model you pick, ranked cheapest first.</p>
+          <h3>Model registry</h3>
+          <p>Every supported model, its context window, and its published price, in one filterable list.</p>
         </div>
       </div>
       <div class="bento-item span-4">
-        <div class="screen-frame"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span></div>
+        <div class="screen-frame"><span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span></div>
         <img class="screen-shot" src="img/self-host-fit-check.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Self-Host Fit Check estimating GPU VRAM headroom for an open-weight model">
         <div class="bento-body">
           <h3>Self-host fit check</h3>
@@ -291,7 +276,31 @@
         </div>
       </div>
     </div>
-    <p style="margin-top: 22px;"><a href="guide.html">See every screen, including the Model Registry and Resources views &rarr;</a></p>
+  </div>
+</section>
+
+<section id="cli">
+  <div class="wrap">
+    <h2>Also scriptable, via pip</h2>
+    <p class="lead-p">The desktop download is a GUI with no command line in it. If you <code class="inline mono">pip install</code> instead, you get a thin CLI too: one file at a time, input cost only, good for a quick check or a shell script.</p>
+    <div class="term reveal">
+      <!-- Real output, not a mockup: `norefund docs/MATHEMATICS.md --model openai:gpt-5.6-sol`
+           run against this repo's own docs/MATHEMATICS.md on 2026-08-26. See
+           docs/MATHEMATICS.md and core/costing.py for how the numbers are derived. -->
+      <div class="term-bar"><span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span><span class="term-title">zsh</span></div>
+      <div class="term-body">
+        <p class="term-line"><span class="term-prompt">$</span> pip install norefund</p>
+        <p class="term-line"><span class="term-prompt">$</span> norefund docs/MATHEMATICS.md --model openai:gpt-5.6-sol</p>
+        <p class="term-line term-muted">File      : docs/MATHEMATICS.md</p>
+        <p class="term-line tabular">Tokens    : 2,145</p>
+        <p class="term-line tabular">Context   : 0.2% of 1,050,000</p>
+        <div class="term-bar-track"><div class="term-bar-fill" style="width: 3%;"></div></div>
+        <p class="term-line">Fits      : Yes</p>
+        <p class="term-line">Min chunks: 1</p>
+        <p class="term-line tabular">Est. cost : $0.008580 USD (input only)</p>
+      </div>
+    </div>
+    <p style="font-size: 14.5px; color: var(--muted); margin-top: 14px;">The GUI is the full product: folders, compare, fit check, export. The CLI is a shortcut for one file when a window is more than you need.</p>
   </div>
 </section>
 
@@ -372,7 +381,6 @@
 <footer class="site">
   <div class="wrap-xl">
     <span>&copy; NoRefund. MIT licensed.</span>
-    <a href="guide.html">Guide</a>
     <a href="https://github.com/Phantom-VK/NoRefund" target="_blank" rel="noopener">GitHub</a>
     <a href="https://github.com/Phantom-VK/NoRefund/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture</a>
     <a href="https://github.com/Phantom-VK/NoRefund/blob/main/docs/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a>

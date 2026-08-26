@@ -119,9 +119,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible {
 }
 .skip-link:focus { top: 12px; }
 
-.wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
-.wrap-wide { max-width: 980px; margin: 0 auto; padding: 0 24px; }
-.wrap-xl { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+.wrap { max-width: 860px; margin: 0 auto; padding: 0 32px; }
+.wrap-wide { max-width: 1100px; margin: 0 auto; padding: 0 32px; }
+.wrap-xl { max-width: 1320px; margin: 0 auto; padding: 0 32px; }
 
 /* ---------- Motion ---------- */
 .pressable { transition: transform var(--dur-press) var(--ease-out); }
@@ -144,11 +144,25 @@ a:focus-visible, button:focus-visible, summary:focus-visible {
 }
 
 /* ---------- Topbar ---------- */
-.topbar { background: var(--surface); border-bottom: 1px solid var(--line); }
+/* Translucent material, not a flat bar: content scrolls under it, like a
+   native toolbar. Falls back to a solid surface when transparency is
+   reduced or blur isn't supported. */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .topbar { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
 .topbar-inner {
-  max-width: 1160px;
+  max-width: 1320px;
   margin: 0 auto;
-  padding: 14px 24px;
+  padding: 14px 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -223,9 +237,9 @@ p { margin: 0 0 16px; max-width: 68ch; }
 .lead-p { font-size: 18px; color: var(--ink-soft); }
 
 /* ---------- Sections ---------- */
-section { padding: 46px 0; border-bottom: 1px solid var(--line); }
+section { padding: clamp(46px, 7vw, 92px) 0; border-bottom: 1px solid var(--line); }
 section:last-of-type { border-bottom: none; }
-main > .hero + section { padding-top: 46px; }
+main > .hero + section { padding-top: clamp(46px, 7vw, 92px); }
 
 .callout {
   background: var(--accent-tint);
@@ -267,30 +281,33 @@ ol.cases li::before, ol.steps li::before {
 ol.cases strong, ol.steps strong { color: var(--ink); }
 
 /* ---------- Hero ---------- */
-.hero { padding: 48px 0 52px; border-bottom: 1px solid var(--line); }
+.hero { padding: clamp(48px, 8vw, 96px) 0 clamp(52px, 8vw, 88px); border-bottom: 1px solid var(--line); }
 .hero-grid { display: grid; grid-template-columns: 1fr; gap: 40px; align-items: center; }
 h1.title {
-  font-size: 46px;
-  line-height: 1.06;
-  letter-spacing: -0.025em;
-  margin: 0 0 14px;
+  /* Size-specific tracking: the larger this gets, the more negative the
+     tracking needs to be to read as tight rather than loose. */
+  font-size: clamp(40px, 5vw + 1rem, 68px);
+  line-height: 1.03;
+  letter-spacing: -0.03em;
+  margin: 0 0 18px;
   font-weight: 800;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
 }
-.hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; padding: 22px 0 0; }
+.hero .lede { font-size: clamp(18px, 1.3vw + 0.9rem, 22px); }
+.hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; padding: 26px 0 0; }
 nav.jump { display: flex; flex-wrap: wrap; gap: 4px 22px; padding: 18px 0 0; font-size: 14.5px; }
 nav.jump a { color: var(--ink-soft); text-decoration: none; }
 nav.jump a:hover { color: var(--accent-strong); }
 
 @media (min-width: 960px) {
-  .hero-grid { grid-template-columns: 1.05fr 0.95fr; gap: 56px; }
+  .hero-grid { grid-template-columns: 1.05fr 0.95fr; gap: 64px; }
 }
 
-/* Terminal panel: brand-consistent stylised output, not a fake screenshot of
-   the app (the app has no CLI). Numbers shown come from a real analyze run,
-   see the comment in index.html. */
+/* Terminal panel: real `norefund` CLI output (see the comment in
+   index.html for the exact command). Used only where the CLI itself is
+   the subject, since the packaged desktop downloads don't include it. */
 .term {
   background: var(--code-bg);
   color: var(--code-fg);
@@ -310,6 +327,12 @@ nav.jump a:hover { color: var(--accent-strong); }
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 .term-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255, 255, 255, 0.16); }
+/* Classic three-colour traffic lights, desaturated a touch to sit quietly
+   in the dark chrome instead of shouting. Used on every terminal-adjacent
+   window frame on the site (the CLI panel and the screenshot chrome). */
+.term-dot.red { background: #e0564d; }
+.term-dot.yellow { background: #dba63b; }
+.term-dot.green { background: #2fa855; }
 .term-title { margin-left: 8px; font-size: 12px; color: rgba(255, 255, 255, 0.4); }
 .term-body { padding: 20px 22px 24px; }
 .term-line { margin: 0 0 9px; white-space: pre-wrap; }
@@ -344,7 +367,6 @@ nav.jump a:hover { color: var(--accent-strong); }
   box-shadow: var(--shadow);
 }
 .screen-frame { display: flex; align-items: center; gap: 6px; padding: 9px 12px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
-.screen-frame .term-dot { background: var(--line); }
 .screen-shot { display: block; width: 100%; height: auto; background: var(--code-bg); }
 .screen-body, .bento-body { padding: 20px 22px 24px; }
 .screen-tag {
