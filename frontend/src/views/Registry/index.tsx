@@ -31,16 +31,33 @@ export default function Registry() {
     () => Array.from(new Set(models.map((m) => m.provider))).sort(),
     [models],
   );
+  // The most recent date any priced entry was checked against its
+  // provider's actual page -- not every entry shares one date, so the
+  // true statement is "at least this recently," not "as of exactly this
+  // day." See docs/registry-refresh.md for the refresh procedure.
+  const latestPricingVerification = useMemo(() => {
+    const dates = models
+      .map((m) => m.pricing_verified_on)
+      .filter((d): d is string => d !== null);
+    return dates.length > 0 ? dates.reduce((a, b) => (a > b ? a : b)) : null;
+  }, [models]);
   const visible =
     activeProvider === "All" ? models : models.filter((m) => m.provider === activeProvider);
 
   return (
     <div className="flex flex-col gap-5 p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <p className="type-body text-muted-foreground">
-          {models.length} models across {providers.length} providers. Locally stored
-          pricing data.
-        </p>
+        <div>
+          <p className="type-body text-muted-foreground">
+            {models.length} models across {providers.length} providers. Locally stored
+            pricing data.
+          </p>
+          {latestPricingVerification && (
+            <p className="type-small text-muted-foreground">
+              Prices verified {latestPricingVerification}
+            </p>
+          )}
+        </div>
         <ProviderFilter
           providers={providers}
           active={activeProvider}

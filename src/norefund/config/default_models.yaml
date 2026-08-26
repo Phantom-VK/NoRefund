@@ -123,6 +123,24 @@
   pricing_note: "Off-peak (all hours except 01:00-04:00 and 06:00-10:00 UTC Mon-Fri) halves both rates to $0.22/$0.66."
   pricing_verified_on: "2026-08-26"
 
+- id: deepseek:deepseek-v3
+  display_name: "DeepSeek V3 (self-hosted)"
+  provider: "DeepSeek"
+  tokenizer_backend: "hf"
+  # Separate from deepseek:deepseek-v4-flash above -- V3 is superseded as
+  # a hosted API product (delisted from DeepSeek's own pricing page) but
+  # remains a real, self-hostable open-weight model with its own
+  # model_architectures.yaml entry (MLA parameters, kv_lora_rank=512),
+  # which needs a matching entry here or the Fit Check has nothing to
+  # look up. Zero-priced since nobody pays DeepSeek per-token to run
+  # their own weights.
+  tokenizer_name: "deepseek-ai/DeepSeek-V3"
+  context_window: 163840  # matches model_architectures.yaml's max_context_length
+  input_price_per_million: 0.00
+  output_price_per_million: 0.00
+  currency: "USD"
+  docs_url: "https://huggingface.co/deepseek-ai/DeepSeek-V3"
+
 - id: meta:llama-3-8b
   display_name: "Llama 3 8B (self-hosted)"
   provider: "Meta"
