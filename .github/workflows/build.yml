@@ -1,0 +1,153 @@
+name: Build
+
+# Cross-OS build verification on every PR and every push to main -- a
+# lighter-weight, continuous companion to release.yml's tag-triggered
+# release builds. Catches "the frozen build doesn't actually launch" the
+# same day it's introduced, not the next time someone cuts a release.
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Linux GTK/WebKit dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 update -y
+          sudo apt-get install -y \
+            python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 xvfb \
+            libgirepository1.0-dev libgirepository-2.0-dev libcairo2-dev \
+            pkg-config python3-dev
+
+      - name: Install project
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            pip install -e ".[dev,linux]"
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            pip install -e ".[dev,macos]"
+          else
+            pip install -e ".[dev]"
+          fi
+
+      - name: Frontend typecheck, test, build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+
+      - name: Python tests
+        shell: bash
+        timeout-minutes: 8
+        run: |
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            xvfb-run --auto-servernum pytest
+          else
+            pytest
+          fi
+
+      - name: Lint
+        run: ruff check src/
+
+      - name: Build frozen app
+        run: python packaging/build.py --skip-frontend
+
+      - name: Smoke test the binary actually launches (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          # No --version flag; with no args the app opens the GUI and
+          # blocks, so give it 5s under a virtual display and kill it.
+          # A clean launch exits 124 (timeout killed it); any other code
+          # means it crashed on startup -- this is exactly the class of
+          # bug (Gdk.Display.get_default() returning None) that compiles
+          # fine and only shows up when the frozen build actually runs.
+          set +e
+          xvfb-run --auto-servernum timeout 5 ./dist/NoRefund/NoRefund
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ] && [ "$code" -ne 124 ]; then
+            echo "::error::NoRefund exited with code $code within 5s instead of staying up — the frozen build is broken."
+            exit 1
+          fi
+
+      - name: Smoke test the binary actually launches (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $proc = Start-Process -FilePath "dist\NoRefund\NoRefund.exe" -PassThru
+          Start-Sleep -Seconds 5
+          if ($proc.HasExited) {
+            Write-Error "NoRefund.exe exited within 5s (exit code $($proc.ExitCode)) instead of staying up — the frozen build is broken."
+            exit 1
+          }
+          Stop-Process -Id $proc.Id -Force
+
+      - name: Smoke test the binary actually launches (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          # py2app names the bundle executable after the plist, not
+          # assumed to match "NoRefund" -- read it back rather than
+          # guessing, same reasoning as the dynamic lookup below.
+          EXE=$(plutil -extract CFBundleExecutable raw dist/NoRefund.app/Contents/Info.plist)
+          "dist/NoRefund.app/Contents/MacOS/$EXE" &
+          PID=$!
+          sleep 5
+          if ! kill -0 "$PID" 2>/dev/null; then
+            echo "::error::NoRefund.app exited within 5s instead of staying up — the frozen build is broken."
+            exit 1
+          fi
+          kill "$PID"
+
+      - name: Package artifact (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: tar -czf NoRefund-linux-x86_64.tar.gz -C dist NoRefund
+
+      - name: Package artifact (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          codesign --force --deep --sign - dist/NoRefund.app
+          tar -czf NoRefund-macos.tar.gz -C dist NoRefund.app
+
+      - uses: actions/upload-artifact@v7
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          name: linux-build
+          path: NoRefund-linux-x86_64.tar.gz
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        if: matrix.os == 'windows-latest'
+        with:
+          name: windows-build
+          path: dist/NoRefund
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        if: matrix.os == 'macos-latest'
+        with:
+          name: macos-build
+          path: NoRefund-macos.tar.gz
+          if-no-files-found: error

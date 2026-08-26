@@ -17,6 +17,43 @@ from norefund.core.paths import tiktoken_cache_dir
 if "TIKTOKEN_CACHE_DIR" not in os.environ:
     os.environ["TIKTOKEN_CACHE_DIR"] = str(tiktoken_cache_dir())
 
+# PyInstaller's own gi runtime hook points GI_TYPELIB_PATH at the frozen
+# bundle's gi_typelibs/ dir unconditionally, even when its build-time hook
+# found nothing to put there (a PyInstaller/PyGObject version mismatch can
+# make that introspection silently fail). That then hides the system's
+# real typelibs instead of falling back to them, and GTK/WebKitGTK can't
+# find a display at all. WebKitGTK is a system dependency by design (see
+# missing_runtime_message() below) and was never meant to be bundled, so
+# undo the override before `gi` reads it -- but only when it's genuinely
+# empty, so a build where the hook did succeed is left alone.
+_typelib_dir = os.environ.get("GI_TYPELIB_PATH")
+if _typelib_dir and not (os.path.isdir(_typelib_dir) and os.listdir(_typelib_dir)):
+    os.environ.pop("GI_TYPELIB_PATH")
+
+
+def _unblock_frozen_bundle() -> None:
+    """Remove Windows' "downloaded from the internet" tag from our files.
+
+    Extracting a build downloaded from GitHub tags every file with a
+    Zone.Identifier stream. .NET Framework then refuses to load pythonnet's
+    DLL from a tagged file, crashing before the app can even start (a
+    locally built .exe never gets tagged, so this only bites downloaded
+    builds). Clearing the tag here, before pythonnet loads, avoids that.
+    """
+    if not getattr(sys, "frozen", False):
+        return
+    bundle_dir = Path(sys.executable).parent
+    for file_path in bundle_dir.rglob("*"):
+        if file_path.is_file():
+            try:
+                os.remove(f"{file_path}:Zone.Identifier")
+            except OSError:
+                pass  # not tagged, or couldn't remove it -- either way, move on
+
+
+if sys.platform == "win32":
+    _unblock_frozen_bundle()
+
 import webview  # noqa: E402
 
 from norefund.core.paths import bundled_resource  # noqa: E402
@@ -88,11 +125,19 @@ def missing_runtime_message() -> str | None:
     if sys.platform == "win32":
         try:
             import clr  # noqa: F401
-        except ImportError:
+        except Exception:
+            # Broad on purpose -- missing WebView2 raises ImportError, but
+            # pythonnet failing to load its .NET host raises other types
+            # too. Either way the app can't start; show a message instead
+            # of a raw traceback.
             return (
                 "NoRefund needs the Microsoft Edge WebView2 runtime.\n\n"
                 "Download it from:\n"
-                "  https://developer.microsoft.com/microsoft-edge/webview2/"
+                "  https://developer.microsoft.com/microsoft-edge/webview2/\n\n"
+                "If that's already installed, this build's files may be "
+                "blocked as downloaded from the internet -- right-click the "
+                "extracted folder, choose Properties, and click Unblock "
+                "(or re-download and extract again)."
             )
     return None
 

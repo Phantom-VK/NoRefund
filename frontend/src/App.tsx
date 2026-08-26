@@ -12,7 +12,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { useShortcuts } from "@/hooks/useShortcuts";
 import { useJob } from "@/hooks/useJob";
 import { useTheme, type ThemeMode } from "@/hooks/useTheme";
-import { bridge, bridgeReady, BridgeError } from "@/lib/bridge";
+import { bridge, BridgeError } from "@/lib/bridge";
 import type { ExchangeRates, ModelInfo, ResourceReport } from "@/lib/types";
 
 import Calculator from "@/views/Calculator";
@@ -49,8 +49,7 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    bridgeReady()
-      .then(() => Promise.all([bridge.getModels(), bridge.getExchangeRates()]))
+    Promise.all([bridge.getModels(), bridge.getExchangeRates()])
       .then(([m, rates]) => {
         if (cancelled) return;
         setModels(m);

@@ -10,7 +10,7 @@ readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.12"
 authors = [
-    { name = "Vikramaditya Khupse", email = "" }
+    { name = "Vikramaditya Khupse" }
 ]
 keywords = ["llm", "tokens", "cost", "ai", "desktop"]
 classifiers = [
@@ -47,6 +47,19 @@ dnd = [
 ]
 linux = [
     "pygobject>=3.50",
+]
+macos = [
+    # py2app 0.28.9+ hard-fails with "install_requires is no longer
+    # supported" the moment ANY pyproject.toml with a [project.dependencies]
+    # table exists anywhere setuptools' own auto-discovery can find one --
+    # this project's own, not anything macos_setup.py passes to setup().
+    # Upstream bug, open as of this pin:
+    # https://github.com/ronaldoussoren/py2app/issues/560
+    "py2app>=0.28,<0.28.9",
+    # py2app 0.28.8 still imports pkg_resources directly; setuptools removed
+    # it entirely in v82.0.0 (the setuptools maintainers' own recommendation
+    # for anyone still needing it: pin setuptools<81).
+    "setuptools<81",
 ]
 
 [project.scripts]

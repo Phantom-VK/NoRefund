@@ -20,7 +20,7 @@ jobs:
     outputs:
       version: ${{ steps.resolve.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Resolve version
         id: resolve
@@ -48,27 +48,40 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
-      - name: Install project
-        run: pip install -e .[dev]
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: Build with PyInstaller
-        run: pyinstaller packaging/norefund.spec --distpath dist --workpath build --noconfirm
+      - name: Install Linux GTK/WebKit dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 update -y
+          sudo apt-get install -y \
+            python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 xvfb \
+            libgirepository1.0-dev libgirepository-2.0-dev libcairo2-dev \
+            pkg-config python3-dev
+
+      - name: Install project
+        run: pip install -e ".[dev,linux]"
+
+      - name: Build
+        run: python packaging/build.py
 
       - name: Smoke test the binary actually launches
         run: |
           # There's no --version flag; with no args the app opens the GUI
-          # and blocks in mainloop(), so give it 5s under a virtual display
-          # and kill it. A clean launch exits 124 (timeout killed it); any
-          # other code means it crashed on startup (this is exactly how the
-          # PIL._tkinter_finder packaging bug was first caught).
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 update -y
-          sudo apt-get install -y xvfb
+          # and blocks, so give it 5s under a virtual display and kill it.
+          # A clean launch exits 124 (timeout killed it); any other code
+          # means it crashed on startup -- this is exactly the class of bug
+          # (Gdk.Display.get_default() returning None; see docs/packaging.md)
+          # that compiles fine and only shows up when the frozen build runs.
           set +e
           xvfb-run --auto-servernum timeout 5 ./dist/NoRefund/NoRefund
           code=$?
@@ -83,7 +96,7 @@ jobs:
           VERSION="${{ needs.version.outputs.version }}"
           tar -czf "NoRefund-${VERSION}-linux-x86_64.tar.gz" -C dist NoRefund
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux-build
           path: NoRefund-*-linux-x86_64.tar.gz
@@ -93,11 +106,17 @@ jobs:
     needs: version
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install project
         run: pip install -e .[dev]
@@ -105,8 +124,8 @@ jobs:
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
 
-      - name: Build with PyInstaller
-        run: pyinstaller packaging\norefund.spec --distpath dist --workpath build --noconfirm
+      - name: Build
+        run: python packaging\build.py
 
       - name: Smoke test the binary actually launches
         shell: pwsh
@@ -125,22 +144,77 @@ jobs:
           $version = "${{ needs.version.outputs.version }}"
           iscc "/DMyAppVersion=$version" packaging\windows\installer.iss
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-build
           path: packaging/windows/dist/NoRefund-Setup-*.exe
           if-no-files-found: error
 
+  build-macos:
+    needs: version
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install project
+        run: pip install -e ".[dev,macos]"
+
+      - name: Build
+        run: python packaging/build.py
+
+      - name: Smoke test the binary actually launches
+        run: |
+          # py2app names the bundle executable after the plist, not
+          # assumed to match "NoRefund" -- read it back rather than
+          # guessing (see build.yml's matching macOS smoke test).
+          EXE=$(plutil -extract CFBundleExecutable raw dist/NoRefund.app/Contents/Info.plist)
+          "dist/NoRefund.app/Contents/MacOS/$EXE" &
+          PID=$!
+          sleep 5
+          if ! kill -0 "$PID" 2>/dev/null; then
+            echo "::error::NoRefund.app exited within 5s instead of staying up — the frozen build is broken."
+            exit 1
+          fi
+          kill "$PID"
+
+      - name: Ad-hoc sign and package tarball
+        run: |
+          # No Apple Developer ID ($99/yr) -- ad-hoc signing is the free
+          # option. It quiets Gatekeeper's outright refusal to launch but
+          # not the "is damaged" first-run dialog; see packaging/README.md
+          # for the xattr -cr workaround end users need until this project
+          # can afford real notarization.
+          VERSION="${{ needs.version.outputs.version }}"
+          codesign --force --deep --sign - dist/NoRefund.app
+          tar -czf "NoRefund-${VERSION}-macos.tar.gz" -C dist NoRefund.app
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-build
+          path: NoRefund-*-macos.tar.gz
+          if-no-files-found: error
+
   release:
-    needs: [version, build-linux, build-windows]
+    needs: [version, build-linux, build-windows, build-macos]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
 
@@ -151,5 +225,6 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             artifacts/linux-build/* \
             artifacts/windows-build/* \
+            artifacts/macos-build/* \
             --title "NoRefund ${{ github.ref_name }}" \
             --generate-notes

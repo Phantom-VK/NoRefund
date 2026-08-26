@@ -41,9 +41,14 @@ def test_nested_dataclasses_are_converted_recursively():
 
 
 def test_tuples_become_lists_and_paths_become_strings():
-    out = to_jsonable({"warnings": ("a", "b"), "p": Path("/tmp/x.pdf")})
+    original = Path("/tmp/x.pdf")
+    out = to_jsonable({"warnings": ("a", "b"), "p": original})
     assert out["warnings"] == ["a", "b"]
-    assert out["p"] == "/tmp/x.pdf"
+    assert isinstance(out["p"], str)
+    # Native separators are correct here (Windows users should see
+    # backslash paths, not a posix path forced on them) -- so compare via
+    # round-trip rather than hardcoding a posix literal.
+    assert Path(out["p"]) == original
 
 
 def test_datetimes_become_iso_strings():

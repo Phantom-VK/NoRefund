@@ -239,3 +239,4 @@ docs/superpowers/
 # swallow the frontend's own src/lib/ directory.
 !/frontend/src/lib/
 !/frontend/src/lib/**
+/graphify-out/

@@ -25,8 +25,14 @@ export class BridgeError extends Error {}
 /** The one place the bridge's return type is unchecked — narrowed
  *  immediately below via the `ok`/`error` envelope check. */
 async function call<T>(method: string, ...args: unknown[]): Promise<T> {
-  const api = window.pywebview?.api;
-  if (!api) throw new BridgeError("Python bridge is not ready");
+  // pywebview injects window.pywebview.api asynchronously, on its own
+  // schedule relative to React mounting -- a call made the instant a
+  // component mounts can easily lose that race. Waiting here, once, means
+  // no call site has to remember to do it (a prior version required each
+  // caller to await bridgeReady() itself; the one that didn't shipped a
+  // silent bridge failure disguised as an infinite loading spinner).
+  await bridgeReady();
+  const api = window.pywebview!.api;
   const fn = api[method];
   if (!fn) throw new BridgeError(`Unknown bridge method: ${method}`);
   const raw = (await fn(...args)) as Envelope<T>;
