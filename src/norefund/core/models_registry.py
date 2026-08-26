@@ -33,6 +33,7 @@ class ModelInfo:
     long_context_input_price_per_million: float | None = None
     long_context_output_price_per_million: float | None = None
     pricing_note: str | None = None  # e.g. DeepSeek's off-peak halving
+    pricing_verified_on: str | None = None  # ISO date a human read the pricing page
 
 
 def load_models(path: Path = _DEFAULT_REGISTRY_PATH) -> dict[str, ModelInfo]:

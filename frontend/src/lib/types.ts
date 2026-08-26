@@ -20,6 +20,7 @@ export interface ModelInfo {
   long_context_input_price_per_million: number | null;
   long_context_output_price_per_million: number | null;
   pricing_note: string | null;
+  pricing_verified_on: string | null;
 }
 
 export interface AnalysisResult {

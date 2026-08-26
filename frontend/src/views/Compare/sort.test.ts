@@ -19,6 +19,7 @@ function model(id: string): ModelInfo {
     long_context_input_price_per_million: null,
     long_context_output_price_per_million: null,
     pricing_note: null,
+    pricing_verified_on: null,
   };
 }
 
