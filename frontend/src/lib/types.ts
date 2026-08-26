@@ -16,6 +16,10 @@ export interface ModelInfo {
   currency: string;
   docs_url: string | null;
   tokenizer_is_approximate: boolean;
+  long_context_threshold: number | null;
+  long_context_input_price_per_million: number | null;
+  long_context_output_price_per_million: number | null;
+  pricing_note: string | null;
 }
 
 export interface AnalysisResult {

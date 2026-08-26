@@ -83,7 +83,9 @@ def _build_comparison(
         min_chunks_needed=min_chunks(token_count, model.context_window),
         output_tokens=output_tokens,
         input_cost=compute_input_cost(token_count, model),
-        output_cost=compute_output_cost(output_tokens, model),
+        output_cost=compute_output_cost(
+            output_tokens, model, prompt_token_count=token_count
+        ),
         total_cost=compute_total_cost(token_count, output_tokens, model),
         tokenizer_is_approximate=model.tokenizer_is_approximate,
         error=None,

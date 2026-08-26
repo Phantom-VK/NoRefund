@@ -10,7 +10,22 @@ import {
 } from "./costing";
 
 // Mirrors tests/test_costing.py's _MODEL.
-const MODEL = { input_price_per_million: 2.0, output_price_per_million: 8.0 };
+const MODEL = {
+  input_price_per_million: 2.0,
+  output_price_per_million: 8.0,
+  long_context_threshold: null,
+  long_context_input_price_per_million: null,
+  long_context_output_price_per_million: null,
+};
+
+// Mirrors tests/test_costing.py's _TIERED_MODEL.
+const TIERED_MODEL = {
+  input_price_per_million: 2.0,
+  output_price_per_million: 8.0,
+  long_context_threshold: 200_000,
+  long_context_input_price_per_million: 4.0,
+  long_context_output_price_per_million: 16.0,
+};
 
 describe("contextUsagePct", () => {
   it("is null when the window is zero", () => {
@@ -64,11 +79,48 @@ describe("inputCost / outputCost / totalCost", () => {
     expect(outputCost(1_000_000, MODEL)).toBeCloseTo(8.0);
   });
   it("is zero for a free model", () => {
-    const free = { input_price_per_million: 0, output_price_per_million: 0 };
+    const free = {
+      input_price_per_million: 0,
+      output_price_per_million: 0,
+      long_context_threshold: null,
+      long_context_input_price_per_million: null,
+      long_context_output_price_per_million: null,
+    };
     expect(inputCost(100_000, free)).toBe(0);
   });
   it("sums input and output", () => {
     expect(totalCost(1_000_000, 1_000_000, MODEL)).toBeCloseTo(10.0);
+  });
+});
+
+describe("context-tiered pricing", () => {
+  it("uses the short rate exactly at the threshold", () => {
+    expect(inputCost(200_000, TIERED_MODEL)).toBeCloseTo((200_000 / 1_000_000) * 2.0);
+  });
+  it("uses the short rate just below the threshold", () => {
+    expect(inputCost(199_999, TIERED_MODEL)).toBeCloseTo((199_999 / 1_000_000) * 2.0);
+  });
+  it("uses the long rate just above the threshold", () => {
+    expect(inputCost(200_001, TIERED_MODEL)).toBeCloseTo((200_001 / 1_000_000) * 4.0);
+  });
+  it("tiers output cost by prompt size, not output size", () => {
+    const cost = outputCost(500_000, TIERED_MODEL, 1_000);
+    expect(cost).toBeCloseTo((500_000 / 1_000_000) * 8.0);
+  });
+  it("uses the long output rate when the prompt crosses the threshold", () => {
+    const cost = outputCost(1_000, TIERED_MODEL, 200_001);
+    expect(cost).toBeCloseTo((1_000 / 1_000_000) * 16.0);
+  });
+  it("defaults the prompt size to the output's own count when omitted", () => {
+    expect(outputCost(200_001, TIERED_MODEL)).toBeCloseTo((200_001 / 1_000_000) * 16.0);
+  });
+  it("totalCost tiers output by the input size", () => {
+    const cost = totalCost(300_000, 1_000, TIERED_MODEL);
+    const expected = (300_000 / 1_000_000) * 4.0 + (1_000 / 1_000_000) * 16.0;
+    expect(cost).toBeCloseTo(expected);
+  });
+  it("is a no-op for a model with no tier fields", () => {
+    expect(inputCost(10_000_000, MODEL)).toBeCloseTo((10_000_000 / 1_000_000) * 2.0);
   });
 });
 

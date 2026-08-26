@@ -27,6 +27,12 @@ class ModelInfo:
     currency: str = "USD"
     docs_url: str | None = None   # Optional link to provider pricing/docs page
     tokenizer_is_approximate: bool = False  # True when no real local tokenizer exists
+    # Context-tiered pricing (OpenAI, Google): prompts above this many tokens
+    # bill at the long_context_* rate instead. None means flat pricing.
+    long_context_threshold: int | None = None
+    long_context_input_price_per_million: float | None = None
+    long_context_output_price_per_million: float | None = None
+    pricing_note: str | None = None  # e.g. DeepSeek's off-peak halving
 
 
 def load_models(path: Path = _DEFAULT_REGISTRY_PATH) -> dict[str, ModelInfo]:

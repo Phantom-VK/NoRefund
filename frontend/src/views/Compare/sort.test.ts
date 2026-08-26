@@ -15,6 +15,10 @@ function model(id: string): ModelInfo {
     currency: "USD",
     docs_url: null,
     tokenizer_is_approximate: false,
+    long_context_threshold: null,
+    long_context_input_price_per_million: null,
+    long_context_output_price_per_million: null,
+    pricing_note: null,
   };
 }
 
