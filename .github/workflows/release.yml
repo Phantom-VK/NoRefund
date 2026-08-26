@@ -80,7 +80,7 @@ jobs:
           # and blocks, so give it 5s under a virtual display and kill it.
           # A clean launch exits 124 (timeout killed it); any other code
           # means it crashed on startup -- this is exactly the class of bug
-          # (Gdk.Display.get_default() returning None; see docs/packaging.md)
+          # (Gdk.Display.get_default() returning None; see packaging/README.md)
           # that compiles fine and only shows up when the frozen build runs.
           set +e
           xvfb-run --auto-servernum timeout 5 ./dist/NoRefund/NoRefund

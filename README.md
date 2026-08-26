@@ -1,41 +1,68 @@
 # NoRefund
 
-> **Know before you run. Because APIs don't care about your feelings.**
+> **Know before you run. Because APIs don't care about your money.**
 
-NoRefund is a free, open-source, desktop-first utility for AI engineers.
-It counts tokens in documents (PDF, PPTX, DOCX, TXT, MD, etc.) and estimates the cost
-of running them through any major LLM — before you make a single API call.
+![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue?logo=python&logoColor=white)
+![React](https://img.shields.io/badge/react-18.3-61DAFB?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/typescript-5.6-3178C6?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/vite-6-646CFF?logo=vite&logoColor=white)
+![pywebview](https://img.shields.io/badge/pywebview-6.2-3776AB)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
+[![CI](https://github.com/Phantom-VK/NoRefund/actions/workflows/ci.yml/badge.svg)](https://github.com/Phantom-VK/NoRefund/actions/workflows/ci.yml)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](docs/CONTRIBUTING.md)
+[![Issues](https://img.shields.io/github/issues/Phantom-VK/NoRefund)](https://github.com/Phantom-VK/NoRefund/issues)
+
+NoRefund is a free, open-source, desktop-first utility for AI engineers. It counts
+tokens in documents (PDF, PPTX, DOCX, TXT, MD) as well as folders and estimates the cost of running them
+through any major LLM - before you make a single API call. Analysis is 100% local: your
+documents never leave your machine. Network access is used only when you explicitly
+download a tokenizer or refresh currency rates.
 
 ---
 
-## Why NoRefund?
+## Why it exists
 
-APIs charge you the moment tokens run. No refund, no mercy.
-NoRefund tells you exactly how many tokens your document will consume, whether it fits in
-a model's context window, and what it will cost.
+Most online token counters ask you to paste your text into a website. That is fine for
+a short paragraph, but not for a client contract, an internal report, or anything you
+are not supposed to hand to a random server. Here is where that actually shows up in
+real work.
 
-Analysis is 100% local — your documents never leave your machine. Network access is
-used only when you explicitly download a tokenizer, from the app's Resources view.
+- **Before building a pipeline that reads documents automatically.** Check whether a
+  batch of files will actually fit inside a model's context window before writing a
+  single line of chunking code.
+- **Before the API bill gets bigger than planned.** Estimate the cost of processing a
+  whole folder of reports across a few different models, and pick the cheapest one that
+  still does the job.
+- **When the documents are confidential.** Legal contracts, HR files, financial reports,
+  anything you would not paste into a public website, can still be measured accurately
+  and privately.
+- **When choosing between providers.** Compare OpenAI, Anthropic, Google, and other
+  providers side by side on the exact same document, sorted by price, instead of
+  guessing from memory.
+- **A quick check before a demo or a deadline.** Five minutes before presenting, you
+  want a straight answer: will this file actually fit, or will the model cut it off
+  halfway through?
+- **Before renting or buying a GPU to self-host a model.** Fit Check estimates whether
+  an open-weight model's weights, KV cache, and activations actually fit in a given
+  card's VRAM before you commit to hardware.
 
 ---
 
 ## Features
 
-- Parse PDF, PPTX, DOCX, TXT, MD files
-- Count tokens for 21 models across 7 providers (OpenAI, Anthropic, Google, DeepSeek,
-  Meta, Mistral, Qwen)
-- Context window usage percentage with fit/chunk analysis
-- Compare cost and context fit across multiple models side by side, with per-model and
-  portfolio cost projection
-- Self-Host Fit Check: estimate whether an open-weight model actually fits on your own
-  GPU, Apple Silicon Mac, or cloud instance, given quantization, KV cache precision,
-  context length, and concurrency
-- Local cost estimation per model, with no data ever sent anywhere
+- Parse any PDF, PPTX, DOCX, TXT, MD files single or select a directory.
+- Count tokens against real tokenizers for 21 models across 7 providers (Count may vary as software develops and we add more models)
+- Context window usage and fit/chunk analysis
+- Compare cost and context fit across multiple models, with portfolio cost projection
+- Self-Host Fit Check: does an open-weight model fit on your own GPU, Apple Silicon Mac,
+  or cloud instance?
 - Model Registry: browse every supported model's context window, pricing, and
-  architecture details
-- Resources view: see which tokenizers are downloaded, where they live on disk, and
-  their size, with a one-click download for anything missing
+  architecture
+- Resources view: manage downloaded tokenizers, one-click download for anything missing
 - CLI and a native desktop app (React + pywebview) for Windows, macOS, and Linux
+
+Built with Python, React, TypeScript, and pywebview.
 
 ---
 
@@ -45,15 +72,12 @@ Prebuilt Windows, macOS, and Linux builds are on the
 [Releases page](https://github.com/Phantom-VK/NoRefund/releases) — no Python install
 required.
 
-**Windows SmartScreen:** NoRefund isn't code-signed (a signing certificate costs money
-this free project doesn't have), so Windows shows a "Windows protected your PC" warning
-the first time you run it. Click **More info → Run anyway** to continue. This warning
-means the publisher isn't verified, not that the app is unsafe — the source is right
-here in this repo.
+**Windows SmartScreen:** NoRefund isn't code-signed yet, so Windows shows a "Windows protected your PC" warning
+the first time you run it. Click **More info → Run anyway** to continue.
 
 **macOS Gatekeeper:** for the same reason, macOS may refuse to open the app with an
 "is damaged and can't be opened" dialog. Run `xattr -cr NoRefund.app` in Terminal after
-extracting it — see `packaging/README.md` for details.
+extracting it — see [`packaging/README.md`](packaging/README.md) for details.
 
 ---
 
@@ -65,55 +89,34 @@ pip install -e ".[dev]"
 cd frontend && npm install && npm run build && cd ..
 
 # CLI
-norefund path/to/file.pdf --model openai:gpt-4o
+norefund path/to/file.pdf --model openai:gpt-5.6-sol
 
 # Desktop app
 norefund --gui
 ```
 
-For frontend development with hot reload, see `CLAUDE.md`'s Commands section.
+For hot-reloading frontend development, see [Contributing](docs/CONTRIBUTING.md).
 
 ---
 
-## Project Structure
+## Documentation
 
-```
-src/norefund/
-  main.py              # CLI entry point + GUI launch
-  desktop/             # pywebview shell and JS bridge (api.py, app.py, dto.py, jobs.py)
-  core/
-    parsing.py         # Document text extraction
-    tokenization.py    # Tokenizer backends
-    costing.py         # Cost & context calculations
-    models_registry.py # Model/pricing config
-    service.py         # Orchestration
-  config/
-    default_models.yaml  # Local model registry
-frontend/               # React UI (Calculator, Parser, Compare, Fit Check, Registry, Resources)
-tests/
-```
+| Doc | What's in it |
+|---|---|
+| [Architecture](docs/ARCHITECTURE.md) | How `core`/`desktop`/`frontend` fit together, the bridge contract, request flow |
+| [Mathematics](docs/MATHEMATICS.md) | Every cost, context-fit, and self-host memory formula, derived |
+| [Data Sources](docs/DATA_SOURCES.md) | Where model pricing & architecture data comes from, and how it's verified |
+| [Project Structure](docs/PROJECT_STRUCTURE.md) | Directory-by-directory map of the repo |
+| [Contributing](docs/CONTRIBUTING.md) | Dev setup, conventions, tests, how to open a PR |
 
 ---
 
-## Supported Models
+## Open Source
 
-21 models across 7 providers — OpenAI, Anthropic, Google, DeepSeek, Meta, Mistral, and
-Qwen, spanning both hosted API models and self-hosted open-weight models. The
-in-app **Model Registry** view is the source of truth for the current list, context
-windows, and pricing (`config/default_models.yaml` backs it, so it never drifts from
-what the app actually uses).
-
-**Tokenizer accuracy:** OpenAI models, DeepSeek V3, Llama, Qwen, and Mistral use each
-provider's real tokenizer. Anthropic and Google don't publish a local tokenizer for
-Claude or Gemini, so those counts are a `cl100k_base` approximation — the app marks
-them `(approx.)` wherever they're shown.
-
-**Tokenizer downloads:** the first time you use a given tokenizer, NoRefund needs its
-vocab files cached locally (one-time, requires internet). Open the **Resources** view
-in the app to see what's downloaded, where it's stored on disk, how much space it
-takes, and to download anything missing with one click. Once cached, NoRefund never
-touches the network again for that tokenizer. If it isn't cached yet, NoRefund raises
-a clear error pointing you to the Resources view instead of silently downloading it.
+NoRefund is open source and welcomes contributions. New issues and feature requests
+are always open — see the [issue tracker](https://github.com/Phantom-VK/NoRefund/issues)
+to report a bug or suggest something, and [Contributing](docs/CONTRIBUTING.md) to get
+started on a PR.
 
 ---
 

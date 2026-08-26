@@ -9,7 +9,7 @@
 # Output lands in dist/NoRefund/ (one-dir build -- an executable plus its
 # dependencies, not a single-file bundle). The frontend must already be
 # built at src/norefund/web/ (packaging/build.py does this automatically;
-# a direct pyinstaller invocation does not). See docs/packaging.md for the
+# a direct pyinstaller invocation does not). See packaging/README.md for the
 # rationale behind one-dir, the hiddenimports, and why tokenizer caches are
 # never bundled.
 #
