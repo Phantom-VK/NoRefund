@@ -13,6 +13,8 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](docs/CONTRIBUTING.md)
 [![Issues](https://img.shields.io/github/issues/Phantom-VK/NoRefund)](https://github.com/Phantom-VK/NoRefund/issues)
 
+**[Website & user guide](https://phantom-vk.github.io/NoRefund/)**
+
 NoRefund is a free, open-source, desktop-first utility for AI engineers. It counts
 tokens in documents (PDF, PPTX, DOCX, TXT, MD) as well as folders and estimates the cost of running them
 through any major LLM - before you make a single API call. Analysis is 100% local: your
