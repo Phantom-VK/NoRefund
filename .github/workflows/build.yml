@@ -105,6 +105,22 @@ jobs:
           }
           Stop-Process -Id $proc.Id -Force
 
+      - name: Smoke test the binary actually launches (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          # py2app names the bundle executable after the plist, not
+          # assumed to match "NoRefund" -- read it back rather than
+          # guessing, same reasoning as the dynamic lookup below.
+          EXE=$(plutil -extract CFBundleExecutable raw dist/NoRefund.app/Contents/Info.plist)
+          "dist/NoRefund.app/Contents/MacOS/$EXE" &
+          PID=$!
+          sleep 5
+          if ! kill -0 "$PID" 2>/dev/null; then
+            echo "::error::NoRefund.app exited within 5s instead of staying up — the frozen build is broken."
+            exit 1
+          fi
+          kill "$PID"
+
       - name: Package artifact (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: tar -czf NoRefund-linux-x86_64.tar.gz -C dist NoRefund

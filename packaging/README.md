@@ -126,11 +126,22 @@ open dist/NoRefund.app
 **End-user requirements:** none beyond macOS 12+ -- WebKit is part of the
 OS, unlike Linux's WebKitGTK.
 
-**Known limitation:** notarisation is out of scope (it needs a paid Apple
-Developer account). The app is only ad-hoc signed, so Gatekeeper will
-block a plain double-click on first launch. End users need to
-**right-click the app -> Open**, confirm once in the dialog that appears,
-and it launches normally on every run after that.
+**Known limitation:** notarisation is out of scope for now (it needs a
+paid $99/yr Apple Developer account) -- deliberately deferred, not an
+oversight; revisit if macOS adoption justifies the cost. The app is only
+ad-hoc signed, so Gatekeeper blocks a plain double-click on first launch.
+On older macOS, **right-click the app -> Open** and confirm once in the
+dialog that appears; every run after that launches normally. On current
+macOS this often shows **"NoRefund is damaged and can't be opened"**
+instead, with no right-click override -- that message is misleading (the
+download isn't actually corrupt), and the fix is to open Terminal and run:
+
+```bash
+xattr -cr /path/to/NoRefund.app
+```
+
+This strips the quarantine flag the browser/Finder attached on download,
+after which the app opens normally on every launch.
 
 ## What is never bundled, on any platform
 

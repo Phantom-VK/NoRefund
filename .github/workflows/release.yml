@@ -150,8 +150,63 @@ jobs:
           path: packaging/windows/dist/NoRefund-Setup-*.exe
           if-no-files-found: error
 
+  build-macos:
+    needs: version
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install project
+        run: pip install -e ".[dev,macos]"
+
+      - name: Build
+        run: python packaging/build.py
+
+      - name: Smoke test the binary actually launches
+        run: |
+          # py2app names the bundle executable after the plist, not
+          # assumed to match "NoRefund" -- read it back rather than
+          # guessing (see build.yml's matching macOS smoke test).
+          EXE=$(plutil -extract CFBundleExecutable raw dist/NoRefund.app/Contents/Info.plist)
+          "dist/NoRefund.app/Contents/MacOS/$EXE" &
+          PID=$!
+          sleep 5
+          if ! kill -0 "$PID" 2>/dev/null; then
+            echo "::error::NoRefund.app exited within 5s instead of staying up — the frozen build is broken."
+            exit 1
+          fi
+          kill "$PID"
+
+      - name: Ad-hoc sign and package tarball
+        run: |
+          # No Apple Developer ID ($99/yr) -- ad-hoc signing is the free
+          # option. It quiets Gatekeeper's outright refusal to launch but
+          # not the "is damaged" first-run dialog; see packaging/README.md
+          # for the xattr -cr workaround end users need until this project
+          # can afford real notarization.
+          VERSION="${{ needs.version.outputs.version }}"
+          codesign --force --deep --sign - dist/NoRefund.app
+          tar -czf "NoRefund-${VERSION}-macos.tar.gz" -C dist NoRefund.app
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-build
+          path: NoRefund-*-macos.tar.gz
+          if-no-files-found: error
+
   release:
-    needs: [version, build-linux, build-windows]
+    needs: [version, build-linux, build-windows, build-macos]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -170,5 +225,6 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             artifacts/linux-build/* \
             artifacts/windows-build/* \
+            artifacts/macos-build/* \
             --title "NoRefund ${{ github.ref_name }}" \
             --generate-notes
