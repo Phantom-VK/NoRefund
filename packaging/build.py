@@ -22,8 +22,12 @@ MACOS_SETUP = PROJECT_ROOT / "packaging" / "macos_setup.py"
 
 
 def _run(cmd: list[str], *, cwd: Path) -> None:
+    # Windows' CreateProcess only auto-appends .exe, not .cmd -- a bare
+    # "npm" (really npm.cmd on Windows) fails with WinError 2 unless
+    # resolved through shutil.which(), which does the full PATHEXT search.
+    resolved = [shutil.which(cmd[0]) or cmd[0], *cmd[1:]]
     print(f"== {' '.join(cmd)} (in {cwd}) ==")
-    result = subprocess.run(cmd, cwd=cwd)
+    result = subprocess.run(resolved, cwd=cwd)
     if result.returncode != 0:
         print(f"FAILED: {' '.join(cmd)}", file=sys.stderr)
         raise SystemExit(result.returncode)
