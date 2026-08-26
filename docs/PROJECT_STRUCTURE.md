@@ -9,6 +9,7 @@ each one to check. For *why* the code is split this way, see
 ```
 NoRefund/
 ├── docs/
+│   ├── ADDING_A_MODEL.md
 │   ├── ARCHITECTURE.md
 │   ├── CONTRIBUTING.md
 │   ├── DATA_SOURCES.md

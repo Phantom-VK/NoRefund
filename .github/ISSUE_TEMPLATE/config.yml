@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Contributing guide
+    url: https://github.com/Phantom-VK/NoRefund/blob/main/docs/CONTRIBUTING.md
+    about: Dev setup, coding conventions, and how to open a PR.

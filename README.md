@@ -108,6 +108,7 @@ For hot-reloading frontend development, see [Contributing](docs/CONTRIBUTING.md)
 | [Architecture](docs/ARCHITECTURE.md) | How `core`/`desktop`/`frontend` fit together, the bridge contract, request flow |
 | [Mathematics](docs/MATHEMATICS.md) | Every cost, context-fit, and self-host memory formula, derived |
 | [Data Sources](docs/DATA_SOURCES.md) | Where model pricing & architecture data comes from, and how it's verified |
+| [Adding a Model](docs/ADDING_A_MODEL.md) | Field-by-field guide to adding or fixing a registry entry (pure YAML, no code) |
 | [Project Structure](docs/PROJECT_STRUCTURE.md) | Directory-by-directory map of the repo |
 | [Contributing](docs/CONTRIBUTING.md) | Dev setup, conventions, tests, how to open a PR |
 

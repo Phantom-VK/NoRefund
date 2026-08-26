@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest something NoRefund should do that it doesn't yet.
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: What are you trying to do that NoRefund currently makes hard or impossible?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should NoRefund do instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds you're using now, or other approaches you thought about.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the app is this closest to?
+      description: Best guess is fine, this is just to route the issue.
+      options:
+        - "core (parsing, tokenization, costing, self-host math)"
+        - "frontend (React UI)"
+        - "desktop (pywebview shell, bridge)"
+        - "packaging (builds, installers)"
+        - "registry data (models, pricing, architecture)"
+        - Not sure

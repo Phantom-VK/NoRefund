@@ -1,0 +1,113 @@
+name: Bug report
+description: Something isn't working the way it should.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. NoRefund's behavior depends heavily on OS, install
+        method, the model you picked, and the file type being analyzed, so please fill
+        in as much of this as you can, not just the description.
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: Install method
+      description: >
+        The packaged download has no CLI (it's a PyInstaller bundle of the desktop app);
+        pip install gives you both the CLI and, with the `[dev]` extra, the GUI.
+      options:
+        - Packaged build from the Releases page
+        - pip install
+        - Running from source (git clone)
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: App version or commit
+      description: The version shown in the app, the release filename, or `git rev-parse HEAD` if running from source.
+      placeholder: e.g. v1.2.0, or a commit hash
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Model selected
+      description: The model id as shown in the picker, e.g. `openai:gpt-5.6-sol`. Leave blank if the bug isn't model-specific.
+      placeholder: openai:gpt-5.6-sol
+
+  - type: dropdown
+    id: file-type
+    attributes:
+      label: File type being analyzed
+      description: Leave "Not applicable" if the bug isn't about analyzing a file.
+      options:
+        - PDF
+        - PPTX
+        - DOCX
+        - TXT
+        - MD
+        - Folder (multiple files)
+        - Not applicable
+
+  - type: dropdown
+    id: tokenizer-downloaded
+    attributes:
+      label: Was the tokenizer for this model already downloaded?
+      description: >
+        Check the Resources view in the app. Most tokenizer bugs only reproduce with a
+        specific cache state (missing, partial, or a stale download).
+      options:
+        - "Yes, it showed as cached in Resources"
+        - "No, it needed to download"
+        - "Not sure"
+        - Not applicable
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, and what went wrong.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the File Parser
+        2. Add a 40-page PDF
+        3. Select openai:gpt-5.6-sol
+        4. Click Analyze
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error output or logs
+      description: >
+        Paste any error text, stack trace, or console output. The app's log location is
+        documented in the desktop shell; a screenshot works too if it's a visual bug.
+      render: shell

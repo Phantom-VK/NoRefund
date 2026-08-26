@@ -3,7 +3,8 @@
 NoRefund's numbers are only as good as the registry data behind them. This page covers
 where that data comes from, what's approximate vs. exact, and the discipline used to
 keep it from silently going stale. For the *formulas* that consume this data, see
-[Mathematics](MATHEMATICS.md).
+[Mathematics](MATHEMATICS.md). For a field-by-field guide to actually adding or fixing
+an entry, see [Adding a Model](ADDING_A_MODEL.md).
 
 ## The three registry files
 

@@ -1,0 +1,48 @@
+name: Add or update a model
+description: Request a model be added to the registry, or flag one that's wrong (price, context window, tokenizer).
+title: "[Model] "
+labels: ["area:registry-data"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Adding a model is pure YAML, no Python required, see
+        [docs/ADDING_A_MODEL.md](../../docs/ADDING_A_MODEL.md) if you'd rather open the
+        PR yourself.
+
+  - type: input
+    id: model
+    attributes:
+      label: Model name and provider
+      placeholder: e.g. OpenAI GPT-5.6 Sol
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What's needed?
+      options:
+        - Add a new model
+        - Fix incorrect pricing or context window on an existing model
+        - Fix incorrect architecture data (self-host fit check) on an existing model
+    validations:
+      required: true
+
+  - type: input
+    id: pricing-page
+    attributes:
+      label: Link to the vendor's pricing or model page
+      description: The page you're reading the numbers from.
+      placeholder: https://...
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: >
+        Whatever you know: input/output price per million tokens, context window,
+        whether the provider publishes a real tokenizer, or what's wrong with an
+        existing entry.
