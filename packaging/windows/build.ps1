@@ -32,7 +32,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Inno Setup compile failed" }
 
     Write-Host "== Done ==" -ForegroundColor Green
-    Write-Host "Installer: packaging\windows\dist\NoRefund-Setup-*.exe"
+    Write-Host "Installer: packaging\windows\dist\NoRefund-*-windows-Setup.exe"
 }
 finally {
     Pop-Location

@@ -70,7 +70,7 @@ from norefund.logging_config import latest_log_file
 
 logger = logging.getLogger(__name__)
 
-_FALLBACK_VERSION = "0.1.0"
+_FALLBACK_VERSION = "1.0.0"
 
 
 def _guard(fn):

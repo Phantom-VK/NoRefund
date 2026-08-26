@@ -20,6 +20,8 @@ from pathlib import Path
 
 from setuptools import setup
 
+from norefund import __version__
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC = PROJECT_ROOT / "src" / "norefund"
 
@@ -59,8 +61,8 @@ OPTIONS = {
         "CFBundleName": "NoRefund",
         "CFBundleDisplayName": "NoRefund",
         "CFBundleIdentifier": "com.norefund.app",
-        "CFBundleVersion": "0.1.0",
-        "CFBundleShortVersionString": "0.1.0",
+        "CFBundleVersion": __version__,
+        "CFBundleShortVersionString": __version__,
         "LSMinimumSystemVersion": "12.0",
         "NSHighResolutionCapable": True,
         # No entitlements requesting network, camera, microphone or

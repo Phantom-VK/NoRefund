@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "norefund"
-version = "0.1.0"
+version = "1.0.0"
 description = "Know before you run. Token counter and cost estimator for LLMs."
 readme = "README.md"
 license = { file = "LICENSE" }

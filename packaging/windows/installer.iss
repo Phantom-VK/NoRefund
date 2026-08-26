@@ -8,11 +8,11 @@
 ; be overridden without editing this file (e.g. from CI, driven by a git
 ; tag): iscc /DMyAppVersion=1.2.3 packaging/windows/installer.iss
 ;
-; Output: packaging/windows/dist/NoRefund-Setup-<version>.exe
+; Output: packaging/windows/dist/NoRefund-<version>-windows-Setup.exe
 
 #define MyAppName "NoRefund"
 #ifndef MyAppVersion
-  #define MyAppVersion "0.1.0"
+  #define MyAppVersion "1.0.0"
 #endif
 #define MyAppPublisher "PhantomVK"
 #define MyAppExeName "NoRefund.exe"
@@ -28,7 +28,7 @@ DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=dist
-OutputBaseFilename=NoRefund-Setup-{#MyAppVersion}
+OutputBaseFilename=NoRefund-{#MyAppVersion}-windows-Setup
 Compression=lzma2
 SolidCompression=yes
 UninstallDisplayIcon={app}\{#MyAppExeName}
