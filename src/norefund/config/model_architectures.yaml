@@ -2,7 +2,10 @@
 # self-host VRAM fit calculator (core/selfhost.py).
 #
 # Every number here is copied from the model's published HuggingFace
-# config.json (linked via docs_url), not derived or guessed. In particular:
+# config.json (linked via docs_url), not derived or guessed, with one
+# exception: max_context_length for the three Qwen2.5 entries comes from
+# the model card, not config.json -- see the comment on those entries.
+# In particular:
 #
 # - head_dim is NOT always hidden_size / n_attention_heads. Gemma 2 9B is the
 #   counter-example: hidden_size=3584, n_attention_heads=16 gives 224, but
@@ -13,6 +16,27 @@
 # - total_params/active_params differ only for mixture-of-experts models
 #   (Mixtral, DeepSeek V3). See core/selfhost.py for why weight memory uses
 #   total_params, not active_params.
+
+- id: meta:llama-3-8b
+  display_name: "Llama 3 8B"
+  family: "Llama 3"
+  vendor: "Meta"
+  # The official meta-llama/Meta-Llama-3-8B repo is licence-gated, so
+  # config.json isn't fetchable without an accepted licence + HF token.
+  # Verified instead against NousResearch/Meta-Llama-3-8B and
+  # unsloth/llama-3-8b, both public mirrors carrying an identical
+  # config.json; total_params cross-checked against the mirror's own
+  # safetensors total (8030261248), not copied from this file.
+  total_params: 8030261248
+  active_params: 8030261248
+  n_layers: 32
+  n_attention_heads: 32
+  n_kv_heads: 8
+  head_dim: 128
+  hidden_size: 4096
+  max_context_length: 8192
+  attention_type: "gqa"
+  docs_url: "https://huggingface.co/meta-llama/Meta-Llama-3-8B"
 
 - id: meta:llama-3.1-8b
   display_name: "Llama 3.1 8B"
@@ -85,6 +109,9 @@
   n_kv_heads: 4
   head_dim: 128
   hidden_size: 3584
+  # config.json's native max_position_embeddings is 32768 with no
+  # rope_scaling block; 131072 is the model card's claimed extended
+  # window via YaRN, not something config.json states on its own.
   max_context_length: 131072
   attention_type: "gqa"
   docs_url: "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct"
@@ -100,6 +127,8 @@
   n_kv_heads: 8
   head_dim: 128
   hidden_size: 5120
+  # See qwen:qwen2.5-7b above -- config.json says 32768, no rope_scaling;
+  # 131072 is the model card's YaRN-extended figure.
   max_context_length: 131072
   attention_type: "gqa"
   docs_url: "https://huggingface.co/Qwen/Qwen2.5-32B-Instruct"
@@ -115,6 +144,8 @@
   n_kv_heads: 8
   head_dim: 128
   hidden_size: 8192
+  # See qwen:qwen2.5-7b above -- config.json says 32768, no rope_scaling;
+  # 131072 is the model card's YaRN-extended figure.
   max_context_length: 131072
   attention_type: "gqa"
   docs_url: "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct"

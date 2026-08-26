@@ -49,7 +49,10 @@
   vendor: "NVIDIA"
   accelerator: "NVIDIA H200"
   device_count: 1
-  memory_gib_per_device: 141.0
+  # NVIDIA markets "141 GB" but nvidia-smi reports 143771 MiB = 140.4 GiB.
+  # Follow this file's own GiB rule (see header) rather than the marketing
+  # figure -- do not "correct" this back to 141.0.
+  memory_gib_per_device: 140.4
   memory_kind: "discrete"
   usable_memory_fraction: 0.90
 

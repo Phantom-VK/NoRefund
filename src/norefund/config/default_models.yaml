@@ -84,7 +84,7 @@
   provider: "DeepSeek"
   tokenizer_backend: "hf"
   tokenizer_name: "deepseek-ai/DeepSeek-V3"
-  context_window: 128000
+  context_window: 163840  # config.json's max_position_embeddings; matches model_architectures.yaml
   input_price_per_million: 0.27
   output_price_per_million: 1.10
   currency: "USD"
@@ -105,7 +105,10 @@
   display_name: "Mistral 7B (self-hosted)"
   provider: "Mistral"
   tokenizer_backend: "hf"
-  tokenizer_name: "mistralai/Mistral-7B-v0.1"
+  # v0.3, not v0.1: v0.1's config.json has sliding_window: 4096, so its
+  # nominal 32768 context is not honestly usable; v0.3 has sliding_window:
+  # null, matching model_architectures.yaml's docs_url for this id.
+  tokenizer_name: "mistralai/Mistral-7B-Instruct-v0.3"
   context_window: 32768
   input_price_per_million: 0.00
   output_price_per_million: 0.00

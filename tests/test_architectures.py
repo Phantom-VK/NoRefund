@@ -17,10 +17,12 @@ def test_load_architectures_returns_dict_of_model_architecture():
     assert all(isinstance(a, ModelArchitecture) for a in architectures.values())
 
 
-def test_exactly_thirteen_entries():
+def test_exactly_fourteen_entries():
     # 13 rows in PLAN.md's table (Llama 3.1 70B and 3.3 70B are separate
-    # entries with identical numbers, despite the "~12 models" decision).
-    assert len(list_architectures()) == 13
+    # entries with identical numbers, despite the "~12 models" decision),
+    # plus meta:llama-3-8b (Phase 14: every self-hosted model in
+    # default_models.yaml must have an architecture entry).
+    assert len(list_architectures()) == 14
 
 
 def test_all_ids_unique():
