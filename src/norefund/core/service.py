@@ -23,7 +23,35 @@ from norefund.core.tokenization import get_tokenizer
 from norefund.logging_config import get_logger
 
 _LOG = get_logger(__name__)
-_SUPPORTED = {".txt", ".md", ".pdf", ".pptx", ".docx", ".py", ".json"}
+_SUPPORTED = {
+    ".txt",
+    ".md",
+    ".pdf",
+    ".pptx",
+    ".docx",
+    ".py",
+    ".json",
+    ".js",
+    ".ts",
+    ".tsx",
+    ".jsx",
+    ".go",
+    ".rs",
+    ".java",
+    ".c",
+    ".cpp",
+    ".h",
+    ".hpp",
+    ".html",
+    ".css",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".xml",
+    ".sql",
+    ".sh",
+    ".bash",
+}
 
 
 @dataclass

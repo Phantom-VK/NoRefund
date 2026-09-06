@@ -5,11 +5,31 @@ from pathlib import Path
 from norefund.core.parsing import SUPPORTED_EXTENSIONS, extract_text
 
 
-def test_supported_extensions_present():
-    assert ".pdf" in SUPPORTED_EXTENSIONS
-    assert ".pptx" in SUPPORTED_EXTENSIONS
-    assert ".docx" in SUPPORTED_EXTENSIONS
-    assert ".txt" in SUPPORTED_EXTENSIONS
+def test_supported_code_extensions_present():
+    expected = {
+        ".js",
+        ".ts",
+        ".tsx",
+        ".jsx",
+        ".go",
+        ".rs",
+        ".java",
+        ".c",
+        ".cpp",
+        ".h",
+        ".hpp",
+        ".html",
+        ".css",
+        ".yaml",
+        ".yml",
+        ".toml",
+        ".xml",
+        ".sql",
+        ".sh",
+        ".bash",
+    }
+
+    assert expected <= SUPPORTED_EXTENSIONS
 
 
 def test_extract_text_txt(tmp_path: Path):

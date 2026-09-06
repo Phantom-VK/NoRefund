@@ -148,6 +148,9 @@ def test_pick_files_filters_to_supported_extensions():
     (pattern,) = kwargs["file_types"]
     assert "*.pdf" in pattern
     assert "*.docx" in pattern
+    assert "*.java" in pattern
+    assert "*.js" in pattern
+    assert "*.cpp" in pattern
 
 
 def test_pick_files_returns_empty_list_when_dialog_is_cancelled():
