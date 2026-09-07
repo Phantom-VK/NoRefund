@@ -1,14 +1,25 @@
 name: Build
 
-# Cross-OS build verification on every PR and every push to main -- a
-# lighter-weight, continuous companion to release.yml's tag-triggered
-# release builds. Catches "the frozen build doesn't actually launch" the
-# same day it's introduced, not the next time someone cuts a release.
+# Cross-OS build verification on every PR and every push to main that
+# touches code -- a lighter-weight, continuous companion to release.yml's
+# tag-triggered release builds. Catches "the frozen build doesn't actually
+# launch" the same day it's introduced, not the next time someone cuts a
+# release. Docs, the marketing site, and other non-code changes skip it.
 on:
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "website/**"
+      - "LICENSE"
   push:
     branches:
       - main
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "website/**"
+      - "LICENSE"
 
 jobs:
   build:

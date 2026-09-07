@@ -1,11 +1,22 @@
 name: CI
 
-# Runs the test suite and lint on every PR and every push to main.
+# Runs the test suite and lint on every PR and every push to main that
+# touches code. Docs, the marketing site, and other non-code changes skip it.
 on:
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "website/**"
+      - "LICENSE"
   push:
     branches:
       - main
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "website/**"
+      - "LICENSE"
 
 jobs:
   test-and-lint:
