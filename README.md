@@ -81,6 +81,15 @@ the first time you run it. Click **More info → Run anyway** to continue.
 "is damaged and can't be opened" dialog. Run `xattr -cr NoRefund.app` in Terminal after
 extracting it — see [`packaging/README.md`](packaging/README.md) for details.
 
+### Or install via pip
+
+For the CLI on any platform with Python 3.12+:
+
+```bash
+pip install norefund
+norefund path/to/file.pdf --model openai:gpt-4o
+```
+
 ---
 
 ## Quick Start
