@@ -7,6 +7,10 @@ from norefund.core.parsing import SUPPORTED_EXTENSIONS, extract_text
 
 def test_supported_code_extensions_present():
     expected = {
+        ".pdf",
+        ".pptx",
+        ".docx",
+        ".txt",
         ".js",
         ".ts",
         ".tsx",

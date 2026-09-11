@@ -149,7 +149,7 @@ def test_pick_files_filters_to_supported_extensions():
     assert "*.pdf" in pattern
     assert "*.docx" in pattern
     assert "*.java" in pattern
-    assert "*.js" in pattern
+    assert "*.js;" in pattern
     assert "*.cpp" in pattern
 
 

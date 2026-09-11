@@ -6,6 +6,8 @@ JSON log lines in the per-user log directory.
 
 from __future__ import annotations
 
+from .parsing import SUPPORTED_EXTENSIONS, extract_text
+
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -23,36 +25,6 @@ from norefund.core.tokenization import get_tokenizer
 from norefund.logging_config import get_logger
 
 _LOG = get_logger(__name__)
-_SUPPORTED = {
-    ".txt",
-    ".md",
-    ".pdf",
-    ".pptx",
-    ".docx",
-    ".py",
-    ".json",
-    ".js",
-    ".ts",
-    ".tsx",
-    ".jsx",
-    ".go",
-    ".rs",
-    ".java",
-    ".c",
-    ".cpp",
-    ".h",
-    ".hpp",
-    ".html",
-    ".css",
-    ".yaml",
-    ".yml",
-    ".toml",
-    ".xml",
-    ".sql",
-    ".sh",
-    ".bash",
-}
-
 
 @dataclass
 class AnalysisResult:
@@ -165,7 +137,7 @@ def analyze_folder(
             )
             break
 
-        if not (f.is_file() and f.suffix.lower() in _SUPPORTED):
+        if not (f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS):
             continue
 
         # analyze_file already catches all exceptions internally
