@@ -68,6 +68,34 @@ Built with Python, React, TypeScript, and pywebview.
 
 ---
 
+## Screenshots
+
+**File Parser** — analyze a whole folder against a chosen model: token count, context
+fit, chunk count, and cost per file.
+
+![NoRefund's File Parser screen: a folder of real files analyzed against a chosen model, with token count, context fit, chunk count and cost per file](https://phantom-vk.github.io/NoRefund/img/file-parser.webp)
+
+**Compare Models** — the same document across every supported model, ranked cheapest
+first.
+
+![Compare Models results ranked cheapest first](https://phantom-vk.github.io/NoRefund/img/compare-models.webp)
+
+**Token Calculator** — context bar and full cost breakdown for a single input.
+
+![Token Calculator context bar and cost breakdown](https://phantom-vk.github.io/NoRefund/img/token-calculator.webp)
+
+**Model Registry** — every supported model's context window, price, and architecture,
+filterable by provider.
+
+![Model Registry showing every supported model's context window, price, and architecture, filterable by provider](https://phantom-vk.github.io/NoRefund/img/model-registry.webp)
+
+**Self-Host Fit Check** — estimate GPU VRAM headroom for an open-weight model before you
+commit to hardware.
+
+![Self-Host Fit Check estimating GPU VRAM headroom for an open-weight model](https://phantom-vk.github.io/NoRefund/img/self-host-fit-check.webp)
+
+---
+
 ## Download
 
 Prebuilt Windows, macOS, and Linux builds are on the
