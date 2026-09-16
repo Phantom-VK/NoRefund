@@ -7,7 +7,35 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_EXTENSIONS = {".pdf", ".pptx", ".docx", ".txt", ".md", ".py", ".json"}
+SUPPORTED_EXTENSIONS = {
+    ".pdf",
+    ".pptx",
+    ".docx",
+    ".txt",
+    ".md",
+    ".py",
+    ".json",
+    ".js",
+    ".ts",
+    ".tsx",
+    ".jsx",
+    ".go",
+    ".rs",
+    ".java",
+    ".c",
+    ".cpp",
+    ".h",
+    ".hpp",
+    ".html",
+    ".css",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".xml",
+    ".sql",
+    ".sh",
+    ".bash",
+}
 
 
 def extract_text(path: Path) -> str:
