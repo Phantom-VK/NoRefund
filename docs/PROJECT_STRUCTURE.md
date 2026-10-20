@@ -38,6 +38,7 @@ NoRefund/
 │   │   │   │   ├── SectionLabel.tsx
 │   │   │   │   ├── Select.tsx
 │   │   │   │   ├── SettingsModal.tsx
+│   │   │   │   ├── ShortcutsModal.tsx
 │   │   │   │   ├── Sidebar.tsx
 │   │   │   │   ├── Spinner.tsx
 │   │   │   │   ├── StatPill.tsx

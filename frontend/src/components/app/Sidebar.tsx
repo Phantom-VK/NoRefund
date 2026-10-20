@@ -4,6 +4,7 @@ import { cn } from "@/lib/cn";
 import { VIEWS, type ViewId } from "@/lib/views";
 import { useBridgeQuery } from "@/hooks/useBridge";
 import { bridge } from "@/lib/bridge";
+import { isMac } from "@/hooks/useShortcuts";
 
 export interface SidebarProps {
   activeView: ViewId;
@@ -23,6 +24,8 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
     [],
   );
 
+  const modKey = isMac ? "⌘" : "Ctrl+";
+
   return (
     <aside className="flex h-full w-[236px] shrink-0 flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex items-center gap-3 px-4 pt-5 pb-4">
@@ -41,11 +44,13 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
             <p className="type-micro px-2 pt-3 pb-1 text-muted-foreground">{section}</p>
             {items.map((item) => {
               const isActive = item.id === activeView;
+              const shortcutHint = `${modKey}${item.shortcut}`;
               return (
                 <button
                   key={item.id}
                   type="button"
                   aria-current={isActive ? "page" : undefined}
+                  title={`${item.navLabel} (${shortcutHint})`}
                   onClick={() => onNavigate(item.id)}
                   className={cn(
                     "pressable hoverable type-label flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
@@ -55,7 +60,18 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
                   )}
                 >
                   <item.icon size={16} aria-hidden="true" />
-                  <span className="truncate">{item.navLabel}</span>
+                  <span className="truncate flex-1">{item.navLabel}</span>
+                  <span
+                    className={cn(
+                      "type-micro font-mono shrink-0 tabular",
+                      isActive
+                        ? "text-muted-foreground dark:text-sidebar-accent-foreground"
+                        : "text-muted-foreground",
+                    )}
+                    aria-hidden="true"
+                  >
+                    {shortcutHint}
+                  </span>
                 </button>
               );
             })}

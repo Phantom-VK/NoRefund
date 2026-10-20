@@ -103,3 +103,25 @@ describe.each([
     ).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+describe("contrast — sidebar shortcut hints", () => {
+  it("inactive hint (muted-foreground) clears 4.5:1 on sidebar in light and dark", () => {
+    const lightRatio = contrastRatio(lightVars["muted-foreground"], lightVars["sidebar"]);
+    expect(lightRatio).toBeGreaterThanOrEqual(4.5);
+
+    const darkRatio = contrastRatio(darkVars["muted-foreground"], darkVars["sidebar"]);
+    expect(darkRatio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("active hint clears 4.5:1 on active sidebar background in light and dark", () => {
+    // Light mode: muted-foreground on sidebar-accent (#f0faf8)
+    const lightRatio = contrastRatio(lightVars["muted-foreground"], lightVars["sidebar-accent"]);
+    expect(lightRatio).toBeGreaterThanOrEqual(4.5);
+
+    // Dark mode: sidebar-accent-foreground (#00d4aa) on blended dark sidebar-accent
+    // rgba(0, 212, 170, 0.12) blended over sidebar #181c23 -> #153233
+    const darkBlendedBg = "#153233";
+    const darkRatio = contrastRatio(darkVars["sidebar-accent-foreground"], darkBlendedBg);
+    expect(darkRatio).toBeGreaterThanOrEqual(4.5);
+  });
+});
