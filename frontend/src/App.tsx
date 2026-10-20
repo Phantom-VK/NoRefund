@@ -4,6 +4,7 @@ import { Button } from "@/components/app/Button";
 import { Header } from "@/components/app/Header";
 import { Sidebar } from "@/components/app/Sidebar";
 import { SettingsModal } from "@/components/app/SettingsModal";
+import { ShortcutsModal } from "@/components/app/ShortcutsModal";
 import { NoticeBanner } from "@/components/app/NoticeBanner";
 import { Spinner } from "@/components/app/Spinner";
 import { AppContext, type AppContextValue } from "@/lib/appContext";
@@ -41,6 +42,7 @@ export default function App() {
   const [lastAnalysisTokens, setLastAnalysisTokens] = useState<number | null>(null);
   const [fileCount, setFileCount] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [noticeDismissed, setNoticeDismissed] = useState(false);
 
   const { settings, save: saveSettings } = useSettings();
@@ -121,9 +123,17 @@ export default function App() {
   }, []);
 
   useShortcuts({
-    onView: setActiveView,
+    onView: (v) => {
+      setShortcutsOpen(false);
+      setActiveView(v);
+    },
     onEscape: () => {
       if (onboardingScan.running) onboardingScan.cancel();
+    },
+    onHelp: () => {
+      if (!settingsOpen) {
+        setShortcutsOpen((prev) => !prev);
+      }
     },
   });
 
@@ -183,6 +193,7 @@ export default function App() {
             themeMode={mode}
             onToggleTheme={cycleTheme}
             onOpenSettings={() => setSettingsOpen(true)}
+            onOpenShortcuts={() => setShortcutsOpen(true)}
           />
           {showOnboardingNotice && (
             <NoticeBanner
@@ -216,6 +227,10 @@ export default function App() {
         onOpenChange={setSettingsOpen}
         settings={ctxValue.settings}
         onSave={saveSettings}
+      />
+      <ShortcutsModal
+        open={shortcutsOpen}
+        onOpenChange={setShortcutsOpen}
       />
     </AppContext.Provider>
   );

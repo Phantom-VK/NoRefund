@@ -1,4 +1,4 @@
-import { Monitor, Moon, Settings as SettingsIcon, Sun } from "lucide-react";
+import { CircleHelp, Monitor, Moon, Settings as SettingsIcon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ThemeMode } from "@/hooks/useTheme";
 
@@ -8,6 +8,7 @@ export interface HeaderProps {
   themeMode: ThemeMode;
   onToggleTheme: () => void;
   onOpenSettings: () => void;
+  onOpenShortcuts: () => void;
 }
 
 const THEME_ICON: Record<ThemeMode, typeof Sun> = {
@@ -22,6 +23,7 @@ export function Header({
   themeMode,
   onToggleTheme,
   onOpenSettings,
+  onOpenShortcuts,
 }: HeaderProps) {
   const ThemeIcon = THEME_ICON[themeMode];
 
@@ -36,6 +38,17 @@ export function Header({
         )}
       </div>
       <div className="flex items-center gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="pressable hoverable"
+          aria-label="Keyboard shortcuts (?)"
+          title="Keyboard shortcuts (?)"
+          onClick={onOpenShortcuts}
+        >
+          <CircleHelp size={16} aria-hidden="true" />
+        </Button>
         <Button
           type="button"
           variant="ghost"
